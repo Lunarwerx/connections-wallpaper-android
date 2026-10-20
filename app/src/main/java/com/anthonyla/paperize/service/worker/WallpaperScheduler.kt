@@ -13,6 +13,7 @@ import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.model.usesVisibleLiveTimer
+import com.anthonyla.paperize.service.unlock.UnlockChangeService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Duration
 import java.time.ZonedDateTime
@@ -73,18 +74,25 @@ class WallpaperScheduler @Inject constructor(
         for (screen in ScreenType.entries) {
             val interval = settings.intervalMinutes(screen)
             val handledByEngine = screen == ScreenType.LIVE && usesVisibleLiveTimer(interval)
-            if (screen in targets && interval > 0 && !handledByEngine) {
+            if (screen in targets && settings.intervalEnabled && interval > 0 && !handledByEngine) {
                 scheduleWallpaperChange(screen, interval, onlyIfNotScheduled = onlyIfNotScheduled)
             } else {
                 workManager.cancelUniqueWork(workName(screen))
             }
         }
         if (enabled) scheduleDailyAlbumRefresh(onlyIfNotScheduled) else workManager.cancelUniqueWork(Constants.WORK_NAME_REFRESH)
+        syncUnlockWatcher(settings, mode)
+    }
+
+    /** Static mode changes on unlock through [UnlockChangeService]; live mode does it in its engine. */
+    fun syncUnlockWatcher(settings: ScheduleSettings, mode: WallpaperMode) {
+        UnlockChangeService.sync(context, UnlockChangeService.wanted(settings, mode))
     }
 
     fun cancelAllWallpaperChanges() {
         ScreenType.entries.forEach { workManager.cancelUniqueWork(workName(it)) }
         workManager.cancelUniqueWork(Constants.WORK_NAME_REFRESH)
+        UnlockChangeService.sync(context, false)
     }
 
     /** Rescan folders now; KEEP coalesces rapid foreground transitions into one scan. */
@@ -128,7 +136,7 @@ internal fun scheduledScreensToReset(
     settings: ScheduleSettings,
     wallpaperMode: WallpaperMode
 ): Set<ScreenType> {
-    if (!settings.enableChanger || !settings.hasRequiredAlbums(wallpaperMode)) return emptySet()
+    if (!settings.enableChanger || !settings.intervalEnabled || !settings.hasRequiredAlbums(wallpaperMode)) return emptySet()
     return settings.activeScreens(wallpaperMode).filterTo(mutableSetOf()) { screen ->
         when (screen) {
             ScreenType.LIVE -> manualScreen == ScreenType.LIVE &&

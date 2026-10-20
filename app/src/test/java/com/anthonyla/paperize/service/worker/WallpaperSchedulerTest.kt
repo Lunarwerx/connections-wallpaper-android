@@ -12,11 +12,15 @@ import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.domain.model.ScheduleSettings
+import com.anthonyla.paperize.service.unlock.UnlockChangeService
+import io.mockk.Runs
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mockk.verify
 import java.util.concurrent.TimeUnit
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -37,6 +41,8 @@ class WallpaperSchedulerTest {
     fun setUp() {
         mockkObject(WorkManager.Companion)
         mockkStatic(Log::class)
+        mockkObject(UnlockChangeService.Companion)
+        every { UnlockChangeService.sync(any(), any()) } just Runs
         every { WorkManager.getInstance(context) } returns workManager
         every { Log.d(any(), any()) } returns 0
         every { workManager.enqueueUniquePeriodicWork(any(), any(), any()) } answers {
@@ -55,7 +61,7 @@ class WallpaperSchedulerTest {
 
     @Test fun `missing required album cancels every schedule including refresh`() = runTest {
         scheduler.updateSchedules(
-            ScheduleSettings(enableChanger = true, homeEnabled = true, lockEnabled = true, homeAlbumId = "home"),
+            ScheduleSettings(intervalEnabled = true, enableChanger = true, homeEnabled = true, lockEnabled = true, homeAlbumId = "home"),
             WallpaperMode.STATIC
         )
         assertTrue(enqueued.isEmpty())
@@ -63,9 +69,29 @@ class WallpaperSchedulerTest {
             Constants.WORK_NAME_LIVE, Constants.WORK_NAME_REFRESH), cancelled.toSet())
     }
 
+    @Test fun `timer off schedules no change job and keeps the unlock watcher on`() = runTest {
+        scheduler.updateSchedules(
+            ScheduleSettings(
+                enableChanger = true, changeOnUnlock = true, intervalEnabled = false,
+                homeEnabled = true, lockEnabled = true, homeAlbumId = "album", lockAlbumId = "album"
+            ),
+            WallpaperMode.STATIC
+        )
+        assertEquals(listOf(Constants.WORK_NAME_REFRESH), enqueued.map { it.first })
+        verify { UnlockChangeService.sync(context, true) }
+    }
+
+    @Test fun `live mode leaves change on unlock to its engine`() = runTest {
+        scheduler.updateSchedules(
+            ScheduleSettings(enableChanger = true, changeOnUnlock = true, liveAlbumId = "live"),
+            WallpaperMode.LIVE
+        )
+        verify { UnlockChangeService.sync(context, false) }
+    }
+
     @Test fun `short live intervals cancel static jobs and keep only library refresh`() = runTest {
         scheduler.updateSchedules(
-            ScheduleSettings(enableChanger = true, liveAlbumId = "live", liveIntervalMinutes = 1),
+            ScheduleSettings(intervalEnabled = true, enableChanger = true, liveAlbumId = "live", liveIntervalMinutes = 1),
             WallpaperMode.LIVE, onlyIfNotScheduled = true
         )
         assertEquals(Constants.WORK_NAME_REFRESH, enqueued.single().first)
@@ -117,7 +143,7 @@ class WallpaperSchedulerTest {
     fun `manual lock reset honors the shared interval even with a stale independent value`() {
         scheduler.resetAfterManualChange(
             ScreenType.LOCK,
-            ScheduleSettings(
+            ScheduleSettings(intervalEnabled = true,
                 enableChanger = true, separateSchedules = false,
                 homeEnabled = true, lockEnabled = true, homeAlbumId = "home", lockAlbumId = "lock",
                 homeIntervalMinutes = 30, lockIntervalMinutes = 90
@@ -133,7 +159,7 @@ class WallpaperSchedulerTest {
     fun `lock-only reset uses the interval shown by the single picker`() {
         scheduler.resetAfterManualChange(
             ScreenType.LOCK,
-            ScheduleSettings(
+            ScheduleSettings(intervalEnabled = true,
                 enableChanger = true, separateSchedules = true,
                 homeEnabled = false, lockEnabled = true, lockAlbumId = "lock",
                 homeIntervalMinutes = 30, lockIntervalMinutes = 90
@@ -148,7 +174,7 @@ class WallpaperSchedulerTest {
         val before = System.currentTimeMillis()
         scheduler.resetAfterManualChange(
             ScreenType.HOME,
-            ScheduleSettings(
+            ScheduleSettings(intervalEnabled = true,
                 enableChanger = true,
                 separateSchedules = true,
                 homeEnabled = true,

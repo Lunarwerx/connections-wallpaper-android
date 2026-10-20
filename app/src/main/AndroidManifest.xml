@@ -93,6 +93,15 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <service
+            android:name=".service.unlock.UnlockChangeService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Sets the next wallpaper as the screen turns off, so a new one shows at unlock" />
+        </service>
+
         <!-- Broadcast Receivers -->
         <receiver
             android:name=".service.alarm.BootReceiver"

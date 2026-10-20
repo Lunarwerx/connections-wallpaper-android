@@ -3,6 +3,9 @@ package com.anthonyla.paperize.presentation.screens.home
 import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -55,7 +58,9 @@ import com.anthonyla.paperize.connections.ConnectionsViewModel
 import com.anthonyla.paperize.connections.ConnectionsViewer
 import com.anthonyla.paperize.connections.SignInStatus
 import com.anthonyla.paperize.connections.rememberSignIn
+import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
+import com.anthonyla.paperize.presentation.screens.album_view.components.ImportProgressDialog
 import com.anthonyla.paperize.presentation.screens.home.components.HomeTopBar
 import com.anthonyla.paperize.presentation.screens.home.components.getTabItems
 import com.anthonyla.paperize.presentation.screens.library.LibraryScreen
@@ -89,6 +94,29 @@ fun HomeScreen(
     var viewerOpen by rememberSaveable { mutableStateOf(false) }
     var viewerStart by rememberSaveable { mutableIntStateOf(0) }
     var showAccount by rememberSaveable { mutableStateOf(false) }
+    val importProgress by viewModel.importProgress.collectAsStateWithLifecycle()
+    val importError by viewModel.importError.collectAsStateWithLifecycle()
+
+    // Adding a folder from a screen's album picker puts the new album on that screen.
+    var folderTarget by rememberSaveable { mutableStateOf<ScreenType?>(null) }
+    val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri: Uri? ->
+        uri?.let { viewModel.addFolderAlbum(it.toString(), folderTarget) }
+        folderTarget = null
+    }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) viewModel.addPhotosAlbum(uris.map { it.toString() }, context.getString(R.string.photos_album_name))
+    }
+    val addFolder: (ScreenType?) -> Unit = { target ->
+        folderTarget = target
+        folderPicker.launch(null)
+    }
+
+    LaunchedEffect(importError) {
+        importError?.let {
+            viewModel.dismissImportError()
+            snackbarHostState.showSnackbar(context.getString(it))
+        }
+    }
 
     val tabItems = getTabItems(
         wallpaperTitle = stringResource(R.string.wallpaper),
@@ -208,6 +236,7 @@ fun HomeScreen(
                             onUpdateScheduleSettings = viewModel::updateScheduleSettings,
                             onUpdateScheduleSettingsDebounced = viewModel::updateScheduleSettingsDebounced,
                             onChangeWallpaperNow = viewModel::changeWallpaperNow,
+                            onAddFolder = { addFolder(it) },
                             homeWallpaperUri = currentHomeWallpaperUri,
                             lockWallpaperUri = currentLockWallpaperUri
                         )
@@ -216,7 +245,8 @@ fun HomeScreen(
                 1 -> LibraryScreen(
                     albums = albums,
                     onViewAlbum = onNavigateToAlbum,
-                    onCreateAlbum = { name -> viewModel.createAlbum(name) }
+                    onAddFolder = { addFolder(null) },
+                    onAddPhotos = { photoPicker.launch(arrayOf("image/*")) }
                 )
                 else -> ConnectionsScreen(
                     onOpen = { index ->
@@ -243,6 +273,8 @@ fun HomeScreen(
             onClose = { viewerOpen = false }
         )
     }
+
+    ImportProgressDialog(progress = importProgress, onCancel = viewModel::cancelImport)
 
     if (showAccount) {
         AccountSheet(

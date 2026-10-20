@@ -24,7 +24,11 @@ data class ScheduleSettings(
     val liveAlbumId: String? = null,
     val liveScalingType: ScalingType = ScalingType.FILL,
     val liveEffects: WallpaperEffects = WallpaperEffects(),
-    val adaptiveBrightness: Boolean = false
+    val adaptiveBrightness: Boolean = false,
+    /** A new wallpaper as the screen turns off, so one is waiting at unlock. */
+    val changeOnUnlock: Boolean = true,
+    /** Off: only unlock, double tap, the widget and the shortcut change the wallpaper. */
+    val intervalEnabled: Boolean = false
 ) {
     val effectiveLockIntervalMinutes: Int
         get() = if (homeEnabled && lockEnabled && separateSchedules) lockIntervalMinutes else homeIntervalMinutes
@@ -63,6 +67,8 @@ data class ScheduleSettings(
 
     fun hasSchedulingChanges(other: ScheduleSettings): Boolean {
         return enableChanger != other.enableChanger ||
+               changeOnUnlock != other.changeOnUnlock ||
+               intervalEnabled != other.intervalEnabled ||
                homeAlbumId != other.homeAlbumId ||
                lockAlbumId != other.lockAlbumId ||
                liveAlbumId != other.liveAlbumId ||

@@ -37,6 +37,8 @@ private val WALLPAPER_MODE = stringPreferencesKey(PreferenceKeys.WALLPAPER_MODE)
 private val ENABLE_CHANGER = booleanPreferencesKey(PreferenceKeys.ENABLE_CHANGER)
 private val SEPARATE_SCHEDULES = booleanPreferencesKey(PreferenceKeys.SEPARATE_SCHEDULES)
 private val SHUFFLE_ENABLED = booleanPreferencesKey(PreferenceKeys.SHUFFLE_ENABLED)
+private val CHANGE_ON_UNLOCK = booleanPreferencesKey(PreferenceKeys.CHANGE_ON_UNLOCK)
+private val INTERVAL_ENABLED = booleanPreferencesKey(PreferenceKeys.INTERVAL_ENABLED)
 private val HOME_ENABLED = booleanPreferencesKey(PreferenceKeys.HOME_ENABLED)
 private val LOCK_ENABLED = booleanPreferencesKey(PreferenceKeys.LOCK_ENABLED)
 private val HOME_ALBUM_ID = stringPreferencesKey(PreferenceKeys.HOME_ALBUM_ID)
@@ -62,7 +64,6 @@ private class EffectKeys(screen: String) {
     val enableGrayscale = booleanPreferencesKey("${screen}_enable_grayscale")
     val grayscale = intPreferencesKey("${screen}_grayscale")
     val enableDoubleTap = booleanPreferencesKey("${screen}_enable_double_tap")
-    val enableChangeOnScreenOff = booleanPreferencesKey("${screen}_enable_change_on_screen_off")
     val enableParallax = booleanPreferencesKey("${screen}_enable_parallax")
     val parallaxIntensity = intPreferencesKey("${screen}_parallax_intensity")
 }
@@ -112,6 +113,8 @@ class SettingsRepositoryImpl @Inject constructor(
             prefs[ENABLE_CHANGER] = settings.enableChanger
             prefs[SEPARATE_SCHEDULES] = settings.separateSchedules
             prefs[SHUFFLE_ENABLED] = settings.shuffleEnabled
+            prefs[CHANGE_ON_UNLOCK] = settings.changeOnUnlock
+            prefs[INTERVAL_ENABLED] = settings.intervalEnabled
             prefs[HOME_ENABLED] = settings.homeEnabled
             prefs[LOCK_ENABLED] = settings.lockEnabled
             prefs.setOrRemove(HOME_ALBUM_ID, settings.homeAlbumId)
@@ -193,6 +196,8 @@ class SettingsRepositoryImpl @Inject constructor(
             enableChanger = prefs[ENABLE_CHANGER] ?: defaults.enableChanger,
             separateSchedules = prefs[SEPARATE_SCHEDULES] ?: defaults.separateSchedules,
             shuffleEnabled = prefs[SHUFFLE_ENABLED] ?: defaults.shuffleEnabled,
+            changeOnUnlock = prefs[CHANGE_ON_UNLOCK] ?: defaults.changeOnUnlock,
+            intervalEnabled = prefs[INTERVAL_ENABLED] ?: defaults.intervalEnabled,
             homeEnabled = prefs[HOME_ENABLED] ?: defaults.homeEnabled,
             lockEnabled = prefs[LOCK_ENABLED] ?: defaults.lockEnabled,
             homeAlbumId = prefs[HOME_ALBUM_ID],
@@ -224,7 +229,6 @@ class SettingsRepositoryImpl @Inject constructor(
             enableGrayscale = this[keys.enableGrayscale] ?: defaults.enableGrayscale,
             grayscalePercentage = this[keys.grayscale] ?: defaults.grayscalePercentage,
             enableDoubleTap = this[keys.enableDoubleTap] ?: defaults.enableDoubleTap,
-            enableChangeOnScreenOff = this[keys.enableChangeOnScreenOff] ?: defaults.enableChangeOnScreenOff,
             enableParallax = this[keys.enableParallax] ?: defaults.enableParallax,
             parallaxIntensity = this[keys.parallaxIntensity] ?: defaults.parallaxIntensity
         )
@@ -240,7 +244,6 @@ class SettingsRepositoryImpl @Inject constructor(
         this[keys.enableGrayscale] = effects.enableGrayscale
         this[keys.grayscale] = effects.grayscalePercentage
         this[keys.enableDoubleTap] = effects.enableDoubleTap
-        this[keys.enableChangeOnScreenOff] = effects.enableChangeOnScreenOff
         this[keys.enableParallax] = effects.enableParallax
         this[keys.parallaxIntensity] = effects.parallaxIntensity
     }

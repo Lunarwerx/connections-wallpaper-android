@@ -1,22 +1,26 @@
 package com.anthonyla.paperize.presentation.screens.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.constants.Constants
-import com.anthonyla.paperize.core.runCatchingCancellable
+import com.anthonyla.paperize.domain.model.Album
 import com.anthonyla.paperize.domain.model.AlbumSummary
 import com.anthonyla.paperize.domain.model.AppSettings
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.repository.AlbumRepository
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
-import com.anthonyla.paperize.domain.usecase.CreateAlbumUseCase
+import com.anthonyla.paperize.domain.usecase.ImportWallpapersUseCase
 import com.anthonyla.paperize.presentation.common.stateWhileSubscribed
+import com.anthonyla.paperize.presentation.screens.album_view.ImportProgress
 import com.anthonyla.paperize.service.SettingsCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -36,7 +40,7 @@ class HomeViewModel @Inject constructor(
     albumRepository: AlbumRepository,
     settingsRepository: SettingsRepository,
     private val wallpaperRepository: WallpaperRepository,
-    private val createAlbumUseCase: CreateAlbumUseCase,
+    private val importWallpapersUseCase: ImportWallpapersUseCase,
     private val coordinator: SettingsCoordinator
 ) : ViewModel() {
 
@@ -64,7 +68,14 @@ class HomeViewModel @Inject constructor(
     private val _showLiveWallpaperPrompt = MutableStateFlow(false)
     val showLiveWallpaperPrompt: StateFlow<Boolean> = _showLiveWallpaperPrompt.asStateFlow()
 
+    private val _importProgress = MutableStateFlow<ImportProgress>(ImportProgress.Idle)
+    val importProgress: StateFlow<ImportProgress> = _importProgress.asStateFlow()
+
+    private val _importError = MutableStateFlow<Int?>(null)
+    val importError: StateFlow<Int?> = _importError.asStateFlow()
+
     private var pendingSettingsJob: Job? = null
+    private var importJob: Job? = null
 
     init {
         // Launched in order so later edits queue behind this check in the coordinator.
@@ -75,7 +86,48 @@ class HomeViewModel @Inject constructor(
         _showLiveWallpaperPrompt.value = false
     }
 
-    suspend fun createAlbum(name: String) = runCatchingCancellable { createAlbumUseCase(name) }
+    /** A new album named after the folder, placed where [screen]'s picker asked (else every empty slot). */
+    fun addFolderAlbum(uri: String, screen: ScreenType? = null) = import(ImportProgress.Scanning(0), screen) {
+        importWallpapersUseCase.createAlbumFromFolder(
+            uri,
+            onScanning = { _importProgress.value = ImportProgress.Scanning(it) },
+            onSaving = { saved, total -> _importProgress.value = ImportProgress.Saving(saved, total) }
+        )
+    }
+
+    fun addPhotosAlbum(uris: List<String>, name: String) = import(ImportProgress.Saving(0, uris.size), null) {
+        importWallpapersUseCase.createAlbumFromImages(uris, name) { saved, total ->
+            _importProgress.value = ImportProgress.Saving(saved, total)
+        }
+    }
+
+    fun cancelImport() {
+        importJob?.cancel()
+    }
+
+    fun dismissImportError() {
+        _importError.value = null
+    }
+
+    private fun import(start: ImportProgress, screen: ScreenType?, create: suspend () -> Album) {
+        if (importJob?.isActive == true) return
+        _importError.value = null
+        _importProgress.value = start
+        importJob = viewModelScope.launch {
+            try {
+                val album = create()
+                if (coordinator.adoptNewAlbum(album.id, screen)) _showLiveWallpaperPrompt.value = true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: SecurityException) {
+                Log.e(TAG, "No permission for the chosen pictures", e)
+                _importError.value = R.string.import_permission_error
+            } catch (e: Exception) {
+                Log.e(TAG, "Could not add the album", e)
+                _importError.value = R.string.import_failed
+            }
+        }.also { job -> job.invokeOnCompletion { _importProgress.value = ImportProgress.Idle } }
+    }
 
     fun selectAlbum(screen: ScreenType, album: AlbumSummary?) {
         viewModelScope.launch { coordinator.selectAlbum(screen, album?.id) }
@@ -116,4 +168,8 @@ class HomeViewModel @Inject constructor(
         wallpaperRepository.getCurrentWallpaperFlow(albumId, screen),
         wallpaperRepository.getCurrentWallpaperFlow(albumId, ScreenType.BOTH)
     ) { specific, both -> (specific ?: both)?.uri }
+
+    private companion object {
+        const val TAG = "HomeViewModel"
+    }
 }

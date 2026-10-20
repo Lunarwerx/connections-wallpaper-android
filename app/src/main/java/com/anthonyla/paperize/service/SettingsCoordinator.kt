@@ -15,6 +15,7 @@ import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -45,6 +46,55 @@ class SettingsCoordinator @Inject constructor(
             val active = settings.activeScreens(mode)
             WallpaperChangeService.changeWallpaper(context, if (ScreenType.BOTH in active) ScreenType.BOTH else screen)
         }
+    }
+
+    /**
+     * A new album goes where it was added from: the [screen] whose picker added it, or every enabled
+     * screen still without an album (both screens when none is on yet). When nothing rotated before,
+     * adding it starts rotation. Returns true when live mode now needs its live wallpaper picked.
+     */
+    suspend fun adoptNewAlbum(albumId: String, screen: ScreenType?): Boolean = mutex.withLock {
+        val count = albumRepository.getAlbumSummaries().first().find { it.id == albumId }?.wallpaperCount ?: 0
+        if (count == 0) return@withLock false
+        val mode = settingsRepository.getWallpaperMode()
+        lateinit var before: ScheduleSettings
+        val after = settingsRepository.updateScheduleSettings { current ->
+            before = current
+            val adopted = when {
+                mode == WallpaperMode.LIVE ->
+                    if (screen != null || current.liveAlbumId == null) current.copy(liveAlbumId = albumId) else current
+                screen == ScreenType.HOME -> current.copy(homeEnabled = true, homeAlbumId = albumId)
+                screen == ScreenType.LOCK -> current.copy(lockEnabled = true, lockAlbumId = albumId)
+                else -> {
+                    val noneOn = !current.homeEnabled && !current.lockEnabled
+                    val home = current.homeEnabled || noneOn
+                    val lock = current.lockEnabled || noneOn
+                    current.copy(
+                        homeEnabled = home,
+                        lockEnabled = lock,
+                        homeAlbumId = if (home && current.homeAlbumId == null) albumId else current.homeAlbumId,
+                        lockAlbumId = if (lock && current.lockAlbumId == null) albumId else current.lockAlbumId
+                    )
+                }
+            }
+            if (current.activeScreens(mode).isEmpty() && adopted.hasRequiredAlbums(mode)) adopted.copy(enableChanger = true) else adopted
+        }
+        if (after == before) return@withLock false
+        scheduler.updateSchedules(after, mode)
+        if (mode == WallpaperMode.LIVE) {
+            return@withLock after.enableChanger && !PaperizeLiveWallpaperService.isActive(context)
+        }
+        if (after.enableChanger && after.hasRequiredAlbums(mode)) {
+            val both = ScreenType.BOTH in after.activeScreens(mode)
+            val home = after.homeAlbumId != before.homeAlbumId
+            val lock = after.lockAlbumId != before.lockAlbumId
+            when {
+                home && lock -> WallpaperChangeService.changeWallpaper(context)
+                home -> WallpaperChangeService.changeWallpaper(context, if (both) ScreenType.BOTH else ScreenType.HOME)
+                lock -> WallpaperChangeService.changeWallpaper(context, if (both) ScreenType.BOTH else ScreenType.LOCK)
+            }
+        }
+        false
     }
 
     /**

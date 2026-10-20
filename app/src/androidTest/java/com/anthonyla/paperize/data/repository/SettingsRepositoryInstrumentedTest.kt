@@ -46,7 +46,7 @@ class SettingsRepositoryInstrumentedTest {
             val effects = WallpaperEffects(
                 enableBlur = true, blurPercentage = 30, enableDarken = true, darkenPercentage = 20,
                 enableVignette = true, vignettePercentage = 40, enableGrayscale = true, grayscalePercentage = 50,
-                enableDoubleTap = true, enableChangeOnScreenOff = true, enableParallax = true, parallaxIntensity = 60
+                enableDoubleTap = true, enableParallax = true, parallaxIntensity = 60
             )
             preferences.updateScheduleSettings(ScheduleSettings(
                 enableChanger = true, separateSchedules = true, shuffleEnabled = true,

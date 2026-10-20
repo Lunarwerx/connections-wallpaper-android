@@ -14,7 +14,6 @@ data class WallpaperEffects(
 
     // Interactive effects (live wallpaper mode only)
     val enableDoubleTap: Boolean = false,
-    val enableChangeOnScreenOff: Boolean = false,
     val enableParallax: Boolean = false,
     val parallaxIntensity: Int = Constants.DEFAULT_PARALLAX_INTENSITY
 ) {

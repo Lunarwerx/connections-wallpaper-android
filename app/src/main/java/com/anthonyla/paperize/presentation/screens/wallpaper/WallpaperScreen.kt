@@ -65,6 +65,7 @@ fun WallpaperScreen(
     onUpdateScheduleSettings: (ScheduleSettings) -> Unit,
     onUpdateScheduleSettingsDebounced: (ScheduleSettings) -> Unit,
     onChangeWallpaperNow: () -> Unit,
+    onAddFolder: (ScreenType) -> Unit,
     homeWallpaperUri: String?,
     lockWallpaperUri: String?,
     modifier: Modifier = Modifier
@@ -163,17 +164,6 @@ fun WallpaperScreen(
                 onClick = { albumPickerScreen = ScreenType.LIVE }
             )
         }
-        if (wallpaperMode == WallpaperMode.STATIC && scheduleSettings.enableChanger && homeEnabled && lockEnabled) {
-            SettingSwitchItem(
-                title = stringResource(R.string.individual_scheduling),
-                description = stringResource(R.string.show_interval_sliders),
-                checked = scheduleSettings.separateSchedules,
-                onCheckedChange = { enabled ->
-                    updateSettingsImmediate(scheduleSettings.copy(separateSchedules = enabled))
-                }
-            )
-        }
-
         val hasAlbumSelected = scheduleSettings.activeScreens(wallpaperMode).isNotEmpty()
         val allRequiredAlbumsSelected = scheduleSettings.hasRequiredAlbums(wallpaperMode)
 
@@ -186,7 +176,29 @@ fun WallpaperScreen(
             )
         }
         if (hasAlbumSelected) {
+            SettingSwitchItem(
+                title = stringResource(R.string.change_on_unlock),
+                checked = scheduleSettings.changeOnUnlock,
+                onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(changeOnUnlock = enabled)) }
+            )
+            SettingSwitchItem(
+                title = stringResource(R.string.change_on_timer),
+                checked = scheduleSettings.intervalEnabled,
+                onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(intervalEnabled = enabled)) }
+            )
+        }
+        if (hasAlbumSelected && scheduleSettings.intervalEnabled) {
             if (wallpaperMode == WallpaperMode.STATIC) {
+                if (scheduleSettings.enableChanger && homeEnabled && lockEnabled) {
+                    SettingSwitchItem(
+                        title = stringResource(R.string.individual_scheduling),
+                        description = stringResource(R.string.show_interval_sliders),
+                        checked = scheduleSettings.separateSchedules,
+                        onCheckedChange = { enabled ->
+                            updateSettingsImmediate(scheduleSettings.copy(separateSchedules = enabled))
+                        }
+                    )
+                }
                 if (!scheduleSettings.separateSchedules || !homeEnabled || !lockEnabled) {
                     TimeIntervalPicker(
                         title = stringResource(R.string.interval_text),
@@ -431,18 +443,6 @@ fun WallpaperScreen(
                             )
                         }
                     )
-                    SettingSwitchItem(
-                        title = stringResource(R.string.change_on_screen_off),
-                        description = if (scheduleSettings.liveEffects.enableChangeOnScreenOff) null else stringResource(R.string.change_wallpaper_when_screen_turns_off),
-                        checked = scheduleSettings.liveEffects.enableChangeOnScreenOff,
-                        onCheckedChange = { enabled ->
-                            updateSettingsImmediate(
-                                scheduleSettings.copy(
-                                    liveEffects = scheduleSettings.liveEffects.copy(enableChangeOnScreenOff = enabled)
-                                )
-                            )
-                        }
-                    )
                     SettingSwitchWithSlider(
                         title = R.string.parallax_effect,
                         description = R.string.wallpaper_moves_with_screen_scroll,
@@ -485,6 +485,10 @@ fun WallpaperScreen(
                     album.wallpaperCount == 0 -> showEmptyAlbumWarning = true
                     else -> onSelectAlbum(selection, album)
                 }
+            },
+            onAddFolder = {
+                albumPickerScreen = null
+                onAddFolder(selection)
             },
             onDismiss = { albumPickerScreen = null }
         )

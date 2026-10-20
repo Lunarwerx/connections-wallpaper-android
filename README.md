@@ -14,10 +14,13 @@ gallery, a home-screen button, and a new name.
 
 ## Features
 
-- **Rotate from your own photos.** Add single photos or whole folders to an album. Folders stay
-  current: new pictures in a folder join the rotation.
-- **When it changes.** On a time interval, when you unlock (live mode), when you double-tap the
-  wallpaper (live mode), from the home-screen widget, the Quick Settings tile, or the app shortcut.
+- **Rotate from your own photos.** Add a folder (the album takes its name) or pick photos. Folders
+  stay current: new pictures in a folder join the rotation. A new album fills any screen that has
+  none, and the first one starts rotation.
+- **When it changes.** When you unlock (on by default), on a timer (off by default), when you
+  double-tap the wallpaper (live mode), from the home-screen widget, the Quick Settings tile, or the
+  app shortcut. In static mode, Change on unlock runs a silent background helper, so Android shows
+  its notification.
 - **Where it shows.** Home and lock screen together, lock screen only, home screen only, or a
   different album for each.
 - **How it looks.** Fill, fit or stretch; darken (brightness), blur, vignette and grayscale.
@@ -86,6 +89,9 @@ The Paperize architecture is unchanged; see its notes below. The Connections tab
   so sign-out only drops the app's tokens: revoking them would sign the browser out too.
   `SignInReturnActivity` is the link the browser comes back to; a link whose state is not the
   pending one is ignored, and a matching one redeems once.
+- `UnlockChangeService` is static mode's Change on unlock: a quiet `specialUse` foreground service
+  that sets the next wallpaper as the screen turns off. `WallpaperScheduler` starts and stops it
+  with the other schedules; live mode does the same inside its engine.
 - `ConnectionsOriginals` downloads an original into the photo library once, then adds it to an
   album through `AlbumRepository` or sets it through `WallpaperManager`.
 - The widget opens the same invisible activity as the launcher shortcut, which starts

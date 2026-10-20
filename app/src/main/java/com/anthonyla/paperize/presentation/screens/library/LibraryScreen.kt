@@ -4,9 +4,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -14,6 +16,12 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -23,50 +31,64 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.anthonyla.paperize.R
-import com.anthonyla.paperize.domain.model.Album
 import com.anthonyla.paperize.domain.model.AlbumSummary
-import com.anthonyla.paperize.presentation.common.components.AddAlbumDialog
 import com.anthonyla.paperize.presentation.common.theme.AppGrid
 import com.anthonyla.paperize.presentation.common.theme.AppIconSizes
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.library.components.AlbumItem
-import kotlinx.coroutines.launch
 
+/** Albums are made from what they hold: a folder (named after it) or picked photos, never a name first. */
 @Composable
 fun LibraryScreen(
     albums: List<AlbumSummary>,
     onViewAlbum: (String) -> Unit,
-    onCreateAlbum: suspend (String) -> Result<Album>,
+    onAddFolder: () -> Unit,
+    onAddPhotos: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val lazyListState = rememberLazyGridState()
-    var showAddAlbumDialog by rememberSaveable { mutableStateOf(false) }
-    var albumNameError by rememberSaveable { mutableStateOf<Int?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    val gridState = rememberLazyGridState()
+    var showAddMenu by remember { mutableStateOf(false) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
         floatingActionButton = {
-            LargeFloatingActionButton(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                onClick = { showAddAlbumDialog = true },
-                shape = MaterialTheme.shapes.large
-            ) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.add_album),
-                    modifier = Modifier.size(AppIconSizes.medium)
-                )
+            Box {
+                LargeFloatingActionButton(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    onClick = { showAddMenu = true },
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    Icon(
+                        Icons.Filled.Add,
+                        contentDescription = stringResource(R.string.add_album),
+                        modifier = Modifier.size(AppIconSizes.medium)
+                    )
+                }
+                DropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.add_folder)) },
+                        leadingIcon = { Icon(Icons.Outlined.CreateNewFolder, contentDescription = null) },
+                        onClick = {
+                            showAddMenu = false
+                            onAddFolder()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.add_photos)) },
+                        leadingIcon = { Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null) },
+                        onClick = {
+                            showAddMenu = false
+                            onAddPhotos()
+                        }
+                    )
+                }
             }
         }
     ) { paddingValues ->
@@ -88,24 +110,22 @@ fun LibraryScreen(
                         tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)
                     )
                     Text(
-                        text = stringResource(R.string.no_albums_found),
+                        text = stringResource(R.string.no_albums_yet),
                         style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = stringResource(R.string.create_first_album_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Button(onClick = onAddFolder) {
+                        Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(stringResource(R.string.add_folder))
+                    }
                 }
             }
         } else {
             LazyVerticalGrid(
-                state = lazyListState,
+                state = gridState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
@@ -122,33 +142,5 @@ fun LibraryScreen(
                 }
             }
         }
-    }
-
-    if (showAddAlbumDialog) {
-        AddAlbumDialog(
-            onDismiss = {
-                showAddAlbumDialog = false
-                albumNameError = null
-            },
-            onConfirm = { name ->
-                if (albums.any { it.name.equals(name, ignoreCase = true) }) {
-                    albumNameError = R.string.album_name_exists_error
-                } else {
-                    isSaving = true
-                    albumNameError = null
-                    scope.launch {
-                        try {
-                            onCreateAlbum(name)
-                                .onSuccess { showAddAlbumDialog = false }
-                                .onFailure { albumNameError = R.string.album_create_failed }
-                        } finally {
-                            isSaving = false
-                        }
-                    }
-                }
-            },
-            errorMessage = albumNameError?.let { stringResource(it) },
-            isSaving = isSaving
-        )
     }
 }

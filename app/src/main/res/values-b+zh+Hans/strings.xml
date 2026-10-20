@@ -50,7 +50,6 @@
   <string name="privacy_information_usage_content">个人数据：如果你使用 Connections 登录，你的姓名、电子邮箱地址和头像会保存在这部手机上，用于显示当前登录的账号。%1$s 不会把它们发送到其他地方，也不收集其他个人数据。\n\n使用情况分析：%1$s 不会跟踪你的使用行为，也不会收集分析数据。</string>
   <string name="privacy_data_security_title">数据安全</string>
   <string name="privacy_data_security_content">设备本地存储：你的相册、设置和登录信息都只保存在你的设备上。只有在你浏览或下载 Connections 壁纸、或登录时，%1$s 才会联网。</string>
-  <string name="no_albums_found">未找到相册</string>
   <string name="empty_album">空相册</string>
   <string name="empty_album_message">这个相册里还没有壁纸。请先向相册中添加壁纸，然后再选择它。</string>
   <string name="ok">确定</string>
@@ -80,8 +79,6 @@
   <string name="make_the_colors_grayscale">将画面变为灰度</string>
   <string name="double_tap_to_change">双击切换</string>
   <string name="double_tap_wallpaper_to_change_it">双击壁纸即可切换</string>
-  <string name="change_on_screen_off">解锁时换新壁纸</string>
-  <string name="change_wallpaper_when_screen_turns_off">息屏时选好下一张壁纸，解锁即可看到新壁纸</string>
   <string name="parallax_effect">视差效果</string>
   <string name="wallpaper_moves_with_screen_scroll">在桌面页面之间滑动可移动壁纸（需要桌面支持）</string>
   <string name="live_wallpaper_name">Connections Wallpaper</string>
@@ -164,7 +161,6 @@
   </plurals>
 
   <!-- Material 3 Expressive UI Strings -->
-  <string name="create_first_album_hint">点击 + 创建你的第一个相册</string>
 
   <!-- Wallpaper Mode Selection -->
   <string name="choose_wallpaper_mode">选择壁纸模式</string>
@@ -266,5 +262,11 @@
   <string name="dynamic_theming_desc">根据壁纸取色</string>
   <string name="app_version">版本</string>
   <string name="battery_allow">允许</string>
+  <string name="change_on_unlock">解锁时更换</string>
+  <string name="change_on_timer">定时更换</string>
+  <string name="unlock_watch_title">解锁时更换已开启</string>
+  <string name="no_albums_yet">还没有相册</string>
+  <string name="add_photos">添加照片</string>
+  <string name="photos_album_name">照片</string>
 </resources>
 

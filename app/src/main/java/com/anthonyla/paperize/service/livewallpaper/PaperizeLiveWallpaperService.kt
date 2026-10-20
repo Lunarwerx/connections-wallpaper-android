@@ -198,7 +198,8 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                         latestWallpaperMode != mode ||
                             latestSettings.enableChanger != settings.enableChanger ||
                             latestSettings.liveAlbumId != settings.liveAlbumId ||
-                            latestSettings.liveIntervalMinutes != settings.liveIntervalMinutes
+                            latestSettings.liveIntervalMinutes != settings.liveIntervalMinutes ||
+                            latestSettings.intervalEnabled != settings.intervalEnabled
                     latestSettings = settings
                     latestWallpaperMode = mode
                     if (timerConfigurationChanged) restartLiveIntervalTimer()
@@ -328,7 +329,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
         private fun handleScreenOff() {
             engineScope.launch {
                 val settings = settingsRepository.getScheduleSettings()
-                if (settings.liveEffects.enableChangeOnScreenOff) {
+                if (settings.enableChanger && settings.changeOnUnlock) {
                     Log.d(TAG, "Screen off - changing wallpaper")
                     renderController.forceReloadCurrentArtwork()
                 }
@@ -345,6 +346,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                     !isPreview &&
                     latestWallpaperMode == WallpaperMode.LIVE &&
                     latestSettings.enableChanger &&
+                    latestSettings.intervalEnabled &&
                     latestSettings.liveAlbumId != null &&
                     usesVisibleLiveTimer(intervalMinutes)
             if (!shouldRun) return

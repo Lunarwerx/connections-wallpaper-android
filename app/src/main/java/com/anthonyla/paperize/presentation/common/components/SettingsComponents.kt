@@ -3,6 +3,7 @@ package com.anthonyla.paperize.presentation.common.components
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -11,7 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -36,9 +37,10 @@ fun SettingSwitchItem(
         ),
         shape = MaterialTheme.shapes.medium
     ) {
+        // The whole row toggles, as in Android's own settings, not just the switch.
         Column(modifier = Modifier
+            .toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(AppSpacing.large)
-            .semantics(mergeDescendants = true) {}
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -70,7 +72,7 @@ fun SettingSwitchItem(
                 Spacer(modifier = Modifier.width(AppSpacing.large))
                 Switch(
                     checked = checked,
-                    onCheckedChange = onCheckedChange,
+                    onCheckedChange = null,
                     enabled = enabled
                 )
             }

@@ -51,7 +51,6 @@
   <string name="privacy_information_usage_content">Personal Data: if you sign in with Connections, your name, email address and profile picture are kept on this phone to show who is signed in. %1$s does not send them anywhere else, and collects no other personal data.\n\nUsage Analytics: %1$s does not track your usage behavior or collect analytics data.</string>
   <string name="privacy_data_security_title">Data Security</string>
   <string name="privacy_data_security_content">On-Device Storage: your albums, settings and sign-in stay on your device. %1$s only goes online when you browse or download Connections wallpapers, or sign in.</string>
-  <string name="no_albums_found">No albums found</string>
   <string name="empty_album">Empty Album</string>
   <string name="empty_album_message">This album has no wallpapers. Please add wallpapers to the album before selecting it.</string>
   <string name="ok">OK</string>
@@ -81,8 +80,6 @@
   <string name="make_the_colors_grayscale">Make the colors grayscale</string>
   <string name="double_tap_to_change">Double-Tap to Change</string>
   <string name="double_tap_wallpaper_to_change_it">Double-tap wallpaper to change it</string>
-  <string name="change_on_screen_off">New Wallpaper on Unlock</string>
-  <string name="change_wallpaper_when_screen_turns_off">Picks the next wallpaper when the screen turns off, so a new one is waiting when you unlock</string>
   <string name="parallax_effect">Parallax Effect</string>
   <string name="wallpaper_moves_with_screen_scroll">Swipe between home-screen pages to move the wallpaper (launcher support required)</string>
   <string name="live_wallpaper_name">Connections Wallpaper</string>
@@ -167,7 +164,6 @@
   </plurals>
 
   <!-- Material 3 Expressive UI Strings -->
-  <string name="create_first_album_hint">Tap + to create your first album</string>
 
   <!-- Wallpaper Mode Selection -->
   <string name="choose_wallpaper_mode">Choose Wallpaper Mode</string>
@@ -269,5 +265,11 @@
   <string name="dynamic_theming_desc">Colors from your wallpaper</string>
   <string name="app_version">Version</string>
   <string name="battery_allow">Allow</string>
+  <string name="change_on_unlock">Change on unlock</string>
+  <string name="change_on_timer">Change on a timer</string>
+  <string name="unlock_watch_title">Change on unlock is on</string>
+  <string name="no_albums_yet">No albums yet</string>
+  <string name="add_photos">Add photos</string>
+  <string name="photos_album_name">Photos</string>
 </resources>
 

@@ -9,7 +9,7 @@ import org.junit.Test
 class WallpaperSchedulingPolicyTest {
     @Test
     fun `manual synchronized change resets the shared job`() {
-        val settings = ScheduleSettings(
+        val settings = ScheduleSettings(intervalEnabled = true,
             enableChanger = true,
             homeEnabled = true,
             lockEnabled = true,
@@ -25,7 +25,7 @@ class WallpaperSchedulingPolicyTest {
 
     @Test
     fun `manual both change resets each independent job`() {
-        val settings = ScheduleSettings(
+        val settings = ScheduleSettings(intervalEnabled = true,
             enableChanger = true,
             separateSchedules = true,
             homeEnabled = true,
@@ -46,15 +46,32 @@ class WallpaperSchedulingPolicyTest {
             emptySet<ScreenType>(),
             scheduledScreensToReset(
                 ScreenType.BOTH,
-                ScheduleSettings(enableChanger = false),
+                ScheduleSettings(intervalEnabled = true, enableChanger = false),
                 WallpaperMode.STATIC
             )
         )
     }
 
     @Test
-    fun `short live interval belongs to visible engine instead of WorkManager`() {
+    fun `timer off resets no schedule after a manual change`() {
         val settings = ScheduleSettings(
+            intervalEnabled = false,
+            enableChanger = true,
+            homeEnabled = true,
+            lockEnabled = true,
+            homeAlbumId = "album",
+            lockAlbumId = "album"
+        )
+
+        assertEquals(
+            emptySet<ScreenType>(),
+            scheduledScreensToReset(ScreenType.HOME, settings, WallpaperMode.STATIC)
+        )
+    }
+
+    @Test
+    fun `short live interval belongs to visible engine instead of WorkManager`() {
+        val settings = ScheduleSettings(intervalEnabled = true,
             enableChanger = true,
             liveAlbumId = "live",
             liveIntervalMinutes = 14
