@@ -31,6 +31,11 @@ jobs:
       - name: Run unit tests
         run: ./gradlew clean test
 
+      # Instrumented tests need a device to run, but they must always compile: a screen's signature
+      # change once broke them unnoticed because nothing else builds androidTest.
+      - name: Compile instrumented tests
+        run: ./gradlew :app:compileDebugAndroidTestKotlin
+
       - name: Run Android lint
         run: ./gradlew :app:lintDebug
 
