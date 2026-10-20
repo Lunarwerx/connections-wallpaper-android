@@ -170,8 +170,8 @@ class SettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateDarkMode(enabled: Boolean) {
-        dataStore.edit { it[DARK_MODE] = enabled }
+    override suspend fun updateDarkMode(dark: Boolean?) {
+        dataStore.edit { if (dark == null) it.remove(DARK_MODE) else it[DARK_MODE] = dark }
     }
 
     override suspend fun updateDynamicTheming(enabled: Boolean) {

@@ -19,7 +19,7 @@
   <string name="save">保存</string>
   <string name="delete_album">删除</string>
   <string name="no_album_selected">未选择相册</string>
-  <string name="currently_selected_album">当前选中的相册</string>
+  <string name="currently_selected_album">相册</string>
   <string name="agree">同意</string>
   <string name="welcome">欢迎</string>
   <string name="continue_button">开始使用</string>
@@ -35,7 +35,6 @@
   <string name="are_you_sure_you_want_to_delete_this">确定要删除吗？</string>
   <string name="delete_album_question">删除相册？</string>
   <string name="animation">动画</string>
-  <string name="dark_mode">深色模式</string>
   <string name="dynamic_theming">动态取色</string>
   <string name="appearance">外观</string>
   <string name="about">关于</string>
@@ -60,7 +59,6 @@
   <string name="home_screen_btn">主屏幕</string>
   <string name="lock_screen_btn">锁屏</string>
   <string name="individual_scheduling">分别定时</string>
-  <string name="show_interval_sliders">显示间隔滑块</string>
   <string name="interval_text">时间间隔</string>
   <string name="change_blur">模糊效果</string>
   <string name="lock">锁屏</string>
@@ -78,14 +76,12 @@
   <string name="darken_the_edges_of_the_image">压暗画面边缘</string>
   <string name="make_the_colors_grayscale">将画面变为灰度</string>
   <string name="double_tap_to_change">双击切换</string>
-  <string name="double_tap_wallpaper_to_change_it">双击壁纸即可切换</string>
   <string name="parallax_effect">视差效果</string>
   <string name="wallpaper_moves_with_screen_scroll">在桌面页面之间滑动可移动壁纸（需要桌面支持）</string>
   <string name="live_wallpaper_name">Connections Wallpaper</string>
   <string name="live_wallpaper_description">带特效与交互功能的动态壁纸</string>
   <string name="adaptive_brightness">自适应亮度</string>
   <string name="adjust_brightness_based_on_mode">根据深色/浅色模式调整亮度</string>
-  <string name="randomly_shuffle_the_wallpapers">随机打乱壁纸顺序</string>
   <string name="changing_wallpaper">正在更换壁纸…</string>
   <string name="add_wallpapers">添加壁纸</string>
   <string name="select_album">选择相册</string>
@@ -109,9 +105,7 @@
   <!-- UI Labels and Status -->
   <string name="enabled">已启用</string>
   <string name="wallpaper_changer">壁纸更换</string>
-  <string name="wallpaper_changer_description">暂停或恢复定时切换，不会清除你的相册。</string>
   <string name="horizontal_wallpaper_scrolling">横向滚动</string>
-  <string name="horizontal_wallpaper_scrolling_description">允许宽幅「填充」壁纸在桌面页面之间移动。锁屏壁纸保持居中。</string>
   <string name="disabled">已禁用</string>
   <string name="lock_album_label">锁屏相册</string>
   <string name="home_album_label">主屏幕相册</string>
@@ -268,5 +262,10 @@
   <string name="no_albums_yet">还没有相册</string>
   <string name="add_photos">添加照片</string>
   <string name="photos_album_name">照片</string>
+  <string name="theme">主题</string>
+  <string name="theme_system">跟随系统</string>
+  <string name="theme_light">浅色</string>
+  <string name="theme_dark">深色</string>
+  <string name="horizontal_scrolling_supporting">宽图片随主屏幕页面平移</string>
 </resources>
 

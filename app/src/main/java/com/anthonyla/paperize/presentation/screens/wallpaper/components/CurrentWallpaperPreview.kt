@@ -67,9 +67,8 @@ fun CurrentWallpaperPreview(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .widthIn(max = 600.dp)
-            .padding(horizontal = AppSpacing.small, vertical = AppSpacing.extraSmall),
-        shape = RoundedCornerShape(20.dp),
+            .widthIn(max = 600.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer
         )
@@ -77,13 +76,13 @@ fun CurrentWallpaperPreview(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(AppSpacing.large)
+                .padding(AppSpacing.medium)
         ) {
             Text(
                 text = stringResource(R.string.current_wallpapers),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(bottom = AppSpacing.medium),
+                modifier = Modifier.padding(bottom = AppSpacing.small),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )

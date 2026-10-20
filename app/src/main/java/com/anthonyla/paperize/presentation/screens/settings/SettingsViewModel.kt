@@ -36,8 +36,9 @@ class SettingsViewModel @Inject constructor(
     private val _resetFailed = MutableStateFlow(false)
     val resetFailed = _resetFailed.asStateFlow()
 
-    fun updateDarkMode(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.updateDarkMode(enabled) }
+    /** null follows the phone's theme; true or false pins dark or light. */
+    fun updateDarkMode(dark: Boolean?) {
+        viewModelScope.launch { settingsRepository.updateDarkMode(dark) }
     }
 
     fun updateDynamicTheming(enabled: Boolean) {

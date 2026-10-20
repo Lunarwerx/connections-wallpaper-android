@@ -1,12 +1,10 @@
 package com.anthonyla.paperize.presentation.screens.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -25,10 +23,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -42,6 +36,10 @@ import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.util.BatteryOptimizationUtil.isIgnoringBatteryOptimizations
 import com.anthonyla.paperize.core.util.BatteryOptimizationUtil.requestIgnoreBatteryOptimizations
+import com.anthonyla.paperize.presentation.common.components.SectionLabel
+import com.anthonyla.paperize.presentation.common.components.SettingsGroup
+import com.anthonyla.paperize.presentation.common.components.SettingsRow
+import com.anthonyla.paperize.presentation.common.components.SwitchRow
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +56,7 @@ fun SettingsScreen(
     val wallpaperMode by viewModel.wallpaperMode.collectAsStateWithLifecycle()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
     var pendingMode by rememberSaveable { mutableStateOf<WallpaperMode?>(null) }
+    var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
     var isIgnoringBatteryOptimizations by remember {
@@ -88,7 +87,7 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = AppSpacing.large)
+                .padding(horizontal = AppSpacing.medium)
         ) {
             if (resetFailed) Text(stringResource(R.string.reset_failed), color = MaterialTheme.colorScheme.error)
             if (isResetting) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -135,11 +134,11 @@ fun SettingsScreen(
             SectionLabel(stringResource(R.string.appearance))
             SettingsGroup(
                 {
-                    SwitchRow(
+                    SettingsRow(
                         icon = Icons.Outlined.DarkMode,
-                        title = stringResource(R.string.dark_mode),
-                        checked = appSettings?.darkMode ?: isSystemInDarkTheme(),
-                        onCheckedChange = { viewModel.updateDarkMode(it) }
+                        title = stringResource(R.string.theme),
+                        supporting = stringResource(themeLabel(appSettings?.darkMode)),
+                        onClick = { showThemeDialog = true }
                     )
                 },
                 {
@@ -225,6 +224,40 @@ fun SettingsScreen(
             )
         }
 
+        // Follow the phone by default; Light or Dark pins the app's theme.
+        if (showThemeDialog) {
+            AlertDialog(
+                onDismissRequest = { showThemeDialog = false },
+                title = { Text(stringResource(R.string.theme)) },
+                text = {
+                    Column(Modifier.selectableGroup()) {
+                        listOf(null, false, true).forEach { dark ->
+                            val selected = appSettings?.darkMode == dark
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .selectable(selected = selected, role = Role.RadioButton, onClick = {
+                                        viewModel.updateDarkMode(dark)
+                                        showThemeDialog = false
+                                    })
+                            ) {
+                                RadioButton(selected = selected, onClick = null)
+                                Spacer(Modifier.width(AppSpacing.medium))
+                                Text(stringResource(themeLabel(dark)), style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showThemeDialog = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
         if (pendingMode != null) {
             AlertDialog(
                 onDismissRequest = { pendingMode = null },
@@ -261,99 +294,9 @@ fun SettingsScreen(
     }
 }
 
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = AppSpacing.large, top = AppSpacing.extraLarge, bottom = AppSpacing.small)
-    )
-}
-
-/** Rows of one section, joined into one rounded block: large outer corners, small inner ones. */
-@Composable
-private fun SettingsGroup(vararg rows: @Composable () -> Unit) {
-    val outer = 24.dp
-    val inner = 4.dp
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        rows.forEachIndexed { index, row ->
-            val shape: Shape = RoundedCornerShape(
-                topStart = if (index == 0) outer else inner,
-                topEnd = if (index == 0) outer else inner,
-                bottomStart = if (index == rows.lastIndex) outer else inner,
-                bottomEnd = if (index == rows.lastIndex) outer else inner
-            )
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(shape)
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-            ) { row() }
-        }
-    }
-}
-
-@Composable
-private fun SettingsRow(
-    icon: ImageVector,
-    title: String,
-    modifier: Modifier = Modifier,
-    supporting: String? = null,
-    iconTint: Color? = null,
-    titleColor: Color? = null,
-    supportingColor: Color? = null,
-    onClick: (() -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
-            .heightIn(min = 64.dp)
-            .padding(horizontal = AppSpacing.large, vertical = AppSpacing.medium)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = iconTint ?: MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.width(AppSpacing.large))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = titleColor ?: MaterialTheme.colorScheme.onSurface
-            )
-            if (supporting != null) {
-                Text(
-                    text = supporting,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = supportingColor ?: MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        if (trailing != null) {
-            Spacer(Modifier.width(AppSpacing.medium))
-            trailing()
-        }
-    }
-}
-
-@Composable
-private fun SwitchRow(
-    icon: ImageVector,
-    title: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    supporting: String? = null
-) {
-    SettingsRow(
-        icon = icon,
-        title = title,
-        supporting = supporting,
-        modifier = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
-        trailing = { Switch(checked = checked, onCheckedChange = null) }
-    )
+@StringRes
+private fun themeLabel(dark: Boolean?): Int = when (dark) {
+    null -> R.string.theme_system
+    false -> R.string.theme_light
+    true -> R.string.theme_dark
 }

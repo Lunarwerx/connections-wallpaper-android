@@ -19,7 +19,7 @@
   <string name="save">Save</string>
   <string name="delete_album">Delete</string>
   <string name="no_album_selected">No album selected</string>
-  <string name="currently_selected_album">Currently selected album</string>
+  <string name="currently_selected_album">Album</string>
   <string name="agree">Agree</string>
   <string name="welcome">Welcome</string>
   <string name="continue_button">I\'m In</string>
@@ -35,7 +35,6 @@
   <string name="are_you_sure_you_want_to_delete_this">Are you sure you want to delete this?</string>
   <string name="delete_album_question">Delete album?</string>
   <string name="animation">Animation</string>
-  <string name="dark_mode">Dark mode</string>
   <string name="dynamic_theming">Dynamic color</string>
   <string name="appearance">Appearance</string>
   <string name="about">About</string>
@@ -61,8 +60,7 @@
   <string name="home_screen_btn">Home Screen</string>
   <string name="lock_screen_btn">Lock Screen</string>
   <string name="individual_scheduling">Individual Scheduling</string>
-  <string name="show_interval_sliders">Show interval sliders</string>
-  <string name="interval_text">Time Interval</string>
+  <string name="interval_text">Time interval</string>
   <string name="change_blur">Blur Effect</string>
   <string name="lock">Lock</string>
   <string name="change_vignette">Vignette Effect</string>
@@ -78,15 +76,13 @@
   <string name="add_blur_to_the_image">Add blur to the image</string>
   <string name="darken_the_edges_of_the_image">Darken the edges of the image</string>
   <string name="make_the_colors_grayscale">Make the colors grayscale</string>
-  <string name="double_tap_to_change">Double-Tap to Change</string>
-  <string name="double_tap_wallpaper_to_change_it">Double-tap wallpaper to change it</string>
-  <string name="parallax_effect">Parallax Effect</string>
+  <string name="double_tap_to_change">Double-tap to change</string>
+  <string name="parallax_effect">Parallax effect</string>
   <string name="wallpaper_moves_with_screen_scroll">Swipe between home-screen pages to move the wallpaper (launcher support required)</string>
   <string name="live_wallpaper_name">Connections Wallpaper</string>
   <string name="live_wallpaper_description">Dynamic wallpapers with effects and interactive features</string>
-  <string name="adaptive_brightness">Adaptive Brightness</string>
+  <string name="adaptive_brightness">Adaptive brightness</string>
   <string name="adjust_brightness_based_on_mode">Adjust brightness based on dark/light mode</string>
-  <string name="randomly_shuffle_the_wallpapers">Randomly shuffle the wallpapers</string>
   <string name="changing_wallpaper">Changing wallpaper…</string>
   <string name="add_wallpapers">Add wallpapers</string>
   <string name="select_album">Select album</string>
@@ -110,12 +106,10 @@
   <!-- UI Labels and Status -->
   <string name="enabled">Enabled</string>
   <string name="wallpaper_changer">Wallpaper changing</string>
-  <string name="wallpaper_changer_description">Pause or resume scheduled changes without clearing your albums.</string>
   <string name="horizontal_wallpaper_scrolling">Horizontal scrolling</string>
-  <string name="horizontal_wallpaper_scrolling_description">Allow wide Fill wallpapers to move between home-screen pages. Lock-screen wallpapers remain centered.</string>
   <string name="disabled">Disabled</string>
-  <string name="lock_album_label">Lock Album</string>
-  <string name="home_album_label">Home Album</string>
+  <string name="lock_album_label">Lock album</string>
+  <string name="home_album_label">Home album</string>
   <string name="scaling">Scaling</string>
   <string name="wallpaper_effects_title">Wallpaper Effects</string>
   <string name="visual_effects">Visual Effects</string>
@@ -271,5 +265,10 @@
   <string name="no_albums_yet">No albums yet</string>
   <string name="add_photos">Add photos</string>
   <string name="photos_album_name">Photos</string>
+  <string name="theme">Theme</string>
+  <string name="theme_system">System default</string>
+  <string name="theme_light">Light</string>
+  <string name="theme_dark">Dark</string>
+  <string name="horizontal_scrolling_supporting">Wide pictures pan across home pages</string>
 </resources>
 
