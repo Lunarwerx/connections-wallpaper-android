@@ -29,10 +29,9 @@ import org.junit.Test
 import com.anthonyla.paperize.presentation.screens.library.LibraryScreen
 import androidx.compose.ui.semantics.SemanticsActions
 import com.anthonyla.paperize.core.WallpaperMode
-import com.anthonyla.paperize.domain.model.AppSettings
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.model.WallpaperEffects
-import com.anthonyla.paperize.presentation.screens.wallpaper.WallpaperScreen
+import com.anthonyla.paperize.presentation.screens.wallpaper.VisualEffectsContent
 
 class AlbumUiInstrumentedTest {
     @get:Rule val compose = createComposeRule()
@@ -49,13 +48,12 @@ class AlbumUiInstrumentedTest {
         var latest = settings.value
         compose.setContent {
             PaperizeTheme(false, false) {
-                WallpaperScreen(
-                    albums = emptyList(), persistedScheduleSettings = settings.value,
-                    appSettings = AppSettings(), wallpaperMode = mode.value,
-                    onToggleChanger = {}, onSelectAlbum = { _, _ -> },
+                VisualEffectsContent(
+                    persistedScheduleSettings = settings.value, wallpaperMode = mode.value,
+                    homeWallpaperUri = null, lockWallpaperUri = null, liveWallpaperUri = null,
                     onUpdateScheduleSettings = { latest = it },
                     onUpdateScheduleSettingsDebounced = { latest = it },
-                    onChangeWallpaperNow = {}, onAddFolder = {}, homeWallpaperUri = null, lockWallpaperUri = null
+                    onNavigateBack = {}
                 )
             }
         }

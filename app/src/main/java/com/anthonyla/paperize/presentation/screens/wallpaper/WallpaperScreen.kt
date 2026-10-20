@@ -1,6 +1,5 @@
 package com.anthonyla.paperize.presentation.screens.wallpaper
 
-import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,26 +13,23 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.Autorenew
-import androidx.compose.material.icons.outlined.BlurOn
-import androidx.compose.material.icons.outlined.Brightness6
-import androidx.compose.material.icons.outlined.BrightnessAuto
 import androidx.compose.material.icons.outlined.ExpandMore
-import androidx.compose.material.icons.outlined.FilterBAndW
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.PhotoFilter
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.Tune
-import androidx.compose.material.icons.outlined.Vignette
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -46,10 +42,8 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,7 +61,6 @@ import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.domain.model.AlbumSummary
 import com.anthonyla.paperize.domain.model.AppSettings
 import com.anthonyla.paperize.domain.model.ScheduleSettings
-import com.anthonyla.paperize.domain.model.WallpaperEffects
 import com.anthonyla.paperize.presentation.common.components.SectionLabel
 import com.anthonyla.paperize.presentation.common.components.SettingsGroup
 import com.anthonyla.paperize.presentation.common.components.SettingsRow
@@ -95,55 +88,22 @@ fun WallpaperScreen(
     onUpdateScheduleSettingsDebounced: (ScheduleSettings) -> Unit,
     onChangeWallpaperNow: () -> Unit,
     onAddFolder: (ScreenType) -> Unit,
+    onOpenVisualEffects: () -> Unit,
     homeWallpaperUri: String?,
     lockWallpaperUri: String?,
     modifier: Modifier = Modifier
 ) {
     var albumPickerScreen by rememberSaveable { mutableStateOf<ScreenType?>(null) }
     var showEmptyAlbumWarning by rememberSaveable { mutableStateOf(false) }
-    var scheduleSettings by remember { mutableStateOf(persistedScheduleSettings) }
+    val draft = rememberScheduleDraft(persistedScheduleSettings, onUpdateScheduleSettings, onUpdateScheduleSettingsDebounced)
+    val scheduleSettings = draft.value
 
-    // Keep an immediate local draft so a slider value waiting for the ViewModel debounce
-    // is included in a switch or other setting changed before that debounce expires.
-    LaunchedEffect(persistedScheduleSettings) {
-        scheduleSettings = persistedScheduleSettings
-    }
+    fun updateSettingsDebounced(newSettings: ScheduleSettings) = draft.updateDebounced(newSettings)
 
-    fun updateSettingsDebounced(newSettings: ScheduleSettings) {
-        scheduleSettings = newSettings
-        onUpdateScheduleSettingsDebounced(newSettings)
-    }
-
-    fun updateSettingsImmediate(newSettings: ScheduleSettings) {
-        scheduleSettings = newSettings
-        onUpdateScheduleSettings(newSettings)
-    }
+    fun updateSettingsImmediate(newSettings: ScheduleSettings) = draft.update(newSettings)
 
     val homeEnabled = scheduleSettings.homeEnabled
     val lockEnabled = scheduleSettings.lockEnabled
-
-    val primaryEffects = when {
-        wallpaperMode == WallpaperMode.LIVE -> scheduleSettings.liveEffects
-        homeEnabled -> scheduleSettings.homeEffects
-        else -> scheduleSettings.lockEffects
-    }
-    val bothEnabled = wallpaperMode == WallpaperMode.STATIC && homeEnabled && lockEnabled
-
-    fun updateEffects(
-        home: (WallpaperEffects) -> WallpaperEffects,
-        lock: (WallpaperEffects) -> WallpaperEffects = home,
-        debounced: Boolean = false
-    ) {
-        val updated = if (wallpaperMode == WallpaperMode.LIVE) {
-            scheduleSettings.copy(liveEffects = home(scheduleSettings.liveEffects))
-        } else {
-            scheduleSettings.copy(
-                homeEffects = if (homeEnabled) home(scheduleSettings.homeEffects) else scheduleSettings.homeEffects,
-                lockEffects = if (lockEnabled) lock(scheduleSettings.lockEffects) else scheduleSettings.lockEffects
-            )
-        }
-        if (debounced) updateSettingsDebounced(updated) else updateSettingsImmediate(updated)
-    }
 
     val scalingOptions = listOf(
         ScalingType.FILL to stringResource(R.string.fill),
@@ -319,92 +279,89 @@ fun WallpaperScreen(
             )
         }
 
-        // How it looks.
+        // How it looks. Visual effects are one switch here; their sliders and a preview are a page away.
         SectionLabel(stringResource(R.string.wallpaper_effects_title))
-        SettingsGroup(
-            {
-                Column(
-                    modifier = Modifier.padding(horizontal = AppSpacing.medium, vertical = AppSpacing.small),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(Modifier.heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.AspectRatio, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Spacer(Modifier.width(AppSpacing.medium))
-                        Text(
-                            text = stringResource(R.string.scaling),
-                            style = MaterialTheme.typography.bodyLarge,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        scalingOptions.forEachIndexed { index, (scalingType, label) ->
-                            SegmentedButton(
-                                shape = SegmentedButtonDefaults.itemShape(index = index, count = scalingOptions.size),
-                                onClick = {
-                                    updateSettingsImmediate(
-                                        if (wallpaperMode == WallpaperMode.LIVE) {
-                                            scheduleSettings.copy(liveScalingType = scalingType)
-                                        } else {
-                                            scheduleSettings.copy(homeScalingType = scalingType, lockScalingType = scalingType)
-                                        }
-                                    )
-                                },
-                                selected = scalingType == selectedScaling
-                            ) {
-                                Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
+        val lookRows = mutableListOf<@Composable () -> Unit>()
+        lookRows.add {
+            Column(
+                modifier = Modifier.padding(horizontal = AppSpacing.medium, vertical = AppSpacing.small),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(Modifier.heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.AspectRatio, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(AppSpacing.medium))
+                    Text(
+                        text = stringResource(R.string.scaling),
+                        style = MaterialTheme.typography.bodyLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    scalingOptions.forEachIndexed { index, (scalingType, label) ->
+                        SegmentedButton(
+                            shape = SegmentedButtonDefaults.itemShape(index = index, count = scalingOptions.size),
+                            onClick = {
+                                updateSettingsImmediate(
+                                    if (wallpaperMode == WallpaperMode.LIVE) {
+                                        scheduleSettings.copy(liveScalingType = scalingType)
+                                    } else {
+                                        scheduleSettings.copy(homeScalingType = scalingType, lockScalingType = scalingType)
+                                    }
+                                )
+                            },
+                            selected = scalingType == selectedScaling
+                        ) {
+                            Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
-            },
-            {
+            }
+        }
+        lookRows.add {
+            SwitchRow(
+                icon = Icons.Outlined.Shuffle,
+                title = stringResource(R.string.shuffle),
+                checked = scheduleSettings.shuffleEnabled,
+                onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(shuffleEnabled = enabled)) }
+            )
+        }
+        if (wallpaperMode == WallpaperMode.LIVE || homeEnabled || lockEnabled) {
+            lookRows.add {
                 SwitchRow(
-                    icon = Icons.Outlined.Shuffle,
-                    title = stringResource(R.string.shuffle),
-                    checked = scheduleSettings.shuffleEnabled,
-                    onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(shuffleEnabled = enabled)) }
+                    icon = Icons.Outlined.PhotoFilter,
+                    title = stringResource(R.string.visual_effects),
+                    checked = scheduleSettings.visualEffectsEnabled,
+                    onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(visualEffectsEnabled = enabled)) }
                 )
             }
-        )
-
-        SectionLabel(stringResource(R.string.visual_effects))
-        val effectRows = mutableListOf<@Composable () -> Unit>()
-        imageEffects.forEach { effect ->
-            effectRows.add {
-                SettingSwitchWithSlider(
-                    icon = effect.icon,
-                    title = effect.title,
-                    description = effect.description,
-                    checked = effect.enabled(primaryEffects),
-                    onCheckedChange = { enabled -> updateEffects({ effect.withEnabled(it, enabled) }) },
-                    homeChecked = effect.enabled(scheduleSettings.homeEffects),
-                    lockChecked = effect.enabled(scheduleSettings.lockEffects),
-                    onHomeCheckedChange = { enabled ->
-                        updateSettingsImmediate(scheduleSettings.copy(homeEffects = effect.withEnabled(scheduleSettings.homeEffects, enabled)))
-                    },
-                    onLockCheckedChange = { enabled ->
-                        updateSettingsImmediate(scheduleSettings.copy(lockEffects = effect.withEnabled(scheduleSettings.lockEffects, enabled)))
-                    },
-                    bothEnabled = bothEnabled,
-                    homePercentage = effect.percentage(primaryEffects),
-                    lockPercentage = effect.percentage(scheduleSettings.lockEffects),
-                    onPercentageChange = { home, lock ->
-                        updateEffects({ effect.withPercentage(it, home) }, { effect.withPercentage(it, lock) }, debounced = true)
+            if (scheduleSettings.visualEffectsEnabled) lookRows.add {
+                val chosen = chosenEffects(scheduleSettings, wallpaperMode).map { stringResource(it) }
+                SettingsRow(
+                    icon = Icons.Outlined.Tune,
+                    title = stringResource(R.string.adjust_visual_effects),
+                    onClick = onOpenVisualEffects,
+                    trailing = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = if (chosen.isEmpty()) stringResource(R.string.none) else chosen.joinToString(", "),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 140.dp)
+                            )
+                            Icon(
+                                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 )
             }
         }
-        effectRows.add {
-            SwitchRow(
-                icon = Icons.Outlined.BrightnessAuto,
-                title = stringResource(R.string.adaptive_brightness),
-                supporting = stringResource(R.string.adjust_brightness_based_on_mode),
-                checked = scheduleSettings.adaptiveBrightness,
-                onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(adaptiveBrightness = enabled)) }
-            )
-        }
-        SettingsGroup(*effectRows.toTypedArray())
+        SettingsGroup(*lookRows.toTypedArray())
 
         if (wallpaperMode == WallpaperMode.LIVE) {
             SectionLabel(stringResource(R.string.interactive_effects))
@@ -561,37 +518,3 @@ private fun AlbumRow(icon: ImageVector, label: String, albumId: String?, albums:
         }
     )
 }
-
-/** One adjustable image effect: a toggle plus a percentage within [WallpaperEffects]. */
-private class ImageEffect(
-    val icon: ImageVector,
-    @StringRes val title: Int,
-    @StringRes val description: Int,
-    val enabled: (WallpaperEffects) -> Boolean,
-    val percentage: (WallpaperEffects) -> Int,
-    val withEnabled: (WallpaperEffects, Boolean) -> WallpaperEffects,
-    val withPercentage: (WallpaperEffects, Int) -> WallpaperEffects
-)
-
-private val imageEffects = listOf(
-    ImageEffect(
-        Icons.Outlined.Brightness6, R.string.change_brightness, R.string.change_the_image_brightness,
-        { it.enableDarken }, { it.darkenPercentage },
-        { e, v -> e.copy(enableDarken = v) }, { e, v -> e.copy(darkenPercentage = v) }
-    ),
-    ImageEffect(
-        Icons.Outlined.BlurOn, R.string.change_blur, R.string.add_blur_to_the_image,
-        { it.enableBlur }, { it.blurPercentage },
-        { e, v -> e.copy(enableBlur = v) }, { e, v -> e.copy(blurPercentage = v) }
-    ),
-    ImageEffect(
-        Icons.Outlined.Vignette, R.string.change_vignette, R.string.darken_the_edges_of_the_image,
-        { it.enableVignette }, { it.vignettePercentage },
-        { e, v -> e.copy(enableVignette = v) }, { e, v -> e.copy(vignettePercentage = v) }
-    ),
-    ImageEffect(
-        Icons.Outlined.FilterBAndW, R.string.gray_filter, R.string.make_the_colors_grayscale,
-        { it.enableGrayscale }, { it.grayscalePercentage },
-        { e, v -> e.copy(enableGrayscale = v) }, { e, v -> e.copy(grayscalePercentage = v) }
-    )
-)

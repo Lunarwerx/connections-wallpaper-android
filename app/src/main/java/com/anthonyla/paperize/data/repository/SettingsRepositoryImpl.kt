@@ -52,6 +52,7 @@ private val LOCK_SCALING_TYPE = stringPreferencesKey(PreferenceKeys.LOCK_SCALING
 private val LIVE_SCALING_TYPE = stringPreferencesKey(PreferenceKeys.LIVE_SCALING_TYPE)
 private val HOME_SCROLLING_ENABLED = booleanPreferencesKey(PreferenceKeys.HOME_SCROLLING_ENABLED)
 private val ADAPTIVE_BRIGHTNESS = booleanPreferencesKey(PreferenceKeys.ADAPTIVE_BRIGHTNESS)
+private val VISUAL_EFFECTS_ENABLED = booleanPreferencesKey(PreferenceKeys.VISUAL_EFFECTS_ENABLED)
 
 /** Effect keys are "<screen>_<field>", e.g. "home_enable_blur" or "live_parallax_intensity". */
 private class EffectKeys(screen: String) {
@@ -131,6 +132,7 @@ class SettingsRepositoryImpl @Inject constructor(
             prefs.writeEffects(LOCK_EFFECTS, settings.lockEffects)
             prefs.writeEffects(LIVE_EFFECTS, settings.liveEffects)
             prefs[ADAPTIVE_BRIGHTNESS] = settings.adaptiveBrightness
+            prefs[VISUAL_EFFECTS_ENABLED] = settings.visualEffectsEnabled
         }
         return scheduleSettings(updated)
     }
@@ -213,7 +215,8 @@ class SettingsRepositoryImpl @Inject constructor(
             homeEffects = prefs.readEffects(HOME_EFFECTS),
             lockEffects = prefs.readEffects(LOCK_EFFECTS),
             liveEffects = prefs.readEffects(LIVE_EFFECTS),
-            adaptiveBrightness = prefs[ADAPTIVE_BRIGHTNESS] ?: defaults.adaptiveBrightness
+            adaptiveBrightness = prefs[ADAPTIVE_BRIGHTNESS] ?: defaults.adaptiveBrightness,
+            visualEffectsEnabled = prefs[VISUAL_EFFECTS_ENABLED] ?: defaults.visualEffectsEnabled
         )
     }
 

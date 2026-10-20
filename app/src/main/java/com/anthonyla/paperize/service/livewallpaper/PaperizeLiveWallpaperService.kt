@@ -209,7 +209,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                     }
                     
                     val albumId = settings.liveAlbumId
-                    val effects = settings.liveEffects
+                    val effects = settings.appliedEffects(ScreenType.LIVE)
                     val scalingType = settings.liveScalingType
 
                     val albumChanged = albumId != currentAlbumId
@@ -219,7 +219,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
 
                     renderer.updateEffects(effects)
                     renderer.updateScalingType(scalingType)
-                    renderer.updateAdaptiveBrightness(settings.adaptiveBrightness)
+                    renderer.updateAdaptiveBrightness(settings.appliesAdaptiveBrightness)
 
                     val scalingChanged =
                         observedScalingType != null && observedScalingType != scalingType

@@ -125,6 +125,14 @@ def scroll_to(text: str) -> None:
         cw.d(scrollable=True).scroll.to(text=text)
 
 
+def tab_bottom_has(text: str, timeout: float = 4) -> bool:
+    """Scroll the tab to its end, again until the timeout, so a row that just appeared below the fold counts."""
+    def at_end() -> bool:
+        cw.d(scrollable=True).scroll.toEnd(max_swipes=5)
+        return cw.has(text)
+    return wait_until(at_end, timeout)
+
+
 def t_lock_first_folder():
     """The user's path: turn on Lock, open its album picker, add a folder from there."""
     cw.fresh_app()
@@ -213,8 +221,15 @@ def t_library_folder_fills_both():
     labels = cw.labels()
     check(labels.count(FOLDER) >= 2, f"Lock and Home both use {FOLDER}: {labels[5:25]}")
     cw.d.screenshot("shots/suite/wallpaper-tab-both.jpg")
-    scroll_to("Grayscale")
+    check(tab_bottom_has("Visual effects"), "the Visual effects switch ends the tab")
+    cw.tap("Visual effects")
+    check(tab_bottom_has("Adjust visual effects"), "the switch shows Adjust visual effects")
+    cw.tap("Adjust visual effects")
+    check(cw.has("Lock screen preview", timeout=5) and cw.has("Home screen preview"), "both screens get a preview")
     cw.d.screenshot("shots/suite/effects-both.jpg")
+    cw.d.press("back")
+    cw.tap("Visual effects")
+    check(wait_until(lambda: not cw.has("Adjust visual effects"), 3), "visual effects off again")
 
 
 def t_same_folder_numbered():
@@ -276,15 +291,31 @@ def t_theme():
 
 
 def t_effects():
-    """With one screen rotating, an effect row turns on with a tap on its title and shows its slider."""
+    """Visual effects: one switch on the tab, a page with a live preview, and the lock wallpaper follows the switch."""
     open_tab("Wallpaper")
-    scroll_to("Grayscale")
+    check(tab_bottom_has("Visual effects") and not cw.has("Adjust visual effects"),
+          "at the end of the tab, no Adjust row while visual effects are off")
+    cw.tap("Visual effects")
+    check(tab_bottom_has("Adjust visual effects"), "the switch shows Adjust visual effects")
+    cw.tap("Adjust visual effects")
+    check(cw.has("Lock screen preview", timeout=5), "the page opens on a lock screen preview")
     check(not cw.has("%"), "no slider while every effect is off")
-    cw.tap("Blur")
-    check(cw.has("%", timeout=3), "Blur on shows its percentage slider")
-    cw.d.screenshot("shots/suite/effects.jpg")
-    cw.tap("Blur")
-    check(wait_until(lambda: not cw.has("%"), 3), "Blur off hides it again")
+    check(wait_until(lambda: not cw.is_gray(cw.element_rgb("Lock screen preview")), 5),
+          f"the preview starts in colour {cw.element_rgb('Lock screen preview')}")
+    cw.tap("Grayscale")
+    check(cw.has("%", timeout=3), "Grayscale on shows its slider")
+    check(wait_until(lambda: cw.is_gray(cw.element_rgb("Lock screen preview")), 5),
+          f"the preview turns gray {cw.element_rgb('Lock screen preview')}")
+    cw.d.screenshot("shots/suite/effects-page.jpg")
+    check(wait_until(lambda: cw.is_gray(cw.wall_rgb("lock")), 20), f"the lock wallpaper is redrawn gray {cw.wall_rgb('lock')}")
+    cw.d.press("back")
+    check(tab_bottom_has("Adjust visual effects"), "back on the Wallpaper tab, Adjust still there")
+    check(cw.has("Grayscale"), "the Adjust row names the effect that is on")
+    cw.d.screenshot("shots/suite/wallpaper-tab-effects.jpg")
+    cw.tap("Visual effects")
+    check(wait_until(lambda: tab_bottom_has("Visual effects", 1) and not cw.has("Adjust visual effects"), 4),
+          "switching visual effects off hides Adjust")
+    check(wait_until(lambda: not cw.is_gray(cw.wall_rgb("lock")), 20), f"and the lock wallpaper has its colour back {cw.wall_rgb('lock')}")
 
 
 def t_shortcut():

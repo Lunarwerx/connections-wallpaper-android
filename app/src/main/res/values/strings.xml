@@ -113,6 +113,10 @@
   <string name="scaling">Scaling</string>
   <string name="wallpaper_effects_title">Wallpaper effects</string>
   <string name="visual_effects">Visual effects</string>
+  <string name="adjust_visual_effects">Adjust visual effects</string>
+  <string name="preview_lock_screen">Lock screen preview</string>
+  <string name="preview_home_screen">Home screen preview</string>
+  <string name="preview_wallpaper">Wallpaper preview</string>
   <string name="interactive_effects">Interactive Effects</string>
   <string name="current_wallpapers">Current wallpapers</string>
 

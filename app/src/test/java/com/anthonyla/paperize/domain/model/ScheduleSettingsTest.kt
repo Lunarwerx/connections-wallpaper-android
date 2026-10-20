@@ -1,6 +1,7 @@
 package com.anthonyla.paperize.domain.model
 
 import com.anthonyla.paperize.core.ScalingType
+import com.anthonyla.paperize.core.ScreenType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,6 +30,32 @@ class ScheduleSettingsTest {
             ),
             settings.validate()
         )
+    }
+
+    @Test
+    fun `visual effects are drawn only while switched on, and double tap and parallax always`() {
+        val home = WallpaperEffects(
+            enableBlur = true, blurPercentage = 40, enableDarken = true, darkenPercentage = 30,
+            enableVignette = true, vignettePercentage = 50, enableGrayscale = true, grayscalePercentage = 100,
+            enableDoubleTap = true, enableParallax = true, parallaxIntensity = 60
+        )
+        val chosen = mapOf(
+            ScreenType.HOME to home, ScreenType.BOTH to home,
+            ScreenType.LOCK to home.copy(blurPercentage = 70), ScreenType.LIVE to home.copy(blurPercentage = 90)
+        )
+        val off = ScheduleSettings(
+            homeEffects = home, lockEffects = chosen.getValue(ScreenType.LOCK), liveEffects = chosen.getValue(ScreenType.LIVE),
+            adaptiveBrightness = true
+        )
+        val on = off.copy(visualEffectsEnabled = true)
+        ScreenType.entries.forEach { screen ->
+            val drawn = off.appliedEffects(screen)
+            assertFalse("$screen off", drawn.enableBlur || drawn.enableDarken || drawn.enableVignette || drawn.enableGrayscale)
+            assertTrue("$screen interactive", drawn.enableDoubleTap && drawn.enableParallax && drawn.parallaxIntensity == 60)
+            assertEquals("$screen on", chosen.getValue(screen), on.appliedEffects(screen))
+        }
+        assertFalse(off.appliesAdaptiveBrightness)
+        assertTrue(on.appliesAdaptiveBrightness)
     }
 
     @Test
@@ -71,7 +98,8 @@ class ScheduleSettingsTest {
             current.copy(homeEffects = effects),
             current.copy(lockEffects = effects),
             current.copy(liveEffects = effects),
-            current.copy(adaptiveBrightness = true)
+            current.copy(adaptiveBrightness = true),
+            current.copy(visualEffectsEnabled = true)
         ).forEach { edited ->
             assertTrue("Display: $edited", current.hasDisplayChanges(edited))
             assertFalse("Scheduling: $edited", current.hasSchedulingChanges(edited))

@@ -35,6 +35,7 @@ import androidx.compose.ui.util.fastRoundToInt
 import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.anthonyla.paperize.core.ScalingType
+import com.anthonyla.paperize.domain.model.WallpaperEffects
 
 private const val TAG = "WallpaperUtil"
 private const val BUILT_IN_DISPLAY_CATEGORY =
@@ -367,6 +368,34 @@ fun adaptiveBrightnessAdjustment(context: Context, source: Bitmap): Bitmap {
     return adjustBitmapBrightness(source, getAdaptiveBrightnessMultiplier(context, brightness))
 }
 
+/**
+ * [effects], then adaptive brightness, in the order a wallpaper gets them; consumes [source] when it
+ * returns another bitmap. [blurScale] shrinks the blur radius for a picture smaller than the screen.
+ */
+fun applyWallpaperEffects(
+    context: Context,
+    source: Bitmap,
+    effects: WallpaperEffects,
+    adaptiveBrightness: Boolean,
+    blurScale: Float = 1f
+): Bitmap {
+    var bitmap = processBitmap(
+        source = source,
+        enableDarken = effects.enableDarken, darkenPercent = effects.darkenPercentage,
+        enableBlur = effects.enableBlur, blurPercent = effects.blurPercentage,
+        enableVignette = effects.enableVignette, vignettePercent = effects.vignettePercentage,
+        enableGrayscale = effects.enableGrayscale, grayscalePercent = effects.grayscalePercentage,
+        blurScale = blurScale
+    )
+    if (bitmap !== source) source.recycle()
+    if (adaptiveBrightness) {
+        val adjusted = adaptiveBrightnessAdjustment(context, bitmap)
+        if (adjusted !== bitmap) bitmap.recycle()
+        bitmap = adjusted
+    }
+    return bitmap
+}
+
 fun processBitmap(
     source: Bitmap,
     enableDarken: Boolean = false,
@@ -376,7 +405,8 @@ fun processBitmap(
     enableVignette: Boolean = false,
     vignettePercent: Int = 0,
     enableGrayscale: Boolean = false,
-    grayscalePercent: Int = 0
+    grayscalePercent: Int = 0,
+    blurScale: Float = 1f
 ): Bitmap {
     val hasDarken = enableDarken && darkenPercent > 0
     val hasBlur = enableBlur && blurPercent > 0
@@ -388,7 +418,7 @@ fun processBitmap(
         return processBitmapGpu(
             source,
             hasDarken, darkenPercent,
-            hasBlur, blurPercent,
+            hasBlur, blurPercent * blurScale,
             hasVignette, vignettePercent,
             hasGrayscale, grayscalePercent
         )
@@ -415,7 +445,7 @@ fun processBitmap(
 private fun processBitmapGpu(
     source: Bitmap,
     hasDarken: Boolean, darkenPercent: Int,
-    hasBlur: Boolean, blurPercent: Int,
+    hasBlur: Boolean, blurPercent: Float,
     hasVignette: Boolean, vignettePercent: Int,
     hasGrayscale: Boolean, grayscalePercent: Int
 ): Bitmap {
@@ -444,7 +474,7 @@ private fun processBitmapGpu(
         }
 
         if (hasBlur) {
-            val radius = (blurPercent.coerceIn(0, 100) / 100f) * Constants.MAX_BLUR_RADIUS
+            val radius = (blurPercent.coerceIn(0f, 100f) / 100f) * Constants.MAX_BLUR_RADIUS
             val blurEffect = RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP)
             effect = if (effect != null) {
                 RenderEffect.createChainEffect(blurEffect, effect)

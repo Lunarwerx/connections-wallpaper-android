@@ -112,6 +112,10 @@
   <string name="scaling">缩放</string>
   <string name="wallpaper_effects_title">壁纸效果</string>
   <string name="visual_effects">视觉效果</string>
+  <string name="adjust_visual_effects">调整视觉效果</string>
+  <string name="preview_lock_screen">锁屏预览</string>
+  <string name="preview_home_screen">主屏幕预览</string>
+  <string name="preview_wallpaper">壁纸预览</string>
   <string name="interactive_effects">交互效果</string>
   <string name="current_wallpapers">当前壁纸</string>
 

@@ -25,6 +25,8 @@ data class ScheduleSettings(
     val liveScalingType: ScalingType = ScalingType.FILL,
     val liveEffects: WallpaperEffects = WallpaperEffects(),
     val adaptiveBrightness: Boolean = false,
+    /** Off: no visual effect or adaptive brightness is drawn; the choices stay for when it is on again. */
+    val visualEffectsEnabled: Boolean = false,
     /** A new wallpaper as the screen turns off, so one is waiting at unlock. */
     val changeOnUnlock: Boolean = true,
     /** Off: only unlock, double tap, the widget and the shortcut change the wallpaper. */
@@ -32,6 +34,20 @@ data class ScheduleSettings(
 ) {
     val effectiveLockIntervalMinutes: Int
         get() = if (homeEnabled && lockEnabled && separateSchedules) lockIntervalMinutes else homeIntervalMinutes
+
+    val appliesAdaptiveBrightness: Boolean
+        get() = visualEffectsEnabled && adaptiveBrightness
+
+    /** What [screen] is drawn with: its visual effects only while they are on; double tap and parallax always. */
+    fun appliedEffects(screen: ScreenType): WallpaperEffects {
+        val chosen = when (screen) {
+            ScreenType.HOME, ScreenType.BOTH -> homeEffects
+            ScreenType.LOCK -> lockEffects
+            ScreenType.LIVE -> liveEffects
+        }
+        return if (visualEffectsEnabled) chosen
+        else chosen.copy(enableBlur = false, enableDarken = false, enableVignette = false, enableGrayscale = false)
+    }
 
     fun hasRequiredAlbums(mode: WallpaperMode): Boolean = when (mode) {
         WallpaperMode.LIVE -> liveAlbumId != null
@@ -89,7 +105,8 @@ data class ScheduleSettings(
                lockEffects != other.lockEffects ||
                liveEffects != other.liveEffects ||
                liveScalingType != other.liveScalingType ||
-               adaptiveBrightness != other.adaptiveBrightness
+               adaptiveBrightness != other.adaptiveBrightness ||
+               visualEffectsEnabled != other.visualEffectsEnabled
     }
 
 }

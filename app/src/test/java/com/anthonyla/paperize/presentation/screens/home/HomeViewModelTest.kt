@@ -80,6 +80,21 @@ class HomeViewModelTest {
         assertEquals(60, stored.value.homeEffects.blurPercentage)
     }
 
+    @Test fun `closing the effects page saves a waiting slider value once, without the debounce`() = runTest {
+        val draft = stored.value.copy(homeEffects = stored.value.homeEffects.copy(enableBlur = true, blurPercentage = 35))
+        viewModel.updateScheduleSettingsDebounced(draft)
+        runCurrent()
+        assertEquals(0, stored.value.homeEffects.blurPercentage)
+
+        viewModel.flushPendingSettings()
+        runCurrent()
+        assertEquals(35, stored.value.homeEffects.blurPercentage)
+
+        viewModel.flushPendingSettings()
+        advanceUntilIdle()
+        coVerify(exactly = 1) { settings.updateScheduleSettings(any<(ScheduleSettings) -> ScheduleSettings>()) }
+    }
+
     @Test fun `disabling one screen clears only its current selection`() = runTest {
         stored.value = stored.value.copy(lockEnabled = true, lockAlbumId = "lock")
         viewModel.updateScheduleSettings(stored.value.copy(homeEnabled = false))

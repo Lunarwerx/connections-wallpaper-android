@@ -65,6 +65,8 @@ class HomeViewModel @Inject constructor(
 
     val currentLockWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LOCK) { it.lockAlbumId }
 
+    val currentLiveWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LIVE) { it.liveAlbumId }
+
     private val _showLiveWallpaperPrompt = MutableStateFlow(false)
     val showLiveWallpaperPrompt: StateFlow<Boolean> = _showLiveWallpaperPrompt.asStateFlow()
 
@@ -75,6 +77,7 @@ class HomeViewModel @Inject constructor(
     val importError: StateFlow<Int?> = _importError.asStateFlow()
 
     private var pendingSettingsJob: Job? = null
+    private var pendingSettings: ScheduleSettings? = null
     private var importJob: Job? = null
 
     init {
@@ -142,16 +145,24 @@ class HomeViewModel @Inject constructor(
     fun updateScheduleSettings(settings: ScheduleSettings) {
         pendingSettingsJob?.cancel()
         pendingSettingsJob = null
+        pendingSettings = null
         viewModelScope.launch { coordinator.updateScheduleSettings(settings) }
     }
 
     fun updateScheduleSettingsDebounced(settings: ScheduleSettings) {
         pendingSettingsJob?.cancel()
+        pendingSettings = settings
         pendingSettingsJob = viewModelScope.launch {
             delay(Constants.SETTINGS_DEBOUNCE_MS)
             pendingSettingsJob = null
+            pendingSettings = null
             coordinator.updateScheduleSettings(settings)
         }
+    }
+
+    /** Save an edit still waiting on its debounce now, for a page that closes before the wait ends. */
+    fun flushPendingSettings() {
+        pendingSettings?.let(::updateScheduleSettings)
     }
 
     fun changeWallpaperNow() = coordinator.changeWallpaperNow()

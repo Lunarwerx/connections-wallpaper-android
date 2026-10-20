@@ -34,4 +34,7 @@ data class SortRoute(val albumId: String)
 object SettingsRoute
 
 @Serializable
+object VisualEffectsRoute
+
+@Serializable
 object PrivacyRoute

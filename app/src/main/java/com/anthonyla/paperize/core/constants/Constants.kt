@@ -130,6 +130,7 @@ object PreferenceKeys {
     const val HOME_SCROLLING_ENABLED = "home_scrolling_enabled"
 
     const val ADAPTIVE_BRIGHTNESS = "adaptive_brightness"
+    const val VISUAL_EFFECTS_ENABLED = "visual_effects_enabled"
     const val FIRST_LAUNCH = "first_launch"
     const val WALLPAPER_MODE = "wallpaper_mode"
 }

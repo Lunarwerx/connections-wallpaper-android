@@ -72,6 +72,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToAlbum: (String) -> Unit,
+    onNavigateToVisualEffects: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     connectionsViewModel: ConnectionsViewModel = hiltViewModel(),
@@ -237,6 +238,7 @@ fun HomeScreen(
                             onUpdateScheduleSettingsDebounced = viewModel::updateScheduleSettingsDebounced,
                             onChangeWallpaperNow = viewModel::changeWallpaperNow,
                             onAddFolder = { addFolder(it) },
+                            onOpenVisualEffects = onNavigateToVisualEffects,
                             homeWallpaperUri = currentHomeWallpaperUri,
                             lockWallpaperUri = currentLockWallpaperUri
                         )

@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -19,11 +21,13 @@ import com.anthonyla.paperize.presentation.common.navigation.util.exitTransition
 import com.anthonyla.paperize.presentation.screens.album_view.AlbumViewScreen
 import com.anthonyla.paperize.presentation.screens.folder_view.FolderViewScreen
 import com.anthonyla.paperize.presentation.screens.home.HomeScreen
+import com.anthonyla.paperize.presentation.screens.home.HomeViewModel
 import com.anthonyla.paperize.presentation.screens.notification.NotificationPermissionScreen
 import com.anthonyla.paperize.presentation.screens.privacy.PrivacyScreen
 import com.anthonyla.paperize.presentation.screens.settings.SettingsScreen
 import com.anthonyla.paperize.presentation.screens.sort.SortViewScreen
 import com.anthonyla.paperize.presentation.screens.startup.StartupScreen
+import com.anthonyla.paperize.presentation.screens.wallpaper.VisualEffectsScreen
 import com.anthonyla.paperize.presentation.screens.wallpaper_view.WallpaperViewScreen
 
 @Composable
@@ -101,7 +105,19 @@ fun NavigationGraph(
                 },
                 onNavigateToAlbum = { albumId ->
                     navController.navigate(AlbumRoute(albumId))
+                },
+                onNavigateToVisualEffects = {
+                    navController.navigate(VisualEffectsRoute) { launchSingleTop = true }
                 }
+            )
+        }
+
+        composable<VisualEffectsRoute> { entry ->
+            // The page edits the Wallpaper tab's settings, so it shares the Home screen's view model.
+            val homeEntry = remember(entry) { navController.getBackStackEntry<HomeRoute>() }
+            VisualEffectsScreen(
+                onNavigateBack = { navController.popBackStack() },
+                viewModel = hiltViewModel<HomeViewModel>(homeEntry)
             )
         }
 

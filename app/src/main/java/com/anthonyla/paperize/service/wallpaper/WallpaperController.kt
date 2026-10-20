@@ -140,7 +140,7 @@ class WallpaperController @Inject constructor(
     )
 
     private fun ScheduleSettings.sameStaticPresentation() =
-        homeEffects == lockEffects && homeScalingType == lockScalingType && !homeScrollingEnabled
+        appliedEffects(ScreenType.HOME) == appliedEffects(ScreenType.LOCK) && homeScalingType == lockScalingType && !homeScrollingEnabled
 
     private fun ScreenType.staticScreens() = if (this == ScreenType.BOTH) listOf(ScreenType.HOME, ScreenType.LOCK) else listOf(this)
 

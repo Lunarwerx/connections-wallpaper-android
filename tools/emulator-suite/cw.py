@@ -133,8 +133,8 @@ def wallpaper_ids() -> dict:
     return ids
 
 
-def wall_color(which: str = "lock") -> str:
-    """The test colour of the wallpaper file itself (needs adb root): the lock one when set, else the shared one."""
+def wall_rgb(which: str = "lock") -> tuple:
+    """The centre pixel of the wallpaper file itself (needs adb root): the lock one when set, else the shared one."""
     import io
     from PIL import Image
     name = "wallpaper_lock" if which == "lock" else "wallpaper"
@@ -143,7 +143,22 @@ def wall_color(which: str = "lock") -> str:
         name = "wallpaper"
     r = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"], capture_output=True, creationflags=0x08000000)
     im = Image.open(io.BytesIO(r.stdout)).convert("RGB")
-    return nearest(im.getpixel((im.width // 2, im.height // 2)))
+    return im.getpixel((im.width // 2, im.height // 2))
+
+
+def wall_color(which: str = "lock") -> str:
+    """The test colour of the wallpaper file itself."""
+    return nearest(wall_rgb(which))
+
+
+def is_gray(rgb, spread: int = 14) -> bool:
+    return max(rgb) - min(rgb) <= spread
+
+
+def element_rgb(description: str) -> tuple:
+    """The centre pixel of the element with this content description, from a fresh screenshot."""
+    b = d(description=description).info["bounds"]
+    return d.screenshot().convert("RGB").getpixel(((b["left"] + b["right"]) // 2, (b["top"] + b["bottom"]) // 2))
 
 
 def fresh_app(grant: bool = True) -> None:
