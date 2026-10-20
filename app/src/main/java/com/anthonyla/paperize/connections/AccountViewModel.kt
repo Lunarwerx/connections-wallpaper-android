@@ -30,7 +30,8 @@ class AccountViewModel @Inject constructor(
     val freeNotice: StateFlow<Boolean> = _freeNotice.asStateFlow()
 
     init {
-        viewModelScope.launch { account.startTrialIfNew() }
+        // A storage error leaves the trial unstarted for now; the next launch tries again.
+        viewModelScope.launch { runCatchingCancellable { account.startTrialIfNew() } }
     }
 
     /** Something worth keeping was just added: say once, while signed out, that the app is free. */
