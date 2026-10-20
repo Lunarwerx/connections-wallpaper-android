@@ -266,6 +266,6 @@
   <string name="theme_system">跟随系统</string>
   <string name="theme_light">浅色</string>
   <string name="theme_dark">深色</string>
-  <string name="horizontal_scrolling_supporting">宽图片随主屏幕页面平移</string>
+  <string name="horizontal_scrolling_supporting">随主屏幕页面平移</string>
 </resources>
 

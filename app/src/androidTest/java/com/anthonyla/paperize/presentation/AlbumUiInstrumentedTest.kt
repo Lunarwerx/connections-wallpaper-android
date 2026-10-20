@@ -26,9 +26,7 @@ import androidx.compose.ui.unit.dp
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
-import com.anthonyla.paperize.domain.model.Album
 import com.anthonyla.paperize.presentation.screens.library.LibraryScreen
-import kotlinx.coroutines.CompletableDeferred
 import androidx.compose.ui.semantics.SemanticsActions
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.domain.model.AppSettings
@@ -57,7 +55,7 @@ class AlbumUiInstrumentedTest {
                     onToggleChanger = {}, onSelectAlbum = { _, _ -> },
                     onUpdateScheduleSettings = { latest = it },
                     onUpdateScheduleSettingsDebounced = { latest = it },
-                    onChangeWallpaperNow = {}, homeWallpaperUri = null, lockWallpaperUri = null
+                    onChangeWallpaperNow = {}, onAddFolder = {}, homeWallpaperUri = null, lockWallpaperUri = null
                 )
             }
         }
@@ -88,28 +86,20 @@ class AlbumUiInstrumentedTest {
         }
     }
 
-    @Test fun failedAlbumCreationKeepsNameAndAllowsRetryAfterPendingSave() {
-        val pending = CompletableDeferred<Result<Album>>()
-        var attempts = 0
+    @Test fun libraryAddsFromAFolderOrPhotosWithoutAskingForAName() {
+        var folders = 0
+        var photos = 0
         compose.setContent {
             PaperizeTheme(false, false) {
-                LibraryScreen(emptyList(), {}, { name ->
-                    assertEquals("Mountains", name)
-                    attempts++
-                    if (attempts == 1) pending.await()
-                    else Result.success(Album.empty(id = "album", name = name))
-                })
+                LibraryScreen(listOf(AlbumSummary.empty("beach").copy(name = "Beach")), {}, { folders++ }, { photos++ })
             }
         }
         compose.onNodeWithContentDescription(context.getString(R.string.add_album)).performClick()
-        compose.onNodeWithText(context.getString(R.string.album_name)).performTextInput("Mountains")
-        compose.onNodeWithText(context.getString(R.string.save)).performClick().assertIsNotEnabled()
-        compose.runOnIdle { pending.complete(Result.failure(IllegalStateException("Storage unavailable"))) }
-        compose.onNodeWithText(context.getString(R.string.album_create_failed)).assertIsDisplayed()
-        compose.onNodeWithText(context.getString(R.string.album_name)).assertTextContains("Mountains")
-        compose.onNodeWithText(context.getString(R.string.save)).performClick()
+        compose.onNodeWithText(context.getString(R.string.add_folder)).performClick()
+        compose.onNodeWithContentDescription(context.getString(R.string.add_album)).performClick()
+        compose.onNodeWithText(context.getString(R.string.add_photos)).performClick()
         compose.onNodeWithText(context.getString(R.string.album_name)).assertDoesNotExist()
-        compose.runOnIdle { assertEquals(2, attempts) }
+        compose.runOnIdle { assertEquals(1, folders); assertEquals(1, photos) }
     }
 
     @Test fun sortSheetExposesCurrentSelectionAndAppliesNewChoice() {

@@ -1,6 +1,8 @@
 package com.anthonyla.paperize.presentation.screens.home
 
+import android.util.Log
 import androidx.lifecycle.ViewModelStore
+import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.domain.model.AlbumSummary
@@ -9,6 +11,8 @@ import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.repository.AlbumRepository
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
+import com.anthonyla.paperize.domain.usecase.ImportWallpapersUseCase
+import com.anthonyla.paperize.presentation.screens.album_view.ImportProgress
 import com.anthonyla.paperize.service.SettingsCoordinator
 import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import io.mockk.*
@@ -31,6 +35,7 @@ class HomeViewModelTest {
     private val albums = mockk<AlbumRepository>()
     private val wallpapers = mockk<WallpaperRepository>(relaxed = true)
     private val scheduler = mockk<WallpaperScheduler>(relaxed = true)
+    private val importer = mockk<ImportWallpapersUseCase>()
     private val stored = MutableStateFlow(ScheduleSettings(homeEnabled = true, homeAlbumId = "old"))
     private val store = ViewModelStore()
     private lateinit var viewModel: HomeViewModel
@@ -51,7 +56,7 @@ class HomeViewModelTest {
         }
         every { wallpapers.getCurrentWallpaperFlow(any(), any()) } returns flowOf(null)
         val coordinator = SettingsCoordinator(mockk(relaxed = true), settings, wallpapers, albums, scheduler)
-        viewModel = HomeViewModel(albums, settings, wallpapers, mockk(), coordinator)
+        viewModel = HomeViewModel(albums, settings, wallpapers, importer, coordinator)
         store.put("home", viewModel)
     }
 
@@ -100,6 +105,24 @@ class HomeViewModelTest {
         advanceUntilIdle()
         assertTrue(stored.value.enableChanger)
         assertEquals(listOf(false, true), scheduled)
+    }
+
+    @Test fun `a failed folder import says why and leaves the importer ready to retry`() = runTest {
+        mockkStatic(Log::class)
+        every { Log.e(any(), any(), any()) } returns 0
+        coEvery { importer.createAlbumFromFolder(any(), any(), any()) } throws
+            SecurityException("permission revoked") andThenThrows IllegalStateException("disk full")
+
+        viewModel.addFolderAlbum("content://tree/pictures")
+        advanceUntilIdle()
+        assertEquals(R.string.import_permission_error, viewModel.importError.value)
+        assertEquals(ImportProgress.Idle, viewModel.importProgress.value)
+
+        viewModel.addFolderAlbum("content://tree/pictures")
+        advanceUntilIdle()
+        assertEquals(R.string.import_failed, viewModel.importError.value)
+        assertEquals(ImportProgress.Idle, viewModel.importProgress.value)
+        coVerify(exactly = 2) { importer.createAlbumFromFolder(any(), any(), any()) }
     }
 
     @Test fun `effect edits do not restart preview subscriptions but album changes do`() = runTest {

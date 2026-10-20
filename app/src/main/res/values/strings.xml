@@ -56,16 +56,16 @@
   <string name="fill">Fill</string>
   <string name="fit">Fit</string>
   <string name="stretch">Stretch</string>
-  <string name="change_brightness">Brightness Effect</string>
+  <string name="change_brightness">Brightness</string>
   <string name="home_screen_btn">Home Screen</string>
   <string name="lock_screen_btn">Lock Screen</string>
   <string name="individual_scheduling">Individual Scheduling</string>
   <string name="interval_text">Time interval</string>
-  <string name="change_blur">Blur Effect</string>
+  <string name="change_blur">Blur</string>
   <string name="lock">Lock</string>
-  <string name="change_vignette">Vignette Effect</string>
+  <string name="change_vignette">Vignette</string>
   <string name="none">None</string>
-  <string name="gray_filter">Gray Filter</string>
+  <string name="gray_filter">Grayscale</string>
   <string name="folders">Folders</string>
   <string name="wallpapers_sort">Wallpapers</string>
   <string name="close">Close</string>
@@ -111,10 +111,10 @@
   <string name="lock_album_label">Lock album</string>
   <string name="home_album_label">Home album</string>
   <string name="scaling">Scaling</string>
-  <string name="wallpaper_effects_title">Wallpaper Effects</string>
-  <string name="visual_effects">Visual Effects</string>
+  <string name="wallpaper_effects_title">Wallpaper effects</string>
+  <string name="visual_effects">Visual effects</string>
   <string name="interactive_effects">Interactive Effects</string>
-  <string name="current_wallpapers">Current Wallpapers</string>
+  <string name="current_wallpapers">Current wallpapers</string>
 
   <!-- Sort Options -->
   <string name="sort_name_asc">Name (A-Z)</string>
@@ -269,6 +269,6 @@
   <string name="theme_system">System default</string>
   <string name="theme_light">Light</string>
   <string name="theme_dark">Dark</string>
-  <string name="horizontal_scrolling_supporting">Wide pictures pan across home pages</string>
+  <string name="horizontal_scrolling_supporting">Pans across home pages</string>
 </resources>
 
