@@ -26,11 +26,15 @@ data class ConnectionsUiState(
     val tags: List<ConnectionsTag> = emptyList(),
     val wallpapers: List<ConnectionsWallpaper> = emptyList(),
     val nextCursor: String? = null,
-    val loading: Boolean = false,
+    /** True from the start: the first page is asked for as soon as the saved shape and the screen are known. */
+    val loading: Boolean = true,
     val failed: Boolean = false,
     /** Wallpapers being added to an album, and being set on the screen, by id. */
     val saving: Set<String> = emptySet(),
-    val setting: Set<String> = emptySet()
+    val setting: Set<String> = emptySet(),
+    /** The shape chip's choice, and the screen it fits ([device] is null until the screen is measured). */
+    val shape: ExploreShape = ExploreShape.FIT,
+    val device: DeviceFit? = null
 )
 
 sealed interface ConnectionsMessage {
@@ -41,6 +45,9 @@ sealed interface ConnectionsMessage {
     data class Failed(val reason: String?) : ConnectionsMessage
 }
 
+/** What one list of pages asks the gallery for; [order] puts each page closest to that screen's shape first. */
+private data class PageRequest(val query: String, val tag: String?, val orientation: WallpaperShape?, val order: DeviceFit?)
+
 private class SignInNeededException : IOException("Connections asked for a sign-in to send this wallpaper")
 
 @HiltViewModel
@@ -49,6 +56,7 @@ class ConnectionsViewModel @Inject constructor(
     private val account: ConnectionsAccount,
     private val originals: ConnectionsOriginals,
     private val createAlbumUseCase: CreateAlbumUseCase,
+    private val preferences: ExplorePreferences,
     albumRepository: AlbumRepository
 ) : ViewModel() {
 
@@ -62,33 +70,64 @@ class ConnectionsViewModel @Inject constructor(
     val messages: Flow<ConnectionsMessage> = _messages.receiveAsFlow()
 
     private var pageJob: Job? = null
+    private var request: PageRequest? = null
+    private var shapeKnown = false
 
     init {
-        reload()
         loadTags()
+        viewModelScope.launch {
+            val saved = preferences.shape()
+            // A shape picked while the saved one was still being read wins.
+            if (!shapeKnown) {
+                shapeKnown = true
+                _state.update { it.copy(shape = saved) }
+            }
+            refresh()
+        }
+    }
+
+    /** The screen Explore is shown on, measured again on every fold, unfold, turn or move to another display. */
+    fun setDevice(device: DeviceFit) {
+        if (device == _state.value.device) return
+        _state.update { it.copy(device = device) }
+        refresh()
+    }
+
+    fun selectShape(shape: ExploreShape) {
+        shapeKnown = true
+        if (shape == _state.value.shape) return
+        _state.update { it.copy(shape = shape) }
+        viewModelScope.launch { preferences.setShape(shape) }
+        refresh()
     }
 
     fun search(query: String) {
         if (query == _state.value.query) return
         _state.update { it.copy(query = query) }
-        reload()
+        refresh()
     }
 
     fun selectTag(tag: String?) {
         if (tag == _state.value.tag) return
         _state.update { it.copy(tag = tag) }
-        reload()
+        refresh()
     }
 
     fun retry() {
         if (_state.value.tags.isEmpty()) loadTags()
-        if (_state.value.wallpapers.isEmpty()) reload() else loadMore()
+        if (_state.value.wallpapers.isEmpty()) {
+            request = null
+            refresh()
+        } else {
+            loadMore()
+        }
     }
 
     fun loadMore() {
         val current = _state.value
+        val request = request ?: return
         if (current.loading || current.nextCursor == null) return
-        load(current.nextCursor)
+        load(request, current.nextCursor)
     }
 
     fun addToAlbum(wallpaper: ConnectionsWallpaper, album: AlbumSummary) = addToAlbum(wallpaper, album.id, album.name)
@@ -139,21 +178,34 @@ class ConnectionsViewModel @Inject constructor(
     private fun failure(e: Throwable): ConnectionsMessage =
         if (e is SignInNeededException) ConnectionsMessage.SignInNeeded else ConnectionsMessage.Failed(e.message)
 
-    private fun reload() {
+    /** Starts the list over when what Explore asks the gallery for has changed; a fit waits for the screen. */
+    private fun refresh() {
+        val current = _state.value
+        if (!shapeKnown) return
+        val fitting = current.shape == ExploreShape.FIT
+        if (fitting && current.device == null) return
+        val next = PageRequest(
+            query = current.query,
+            tag = current.tag,
+            orientation = current.shape.requested(current.device),
+            order = current.device.takeIf { fitting }
+        )
+        if (next == request) return
+        request = next
         pageJob?.cancel()
-        _state.update { it.copy(wallpapers = emptyList(), nextCursor = null, loading = false) }
-        load(cursor = null)
+        _state.update { it.copy(wallpapers = emptyList(), nextCursor = null) }
+        load(next, cursor = null)
     }
 
-    private fun load(cursor: String?) {
-        val request = _state.value
+    private fun load(request: PageRequest, cursor: String?) {
         _state.update { it.copy(loading = true, failed = false) }
         pageJob = viewModelScope.launch {
-            runCatchingCancellable { api.wallpapers(request.query, request.tag, cursor) }
+            runCatchingCancellable { api.wallpapers(request.query, request.tag, request.orientation?.wire, cursor) }
                 .onSuccess { page ->
+                    val items = request.order?.let { page.items.closestFirst(it) } ?: page.items
                     _state.update {
                         it.copy(
-                            wallpapers = (it.wallpapers + page.items).distinctBy { wallpaper -> wallpaper.id },
+                            wallpapers = (it.wallpapers + items).distinctBy { wallpaper -> wallpaper.id },
                             nextCursor = page.nextCursor,
                             loading = false
                         )

@@ -1,5 +1,7 @@
 package com.anthonyla.paperize.connections
 
+import android.content.pm.PackageManager
+import android.view.WindowManager
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -31,11 +34,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Computer
+import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.DevicesFold
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.TabletAndroid
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
@@ -47,6 +58,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,6 +76,7 @@ import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -81,7 +94,10 @@ import com.anthonyla.paperize.R
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
-/** Explore: the Connections gallery as a wall of pictures, with search and tag filters. Tap one to open the viewer. */
+/**
+ * Explore: the Connections gallery as a wall of pictures, with search, a shape filter that opens on what fits
+ * this screen, and tag filters. Tap one to open the viewer.
+ */
 @Composable
 fun ConnectionsScreen(
     onOpen: (Int) -> Unit,
@@ -89,10 +105,20 @@ fun ConnectionsScreen(
     viewModel: ConnectionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val device = rememberDeviceFit()
+    LaunchedEffect(device) { viewModel.setDevice(device) }
+    val showAllShapes = { viewModel.selectShape(ExploreShape.ALL) }
 
     Column(modifier = modifier.fillMaxSize()) {
         SearchPill(query = state.query, onSearch = viewModel::search)
-        TagRow(tags = state.tags, selectedTag = state.tag, onSelect = viewModel::selectTag)
+        FilterRow(
+            shape = state.shape,
+            device = state.device,
+            tags = state.tags,
+            selectedTag = state.tag,
+            onShape = viewModel::selectShape,
+            onTag = viewModel::selectTag
+        )
         Box(modifier = Modifier.fillMaxSize()) {
             when {
                 state.wallpapers.isEmpty() && state.failed -> EmptyState(
@@ -102,6 +128,12 @@ fun ConnectionsScreen(
                     onAction = viewModel::retry
                 )
                 state.wallpapers.isEmpty() && state.loading -> SkeletonGrid()
+                state.wallpapers.isEmpty() && state.shape != ExploreShape.ALL -> EmptyState(
+                    icon = Icons.Outlined.SearchOff,
+                    text = stringResource(R.string.connections_empty_shape),
+                    action = stringResource(R.string.connections_show_all_shapes),
+                    onAction = showAllShapes
+                )
                 state.wallpapers.isEmpty() -> EmptyState(
                     icon = Icons.Outlined.SearchOff,
                     text = stringResource(R.string.connections_empty)
@@ -112,10 +144,34 @@ fun ConnectionsScreen(
                     failed = state.failed,
                     onRetry = viewModel::retry,
                     onLoadMore = viewModel::loadMore,
-                    onOpen = onOpen
+                    onOpen = onOpen,
+                    // The end of a list cut down to one shape says so, and offers the rest.
+                    onShowAllShapes = showAllShapes.takeIf { state.shape != ExploreShape.ALL && state.nextCursor == null }
                 )
             }
         }
+    }
+}
+
+/**
+ * The screen a wallpaper set from here would fill: the largest window this display allows, which is the
+ * whole display as it is held now. Read again on every configuration change, so folding, unfolding,
+ * turning, or moving the window to another display picks again.
+ */
+@Composable
+private fun rememberDeviceFit(): DeviceFit {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    return remember(context, configuration) {
+        val bounds = context.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
+        val density = context.resources.displayMetrics.density
+        val packages = context.packageManager
+        DeviceFit.of(
+            widthDp = bounds.width() / density,
+            heightDp = bounds.height() / density,
+            foldable = packages.hasSystemFeature(PackageManager.FEATURE_SENSOR_HINGE_ANGLE),
+            computer = packages.hasSystemFeature(PackageManager.FEATURE_PC)
+        )
     }
 }
 
@@ -164,32 +220,106 @@ private fun SearchPill(query: String, onSearch: (String) -> Unit) {
     )
 }
 
+/** The shape chip first, then the tags, in one row. */
 @Composable
-private fun TagRow(
+private fun FilterRow(
+    shape: ExploreShape,
+    device: DeviceFit?,
     tags: List<ConnectionsTag>,
     selectedTag: String?,
-    onSelect: (String?) -> Unit
+    onShape: (ExploreShape) -> Unit,
+    onTag: (String?) -> Unit
 ) {
-    if (tags.isEmpty()) return
     val haptics = LocalHapticFeedback.current
     LazyRow(
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.padding(bottom = 8.dp)
     ) {
+        item(key = SHAPE_KEY) {
+            ShapeChip(shape = shape, device = device) { choice ->
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                onShape(choice)
+            }
+        }
+        if (tags.isEmpty()) return@LazyRow
+        item(key = DIVIDER_KEY) {
+            VerticalDivider(modifier = Modifier.height(FilterChipDefaults.Height))
+        }
         item(key = ALL_TAGS_KEY) {
             TagChip(label = stringResource(R.string.connections_all), selected = selectedTag == null) {
                 haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                onSelect(null)
+                onTag(null)
             }
         }
         items(tags, key = { it.tag }) { tag ->
             TagChip(label = tag.tag.replaceFirstChar { it.titlecase() }, selected = selectedTag == tag.tag) {
                 haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                onSelect(if (selectedTag == tag.tag) null else tag.tag)
+                onTag(if (selectedTag == tag.tag) null else tag.tag)
             }
         }
     }
+}
+
+/** Which shapes show: what fits this screen (named by its kind), every shape, or one. Opens a menu of them. */
+@Composable
+private fun ShapeChip(shape: ExploreShape, device: DeviceFit?, onSelect: (ExploreShape) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        FilterChip(
+            selected = shape != ExploreShape.ALL,
+            onClick = { open = true },
+            label = { Text(shapeLabel(shape, device)) },
+            shape = CircleShape,
+            leadingIcon = if (shape == ExploreShape.FIT) {
+                { Icon(deviceIcon(device), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+            } else null,
+            trailingIcon = {
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize))
+            }
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            ExploreShape.entries.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(shapeLabel(option, device)) },
+                    onClick = {
+                        open = false
+                        onSelect(option)
+                    },
+                    trailingIcon = if (option == shape) {
+                        { Icon(Icons.Filled.Done, contentDescription = null) }
+                    } else null
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun shapeLabel(shape: ExploreShape, device: DeviceFit?): String = stringResource(
+    when (shape) {
+        ExploreShape.FIT -> when (device?.kind) {
+            DeviceKind.PHONE -> R.string.connections_fits_phone
+            DeviceKind.FOLDED -> R.string.connections_fits_folded
+            DeviceKind.UNFOLDED -> R.string.connections_fits_unfolded
+            DeviceKind.TABLET -> R.string.connections_fits_tablet
+            DeviceKind.COMPUTER -> R.string.connections_fits_computer
+            null -> R.string.connections_fits_screen
+        }
+        ExploreShape.ALL -> R.string.connections_all_shapes
+        ExploreShape.PORTRAIT -> R.string.connections_portrait
+        ExploreShape.LANDSCAPE -> R.string.connections_landscape
+        ExploreShape.SQUARE -> R.string.connections_square
+    }
+)
+
+private fun deviceIcon(device: DeviceFit?): ImageVector = when (device?.kind) {
+    DeviceKind.PHONE -> Icons.Outlined.PhoneAndroid
+    DeviceKind.FOLDED, DeviceKind.UNFOLDED -> Icons.Outlined.DevicesFold
+    DeviceKind.TABLET -> Icons.Outlined.TabletAndroid
+    DeviceKind.COMPUTER -> Icons.Outlined.Computer
+    null -> Icons.Outlined.Devices
 }
 
 @Composable
@@ -213,7 +343,8 @@ private fun WallpaperGrid(
     failed: Boolean,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit,
-    onOpen: (Int) -> Unit
+    onOpen: (Int) -> Unit,
+    onShowAllShapes: (() -> Unit)?
 ) {
     val gridState = rememberLazyStaggeredGridState()
     LaunchedEffect(gridState) {
@@ -235,15 +366,33 @@ private fun WallpaperGrid(
         itemsIndexed(wallpapers, key = { _, wallpaper -> wallpaper.id }) { index, wallpaper ->
             Tile(wallpaper = wallpaper, onClick = { onOpen(index) })
         }
-        if (loading || failed) {
+        if (loading || failed || onShowAllShapes != null) {
             item(key = FOOTER_KEY, span = StaggeredGridItemSpan.FullLine) {
                 Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    if (loading) LoadingIndicator() else FilledTonalButton(onClick = onRetry) {
-                        Text(stringResource(R.string.connections_retry))
+                    when {
+                        loading -> LoadingIndicator()
+                        failed -> FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.connections_retry)) }
+                        onShowAllShapes != null -> EndOfShape(onShowAllShapes)
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EndOfShape(onShowAllShapes: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.connections_end_of_shape),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        FilledTonalButton(onClick = onShowAllShapes) { Text(stringResource(R.string.connections_show_all_shapes)) }
     }
 }
 
@@ -350,4 +499,6 @@ private const val MIN_RATIO = 0.4f
 private const val MAX_RATIO = 2.5f
 private const val LOAD_MORE_THRESHOLD = 6
 private const val ALL_TAGS_KEY = "__all__"
+private const val SHAPE_KEY = "__shape__"
+private const val DIVIDER_KEY = "__divider__"
 private const val FOOTER_KEY = "__footer__"

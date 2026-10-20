@@ -59,7 +59,7 @@ class AccountViewModel @Inject constructor(
     fun loadShowcase() {
         if (_showcase.value.isNotEmpty()) return
         viewModelScope.launch {
-            runCatchingCancellable { api.wallpapers("", null, null) }
+            runCatchingCancellable { api.wallpapers("", null, null, null) }
                 .onSuccess { page -> _showcase.value = page.items.take(SHOWCASE_SIZE) }
         }
     }

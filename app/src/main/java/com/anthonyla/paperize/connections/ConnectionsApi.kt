@@ -65,11 +65,13 @@ class ConnectionsApiException(val status: Int, override val message: String) : I
 class ConnectionsApi @Inject constructor() {
     private val json = Json { ignoreUnknownKeys = true }
 
-    suspend fun wallpapers(query: String, tag: String?, cursor: String?): ConnectionsWallpaperPage {
+    /** [orientation] is the gallery's portrait, landscape or square; null lists every shape. */
+    suspend fun wallpapers(query: String, tag: String?, orientation: String?, cursor: String?): ConnectionsWallpaperPage {
         val params = buildList {
             add("limit" to PAGE_SIZE.toString())
             query.trim().takeIf { it.isNotEmpty() }?.let { add("q" to it) }
             tag?.let { add("tag" to it) }
+            orientation?.let { add("orientation" to it) }
             cursor?.let { add("cursor" to it) }
         }
         val search = params.joinToString("&") { (name, value) -> "$name=${URLEncoder.encode(value, "UTF-8")}" }
