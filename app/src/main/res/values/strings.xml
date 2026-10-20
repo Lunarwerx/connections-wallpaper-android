@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
   <string name="album_create_failed">Could not create the album. Please try again.</string>
-  <string name="app_name">Paperize</string>
+  <string name="app_name">Connections Wallpaper</string>
   <string name="import_adding_folder">Adding folder…</string>
   <string name="import_adding_wallpapers">Adding wallpapers…</string>
   <string name="import_scanning">Scanning… %1$d found</string>
@@ -50,11 +50,11 @@
   <string name="privacy_intro_title">Introduction</string>
   <string name="privacy_intro_content">Welcome to %1$s! This privacy notice outlines how we collect, use, and protect your personal information when you use our mobile application. By using %1$s, you agree to the terms described in this notice.</string>
   <string name="privacy_data_collection_title">Data Collection</string>
-  <string name="privacy_data_collection_content">Notifications: %1$s requests permission to display its own wallpaper-change, background-operation, and error notifications. It does not read notifications from other apps or use them to recommend wallpapers.\n\nLocal Files: %1$s accesses the images and folders you select so it can set them as wallpapers. We do not upload or transfer these files to any external servers.</string>
+  <string name="privacy_data_collection_content">Notifications: %1$s requests permission to display its own wallpaper-change, background-operation, and error notifications. It does not read notifications from other apps or use them to recommend wallpapers.\n\nLocal Files: %1$s accesses the images and folders you select so it can set them as wallpapers. We do not upload or transfer these files to any external servers.\n\nConnections gallery: when you open the Connections tab, %1$s loads wallpaper previews from wallpaper.connectionsapi.com. When you add one to an album, it uses your Connections key to download the full-size picture and saves it to Pictures/Connections Wallpaper.</string>
   <string name="privacy_information_usage_title">Information Usage</string>
   <string name="privacy_information_usage_content">Personal Data: We do not collect or store any personal data such as names, email addresses, or phone numbers.\n\nUsage Analytics: %1$s does not track your usage behavior or collect analytics data.</string>
   <string name="privacy_data_security_title">Data Security</string>
-  <string name="privacy_data_security_content">On-Device Storage: All data used by %1$s remains on your device. We do not transmit or store any data externally.</string>
+  <string name="privacy_data_security_content">On-Device Storage: your albums, settings and Connections key stay on your device. %1$s only goes online when you browse or add Connections wallpapers.</string>
   <string name="no_albums_found">No albums found</string>
   <string name="empty_album">Empty Album</string>
   <string name="empty_album_message">This album has no wallpapers. Please add wallpapers to the album before selecting it.</string>
@@ -85,11 +85,11 @@
   <string name="make_the_colors_grayscale">Make the colors grayscale</string>
   <string name="double_tap_to_change">Double-Tap to Change</string>
   <string name="double_tap_wallpaper_to_change_it">Double-tap wallpaper to change it</string>
-  <string name="change_on_screen_off">Change on Screen Off</string>
-  <string name="change_wallpaper_when_screen_turns_off">Change wallpaper when screen turns off</string>
+  <string name="change_on_screen_off">New Wallpaper on Unlock</string>
+  <string name="change_wallpaper_when_screen_turns_off">Picks the next wallpaper when the screen turns off, so a new one is waiting when you unlock</string>
   <string name="parallax_effect">Parallax Effect</string>
   <string name="wallpaper_moves_with_screen_scroll">Swipe between home-screen pages to move the wallpaper (launcher support required)</string>
-  <string name="live_wallpaper_name">Paperize Live Wallpaper</string>
+  <string name="live_wallpaper_name">Connections Wallpaper</string>
   <string name="live_wallpaper_description">Dynamic wallpapers with effects and interactive features</string>
   <string name="adaptive_brightness">Adaptive Brightness</string>
   <string name="adjust_brightness_based_on_mode">Adjust brightness based on dark/light mode</string>
@@ -99,7 +99,7 @@
   <string name="select_album">Select album</string>
   <string name="sort">Sort</string>
   <string name="notification_permission_title">Enable Notifications</string>
-  <string name="notification_permission_description">Allow Paperize to send notifications about wallpaper changes and when the app is running in the background. You can change this anytime in settings.</string>
+  <string name="notification_permission_description">Allow Connections Wallpaper to send notifications about wallpaper changes and when the app is running in the background. You can change this anytime in settings.</string>
   <string name="skip">Skip</string>
   <string name="permission_granted">Permission Granted</string>
 
@@ -145,7 +145,7 @@
   <string name="mins">Mins</string>
   <string name="total_interval">Total: </string>
   <string name="time_unit_min">min</string>
-  <string name="live_short_interval_note">Intervals under 15 minutes run only while Paperize is the visible live wallpaper.</string>
+  <string name="live_short_interval_note">Intervals under 15 minutes run only while Connections Wallpaper is the visible live wallpaper.</string>
 
   <!-- Notification Service -->
   <string name="notification_channel_description">Wallpaper change notifications</string>
@@ -183,7 +183,7 @@
 
   <!-- Live Wallpaper Selection Dialog -->
   <string name="select_live_wallpaper">Select Live Wallpaper</string>
-  <string name="select_live_wallpaper_instruction">To use Paperize in Live Wallpaper mode, you need to select it as your live wallpaper from the system settings.</string>
+  <string name="select_live_wallpaper_instruction">To use Connections Wallpaper in Live Wallpaper mode, you need to select it as your live wallpaper from the system settings.</string>
   <string name="open_wallpaper_picker">Open Wallpaper Picker</string>
   <string name="later">Later</string>
 
@@ -197,7 +197,7 @@
   <string name="switch_mode_dialog_title">Switch to %1$s Mode?</string>
   <string name="switch_mode_dialog_description">This will reset all albums, wallpapers, and scheduling settings. This action cannot be undone.\n\nYou\'ll need to re-add your albums and configure your wallpaper settings.</string>
   <string name="switch_mode_button">Switch Mode</string>
-  <string name="open_wallpaper_picker_instruction_newline">\nTap \'Open Wallpaper Picker\' below to select Paperize from the list of available live wallpapers.</string>
+  <string name="open_wallpaper_picker_instruction_newline">\nTap \'Open Wallpaper Picker\' below to select Connections Wallpaper from the list of available live wallpapers.</string>
   <string name="loading_placeholder">…</string>
   <string name="album_name_exists_error">Album with this name already exists</string>
   <string name="battery_optimization">Battery Optimization</string>
@@ -229,4 +229,38 @@
   <string name="sort_load_failed">Could not load the album. Go back and try again.</string>
   <string name="sort_save_failed">Could not save the order. Please try again.</string>
   <string name="reset_failed">Could not finish resetting data. Please try again.</string>
+  <!-- Connections tab -->
+  <string name="connections_tab" translatable="false">Connections</string>
+  <string name="connections_search_hint">Search wallpapers</string>
+  <string name="connections_all">All</string>
+  <string name="connections_load_failed">Could not load the Connections gallery. Check your connection.</string>
+  <string name="connections_retry">Retry</string>
+  <string name="connections_empty">No wallpapers match.</string>
+  <string name="connections_view_source">View source</string>
+  <string name="connections_add_to_album">Add to album</string>
+  <string name="connections_new_album">New album</string>
+  <string name="connections_key_needed">Browsing is free. Add your Connections key to put full-size wallpapers in your albums.</string>
+  <string name="connections_add_key">Add key</string>
+  <string name="connections_saved">Added to %1$s</string>
+  <string name="connections_already_in_album">Already in that album</string>
+  <string name="connections_key_refused">Connections refused the key: %1$s</string>
+  <string name="connections_save_failed">Could not add the wallpaper: %1$s</string>
+  <string name="connections_unknown_error">unknown error</string>
+  <string name="connections_key_title">Connections key</string>
+  <string name="connections_key_body">Make a key in Connections Studio with the \"Browse and download wallpapers\" scope, then paste it here. It stays on this device.</string>
+  <string name="connections_key_saved_body">Your key is saved on this device. Paste a new one to replace it, or remove it.</string>
+  <string name="connections_key_get">Make a key in Studio</string>
+  <string name="connections_key_label">Key</string>
+  <string name="connections_key_replace">New key</string>
+  <string name="connections_key_save">Save</string>
+  <string name="connections_key_remove">Remove key</string>
+  <string name="connections_key_cancel">Cancel</string>
+  <string name="connections_license_cc0" translatable="false">CC0</string>
+  <string name="connections_license_public_domain">Public domain</string>
+  <string name="connections_license_original">Original</string>
+
+  <!-- Next-wallpaper widget -->
+  <string name="widget_next_wallpaper">Next wallpaper</string>
+  <string name="widget_next_wallpaper_description">Tap to switch to the next wallpaper</string>
 </resources>
+

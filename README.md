@@ -1,149 +1,100 @@
 <div align="center">
-  <img style="display: block" src="https://github.com/user-attachments/assets/e8fb14f5-ec8e-440e-a2ac-8065322b0e28" alt="">
-  <h1>Paperize</h1>
-  <p><strong>A dynamic wallpaper changer that keeps your device's aesthetic fresh and exciting</strong></p>
+  <h1>Connections Wallpaper</h1>
+  <p><strong>A Material 3 wallpaper rotator for Android that also browses the Connections Wallpaper gallery.</strong></p>
 
-  [![GitHub Downloads](https://img.shields.io/github/downloads/Anthonyy232/Paperize/total?style=flat&logo=github&label=Downloads)](https://github.com/Anthonyy232/Paperize/releases)
-  [![GitHub Release](https://img.shields.io/github/v/release/Anthonyy232/Paperize?style=flat&logo=github)](https://github.com/Anthonyy232/Paperize/releases/latest)
-  [![License](https://img.shields.io/github/license/Anthonyy232/Paperize?style=flat)](LICENSE)
-  [![F-Droid](https://img.shields.io/f-droid/v/com.anthonyla.paperize?style=flat&logo=fdroid)](https://f-droid.org/en/packages/com.anthonyla.paperize/)
-  
-  [![Crowdin](https://badges.crowdin.net/paperize/localized.svg)](https://crowdin.com/project/paperize)
+  [![License](https://img.shields.io/github/license/Lunarwerx/connections-wallpaper-android?style=flat)](LICENSE)
 </div>
 
 ---
 
+Connections Wallpaper is a fork of [Paperize](https://github.com/Anthonyy232/Paperize) by Anthony La,
+licensed under the GNU GPL v3.0 like the original. Paperize did the hard part (a fast, careful
+wallpaper changer). This fork adds the [Connections Wallpaper](https://wallpaper.connections.icu)
+gallery, a home-screen button, and a new name.
+
 ## Features
 
-- **Dynamic Wallpaper Changer** — Set your wallpaper to change at specific time intervals
-- **Static & Live Wallpapers** — Choose between traditional static wallpapers or smooth live wallpaper transitions
-- **Multiple Image Formats** — Supports JPG, PNG, WEBP, AVIF, HEIC/HEIF, BMP, GIF, TIFF, and SVG
-- **Folder Support** — Organize wallpapers into folders for auto-updating
-- **Dual Screen Support** — Choose the same or separate albums for home and lock screen
-- **Wallpaper Effects** — Apply various effects including brightness, blur, scaling, vignette, and more
-- **On-Device Storage** — All wallpapers and settings stored locally on your device
+- **Rotate from your own photos.** Add single photos or whole folders to an album. Folders stay
+  current: new pictures in a folder join the rotation.
+- **When it changes.** On a time interval, when you unlock (live mode), when you double-tap the
+  wallpaper (live mode), from the home-screen widget, the Quick Settings tile, or the app shortcut.
+- **Where it shows.** Home and lock screen together, lock screen only, home screen only, or a
+  different album for each.
+- **How it looks.** Fill, fit or stretch; darken (brightness), blur, vignette and grayscale.
+- **Order.** In order, or shuffled.
+- **Connections gallery.** The Connections tab browses and searches the public gallery, with tag
+  filters. Tap a wallpaper to add the full-size picture to any album.
 
----
+## The Connections tab
 
-## Download
+Browsing is free and needs no account. Adding a full-size picture to an album needs a Connections
+key with the "Browse and download wallpapers" scope:
 
-[<img src="https://github.com/Anthonyy232/Paperize/assets/60626873/1c034414-21cd-4a0a-838d-89fe7bd56910" alt="Download from GitHub" height="60">](https://github.com/Anthonyy232/Paperize/releases)
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="60">](https://f-droid.org/en/packages/com.anthonyla.paperize/)
-[<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroid" height="60">](https://apt.izzysoft.de/fdroid/index/apk/com.anthonyla.paperize)
+1. Make a key at [Connections Studio](https://studio.connections.icu/dev).
+2. In the app, open the Connections tab, tap the key button next to search, and paste it.
 
----
+The key stays on the device. Pictures you add are saved to `Pictures/Connections Wallpaper` and
+join your album like any other photo.
 
-## Localization
+## What changed from Paperize
 
-Help translate Paperize into your language! Currently, most translations are provided using machine translation — contributions from native speakers are greatly appreciated.
+- New Connections tab (`connections/`): gallery client, key storage, and saving to albums through
+  the system photo library.
+- New "Next wallpaper" home-screen widget (`service/widget/`).
+- "Change on screen off" is labelled "New Wallpaper on Unlock": the next picture is chosen as the
+  screen turns off, so it is waiting when you unlock.
+- New name, app id (`icu.connections.wallpaper`) and icon. It installs next to Paperize rather than
+  over it.
 
-**[Contribute on Crowdin →](https://crowdin.com/project/paperize/invite?h=d8d7a7513d2beb0c96ba9b2a5f85473e2084922)**
-
----
-
-## Tech Stack
-
-| Category | Technology |
-|----------|------------|
-| **Language** | [Kotlin](https://kotlinlang.org/) |
-| **UI Framework** | [Jetpack Compose](https://developer.android.com/develop/ui/compose) |
-| **Design System** | [Material 3](https://m3.material.io/) |
-| **Dependency Injection** | [Dagger Hilt](https://dagger.dev/hilt/) |
-| **Database** | [Room](https://developer.android.com/training/data-storage/room) |
-| **Image Loading** | [Coil](https://coil-kt.github.io/coil/) |
-
-<details>
-<summary><b>View all dependencies</b></summary>
-
-- [Zoomable](https://github.com/usuiat/Zoomable) — Zoomable and pannable views
-
-</details>
-
----
-
-## Architecture
-
-- `AlbumRepository` owns library mutations. Imports, reordering, removal, covers,
-  and queue invalidation use Room transactions; provider scans run outside them.
-- `DocumentSource` and `WallpaperRenderer` (domain interfaces, Android implementations in
-  `data/source`) keep use cases free of document-provider and bitmap-decoding details.
-- `WallpaperRepository` owns rotation queues and current-wallpaper records.
-  Queue creation checks and writes in one transaction, including synchronized screens.
-  Static changes and the live wallpaper engine both dequeue through
-  `ChangeWallpaperUseCase.dequeueNext`.
-- `WallpaperController` shares static wallpaper application between the service
-  and worker. Callers hold `WallpaperChangeLock` through application and schedule
-  updates. The controller recycles applied bitmaps.
-- `SettingsCoordinator` persists wallpaper settings edits and applies their side effects
-  (schedules, queues, immediate changes) one at a time; ViewModels only hold UI state.
-  `WallpaperChangeService` helpers are the single way to start a manual change.
-- Repositories and use cases throw on failure. ViewModels, services, and workers
-  catch at the edge, using `runCatchingCancellable` where they need a `Result`, so
-  coroutine cancellation always propagates. Progress belongs to UI state.
-- Room migrations preserve versions 1–3 when upgrading to version 4. New schema
-  changes must include a migration; destructive fallback is disabled.
-
-## Building from Source
-
-### Prerequisites
+## Building from source
 
 | Requirement | Version |
 |-------------|---------|
 | Java | 17 |
 | Android Gradle Plugin | 9.3.2 |
 | Gradle | 9.7.1 |
-| Compile SDK | 37 (Android 17) |
+| Compile SDK | 37 |
 | Minimum SDK | 31 (Android 12) |
 | Target SDK | 36 |
 
-### Build Steps
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Anthonyy232/Paperize.git
-   cd Paperize
-   ```
-
-2. **Open in Android Studio**
-   - Launch Android Studio
-   - Select `File > Open` and navigate to the cloned repository
-
-3. **Build and Run**
-   - Click `▶ Run` to build and install on a connected device, or
-   - Select `Build > Generate Signed Bundle / APK` to create a signed release
-
----
-
-### Verification
-
-Set `ANDROID_HOME` to your Android SDK directory, or configure `sdk.dir` in
-`local.properties`. Use the checked-in Gradle wrapper:
+Set `ANDROID_HOME` to your Android SDK, or put `sdk.dir` in `local.properties`, then:
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew assembleDebug
+```
+
+The APK lands in `app/build/outputs/apk/debug/`. On Windows, use `gradlew.bat`.
+
+Paperize's own checks still apply:
+
+```bash
+./gradlew testDebugUnitTest lintDebug
 ./gradlew connectedDebugAndroidTest
 ```
 
-On Windows, use `gradlew.bat`. Device tests require a running Android emulator or
-connected device (API 31 or newer). They cover rendering, scheduling, document
-provider failures, import rollback, album cleanup, and library controls.
+## Architecture
 
-## Contributing
+The Paperize architecture is unchanged; see its notes below. The Connections tab sits beside it:
 
-Contributions are welcome! Feel free to:
+- `ConnectionsApi` calls `wallpaper.connectionsapi.com`: `GET /v1/wallpapers`, `GET /v1/tags`, and
+  `POST /v1/wallpapers/download` with the member's key.
+- `SaveConnectionsWallpaperUseCase` downloads the original into the photo library and adds it to
+  an album through `AlbumRepository`, so the rotation code treats it like any other photo.
+- The widget opens the same invisible activity as the launcher shortcut, which starts
+  `WallpaperChangeService`.
 
-- Report bugs by opening an issue
-- Suggest features or improvements
-- Submit pull requests
+Paperize's notes:
 
----
-
-## Support
-
-If you find Paperize useful, consider supporting development through [GitHub Sponsors](https://github.com/sponsors/Anthonyy232) (one-time or monthly). Thank you!
-
----
+- `AlbumRepository` owns library mutations. Imports, reordering, removal, covers,
+  and queue invalidation use Room transactions; provider scans run outside them.
+- `WallpaperRepository` owns rotation queues and current-wallpaper records. Static changes and
+  the live wallpaper engine both dequeue through `ChangeWallpaperUseCase.dequeueNext`.
+- `SettingsCoordinator` persists wallpaper settings edits and applies their side effects one at a
+  time; `WallpaperChangeService` helpers are the single way to start a manual change.
+- Repositories and use cases throw on failure. ViewModels, services, and workers catch at the
+  edge, using `runCatchingCancellable`, so coroutine cancellation always propagates.
 
 ## License
 
-This project is licensed under the **GNU General Public License v3.0** — see the [LICENSE](LICENSE) file for details.
+GNU General Public License v3.0; see [LICENSE](LICENSE). Original work © Anthony La and the
+Paperize contributors.

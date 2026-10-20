@@ -29,6 +29,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.anthonyla.paperize.R
+import com.anthonyla.paperize.connections.ConnectionsScreen
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.presentation.screens.home.components.HomeTopBar
 import com.anthonyla.paperize.presentation.screens.home.components.getTabItems
@@ -56,7 +57,8 @@ fun HomeScreen(
 
     val tabItems = getTabItems(
         wallpaperTitle = stringResource(R.string.wallpaper),
-        libraryTitle = stringResource(R.string.library)
+        libraryTitle = stringResource(R.string.library),
+        connectionsTitle = stringResource(R.string.connections_tab)
     )
 
     val pagerState = rememberPagerState { tabItems.size }
@@ -116,11 +118,12 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        else -> LibraryScreen(
+                        1 -> LibraryScreen(
                             albums = albums,
                             onViewAlbum = onNavigateToAlbum,
                             onCreateAlbum = { name -> viewModel.createAlbum(name) }
                         )
+                        else -> ConnectionsScreen()
                     }
                 }
             }

@@ -31,11 +31,11 @@ android {
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
 
     defaultConfig {
-        applicationId = "com.anthonyla.paperize"
+        applicationId = "icu.connections.wallpaper"
         minSdk = 31
         targetSdk = 36
-        versionCode = 58
-        versionName = "4.2.1"
+        versionCode = 1
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -97,6 +97,7 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
     implementation(libs.coil.svg)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.hilt.navigation.compose)
