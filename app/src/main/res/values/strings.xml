@@ -229,35 +229,50 @@
   <string name="sort_load_failed">Could not load the album. Go back and try again.</string>
   <string name="sort_save_failed">Could not save the order. Please try again.</string>
   <string name="reset_failed">Could not finish resetting data. Please try again.</string>
-  <!-- Connections tab -->
-  <string name="connections_tab" translatable="false">Connections</string>
+
+  <!-- Connections: Explore, the viewer and sign-in -->
+  <string name="explore">Explore</string>
   <string name="connections_search_hint">Search wallpapers</string>
+  <string name="connections_clear_search">Clear search</string>
   <string name="connections_all">All</string>
-  <string name="connections_load_failed">Could not load the Connections gallery. Check your connection.</string>
+  <string name="connections_load_failed">Couldn\'t load the gallery</string>
   <string name="connections_retry">Retry</string>
-  <string name="connections_empty">No wallpapers match.</string>
+  <string name="connections_empty">No wallpapers match</string>
   <string name="connections_view_source">View source</string>
   <string name="connections_add_to_album">Add to album</string>
   <string name="connections_new_album">New album</string>
-  <string name="connections_key_needed">Browsing is free. Add your Connections key to put full-size wallpapers in your albums.</string>
-  <string name="connections_add_key">Add key</string>
   <string name="connections_saved">Added to %1$s</string>
   <string name="connections_already_in_album">Already in that album</string>
-  <string name="connections_key_refused">Connections refused the key: %1$s</string>
-  <string name="connections_save_failed">Could not add the wallpaper: %1$s</string>
+  <string name="connections_failed">Couldn\'t get the wallpaper: %1$s</string>
   <string name="connections_unknown_error">unknown error</string>
-  <string name="connections_key_title">Connections key</string>
-  <string name="connections_key_body">Make a key in Connections Studio with the \"Browse and download wallpapers\" scope, then paste it here. It stays on this device.</string>
-  <string name="connections_key_saved_body">Your key is saved on this device. Paste a new one to replace it, or remove it.</string>
-  <string name="connections_key_get">Make a key in Studio</string>
-  <string name="connections_key_label">Key</string>
-  <string name="connections_key_replace">New key</string>
-  <string name="connections_key_save">Save</string>
-  <string name="connections_key_remove">Remove key</string>
-  <string name="connections_key_cancel">Cancel</string>
-  <string name="connections_license_cc0" translatable="false">CC0</string>
+  <string name="connections_close">Close</string>
+  <string name="connections_set_wallpaper">Set wallpaper</string>
+  <string name="connections_setting">Setting…</string>
+  <string name="connections_set_both">Home and lock screens</string>
+  <string name="connections_set_home">Home screen</string>
+  <string name="connections_set_lock">Lock screen</string>
+  <string name="connections_set_done">Wallpaper set</string>
+  <string name="connections_account">Account</string>
+  <string name="connections_sign_in">Sign in with Connections</string>
+  <string name="connections_sign_in_action">Sign in</string>
+  <string name="connections_signing_in">Signing in…</string>
+  <string name="connections_sign_in_failed">Sign-in didn\'t finish: %1$s</string>
+  <string name="connections_sign_in_needed">Sign in to download full-size wallpapers</string>
+  <string name="connections_no_browser">No browser on this phone can open Connections sign-in</string>
+  <string name="connections_sign_out">Sign out</string>
+  <string name="connections_free_account">Free Connections account</string>
+  <string name="connections_perk_full_size">Full-size wallpapers</string>
+  <string name="connections_free_no_card">Free · No card</string>
+  <string name="connections_trial_over">Your free week is over</string>
+  <string name="connections_wall_title">Sign in to keep going</string>
+  <string name="connections_wall_body">Your free week is over. Your wallpapers keep changing either way.</string>
   <string name="connections_license_public_domain">Public domain</string>
   <string name="connections_license_original">Original</string>
+  <string name="connections_license_cc0" translatable="false">CC0</string>
+  <plurals name="connections_trial_days_left">
+    <item quantity="one">%d day left in your free week</item>
+    <item quantity="other">%d days left in your free week</item>
+  </plurals>
 
   <!-- Next-wallpaper widget -->
   <string name="widget_next_wallpaper">Next wallpaper</string>

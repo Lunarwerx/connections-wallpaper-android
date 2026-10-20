@@ -76,7 +76,7 @@ fun SettingSwitchWithSlider(
                     Text(
                         text = stringResource(title),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
@@ -121,7 +121,7 @@ fun SettingSwitchWithSlider(
                         Text(
                             text = stringResource(title),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
@@ -217,7 +217,7 @@ private fun PercentageSlider(
                 text = "${value.roundToInt()}%",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(start = AppSpacing.medium)
             )
         }

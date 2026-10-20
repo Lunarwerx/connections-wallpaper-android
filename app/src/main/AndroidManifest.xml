@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions -->
-    <!-- The Connections tab browses and downloads from the Connections Wallpaper gallery. -->
+    <!-- Explore browses the Connections Wallpaper gallery and downloads originals; sign-in talks to Connections. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -68,6 +68,24 @@
             android:noHistory="true"
             android:taskAffinity=""
             android:theme="@android:style/Theme.NoDisplay" />
+
+        <!-- Connections sign-in: the browser returns here with the code, then the app comes back -->
+        <activity
+            android:name=".connections.SignInReturnActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="aegis-handoff"
+                    android:scheme="icu.connections.wallpaper" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".service.wallpaper.WallpaperChangeService"

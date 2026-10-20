@@ -74,7 +74,7 @@ fun CurrentWallpaperPreview(
             Text(
                 text = stringResource(R.string.current_wallpapers),
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Medium,
                 modifier = Modifier.padding(bottom = AppSpacing.medium),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis

@@ -109,7 +109,7 @@ fun OnboardingLayout(
                             text = title,
                             style = MaterialTheme.typography.headlineLarge,
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center
                         )
                     }

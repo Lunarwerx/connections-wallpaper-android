@@ -227,32 +227,49 @@
   <string name="sort_save_failed">无法保存顺序。请重试。</string>
   <string name="reset_failed">无法完成数据重置，请重试。</string>
   <!-- Connections 标签页 -->
+
+  <!-- Connections: Explore, the viewer and sign-in -->
+  <string name="explore">探索</string>
   <string name="connections_search_hint">搜索壁纸</string>
+  <string name="connections_clear_search">清除搜索</string>
   <string name="connections_all">全部</string>
-  <string name="connections_load_failed">无法加载 Connections 图库，请检查网络连接。</string>
+  <string name="connections_load_failed">无法加载图库</string>
   <string name="connections_retry">重试</string>
-  <string name="connections_empty">没有匹配的壁纸。</string>
+  <string name="connections_empty">没有匹配的壁纸</string>
   <string name="connections_view_source">查看来源</string>
   <string name="connections_add_to_album">添加到相册</string>
   <string name="connections_new_album">新建相册</string>
-  <string name="connections_key_needed">浏览免费。添加你的 Connections 密钥后，即可把原图壁纸放进相册。</string>
-  <string name="connections_add_key">添加密钥</string>
   <string name="connections_saved">已添加到 %1$s</string>
   <string name="connections_already_in_album">已在该相册中</string>
-  <string name="connections_key_refused">Connections 拒绝了此密钥：%1$s</string>
-  <string name="connections_save_failed">无法添加壁纸：%1$s</string>
+  <string name="connections_failed">无法获取壁纸：%1$s</string>
   <string name="connections_unknown_error">未知错误</string>
-  <string name="connections_key_title">Connections 密钥</string>
-  <string name="connections_key_body">在 Connections Studio 中创建一个带有“Browse and download wallpapers”权限的密钥，然后粘贴到这里。密钥只保存在此设备上。</string>
-  <string name="connections_key_saved_body">你的密钥已保存在此设备上。粘贴新密钥即可替换，也可以将其移除。</string>
-  <string name="connections_key_get">在 Studio 中创建密钥</string>
-  <string name="connections_key_label">密钥</string>
-  <string name="connections_key_replace">新密钥</string>
-  <string name="connections_key_save">保存</string>
-  <string name="connections_key_remove">移除密钥</string>
-  <string name="connections_key_cancel">取消</string>
+  <string name="connections_close">关闭</string>
+  <string name="connections_set_wallpaper">设为壁纸</string>
+  <string name="connections_setting">正在设置…</string>
+  <string name="connections_set_both">主屏幕和锁屏</string>
+  <string name="connections_set_home">主屏幕</string>
+  <string name="connections_set_lock">锁屏</string>
+  <string name="connections_set_done">壁纸已设置</string>
+  <string name="connections_account">账号</string>
+  <string name="connections_sign_in">使用 Connections 登录</string>
+  <string name="connections_sign_in_action">登录</string>
+  <string name="connections_signing_in">正在登录…</string>
+  <string name="connections_sign_in_failed">登录未完成：%1$s</string>
+  <string name="connections_sign_in_needed">登录后即可下载原图壁纸</string>
+  <string name="connections_no_browser">此手机上没有可以打开 Connections 登录页面的浏览器</string>
+  <string name="connections_sign_out">退出登录</string>
+  <string name="connections_free_account">免费 Connections 账号</string>
+  <string name="connections_perk_full_size">原图壁纸</string>
+  <string name="connections_free_no_card">免费 · 无需银行卡</string>
+  <string name="connections_trial_over">免费试用周已结束</string>
+  <string name="connections_wall_title">登录以继续使用</string>
+  <string name="connections_wall_body">免费试用周已结束。你的壁纸仍会照常更换。</string>
   <string name="connections_license_public_domain">公共领域</string>
   <string name="connections_license_original">原创</string>
+  <plurals name="connections_trial_days_left">
+    <item quantity="one">免费试用还剩 %d 天</item>
+    <item quantity="other">免费试用还剩 %d 天</item>
+  </plurals>
 
   <!-- 下一张壁纸小组件 -->
   <string name="widget_next_wallpaper">下一张壁纸</string>

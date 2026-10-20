@@ -58,11 +58,9 @@ private data class ConnectionsRefusal(val error: String? = null, val message: St
 
 /** The gallery refused a request; [message] is its own sentence when it sent one. */
 class ConnectionsApiException(val status: Int, override val message: String) : IOException(message) {
-    /** 401/403: no key, a key it does not accept, or a key without wallpaper:read. */
-    val keyRefused: Boolean get() = status == 401 || status == 403
 }
 
-/** The Connections Wallpaper plane's public API: browse for everyone, originals for a key with wallpaper:read. */
+/** The Connections Wallpaper plane's public API: browse for everyone, originals for a signed-in member. */
 @Singleton
 class ConnectionsApi @Inject constructor() {
     private val json = Json { ignoreUnknownKeys = true }
@@ -81,9 +79,10 @@ class ConnectionsApi @Inject constructor() {
     suspend fun tags(): List<ConnectionsTag> =
         json.decodeFromString<ConnectionsTags>(request("GET", "/v1/tags")).tags
 
-    suspend fun download(id: String, key: String): ConnectionsDownload =
+    /** [token] is the member's AEGIS access token (ConnectionsAccount.accessToken). */
+    suspend fun download(id: String, token: String): ConnectionsDownload =
         json.decodeFromString(
-            request("POST", "/v1/wallpapers/download", body = json.encodeToString(mapOf("id" to id)), key = key)
+            request("POST", "/v1/wallpapers/download", body = json.encodeToString(mapOf("id" to id)), token = token)
         )
 
     /** Streams the original behind a [download] URL into [write]. */
@@ -98,13 +97,13 @@ class ConnectionsApi @Inject constructor() {
         }
     }
 
-    private suspend fun request(method: String, path: String, body: String? = null, key: String? = null): String =
+    private suspend fun request(method: String, path: String, body: String? = null, token: String? = null): String =
         withContext(Dispatchers.IO) {
             val connection = open(BASE_URL + path)
             try {
                 connection.requestMethod = method
                 connection.setRequestProperty("accept", "application/json")
-                key?.let { connection.setRequestProperty("authorization", "Bearer $it") }
+                token?.let { connection.setRequestProperty("authorization", "Bearer $it") }
                 if (body != null) {
                     connection.doOutput = true
                     connection.setRequestProperty("content-type", "application/json")
@@ -134,7 +133,6 @@ class ConnectionsApi @Inject constructor() {
     companion object {
         const val BASE_URL = "https://wallpaper.connectionsapi.com"
         const val GALLERY_URL = "https://wallpaper.connections.icu"
-        const val KEYS_URL = "https://studio.connections.icu/dev"
         private const val PAGE_SIZE = 30
         private const val TIMEOUT_MS = 20_000
     }

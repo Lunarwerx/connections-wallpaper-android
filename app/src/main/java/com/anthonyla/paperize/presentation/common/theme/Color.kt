@@ -1,76 +1,87 @@
 package com.anthonyla.paperize.presentation.common.theme
 
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
-val md_theme_light_primary = Color(0xFFB8336A)
-val md_theme_light_onPrimary = Color(0xFFFFFFFF)
-val md_theme_light_primaryContainer = Color(0xFFFFD9E4)
-val md_theme_light_onPrimaryContainer = Color(0xFF8C1F4C)
-val md_theme_light_secondary = Color(0xFF8B5563)
-val md_theme_light_onSecondary = Color(0xFFFFFFFF)
-val md_theme_light_secondaryContainer = Color(0xFFFFDAE1)
-val md_theme_light_onSecondaryContainer = Color(0xFF6A3D49)
-val md_theme_light_tertiary = Color(0xFFA35F35)
-val md_theme_light_onTertiary = Color(0xFFFFFFFF)
-val md_theme_light_tertiaryContainer = Color(0xFFFFDCC2)
-val md_theme_light_onTertiaryContainer = Color(0xFF7A4520)
-val md_theme_light_error = Color(0xFFBA1A1A)
-val md_theme_light_errorContainer = Color(0xFFFFDAD6)
-val md_theme_light_onError = Color(0xFFFFFFFF)
-val md_theme_light_onErrorContainer = Color(0xFF93000A)
-val md_theme_light_background = Color(0xFFFFFBFF)
-val md_theme_light_onBackground = Color(0xFF211A1C)
-val md_theme_light_surface = Color(0xFFFFFBFF)
-val md_theme_light_onSurface = Color(0xFF211A1C)
-val md_theme_light_surfaceVariant = Color(0xFFF4DDE2)
-val md_theme_light_onSurfaceVariant = Color(0xFF524245)
-val md_theme_light_outline = Color(0xFF857275)
-val md_theme_light_inverseOnSurface = Color(0xFFFEEDF0)
-val md_theme_light_inverseSurface = Color(0xFF372E2F)
-val md_theme_light_inversePrimary = Color(0xFFFFB0C8)
-val md_theme_light_surfaceTint = Color(0xFFB8336A)
-val md_theme_light_outlineVariant = Color(0xFFD7C1C4)
-val md_theme_light_scrim = Color(0xFF000000)
+/**
+ * Google Material 3 tones: neutral text, one blue accent, surfaces that step in tone rather than
+ * cast shadows. Dynamic color (Settings) replaces these with the wallpaper's own palette.
+ */
+internal val LightColors = lightColorScheme(
+    primary = Color(0xFF0B57D0),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFD3E3FD),
+    onPrimaryContainer = Color(0xFF041E49),
+    inversePrimary = Color(0xFFA8C7FA),
+    secondary = Color(0xFF00639B),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFC2E7FF),
+    onSecondaryContainer = Color(0xFF001D35),
+    tertiary = Color(0xFF146C2E),
+    onTertiary = Color(0xFFFFFFFF),
+    tertiaryContainer = Color(0xFFC4EED0),
+    onTertiaryContainer = Color(0xFF072711),
+    error = Color(0xFFB3261E),
+    onError = Color(0xFFFFFFFF),
+    errorContainer = Color(0xFFF9DEDC),
+    onErrorContainer = Color(0xFF410E0B),
+    background = Color(0xFFFFFFFF),
+    onBackground = Color(0xFF1F1F1F),
+    surface = Color(0xFFFFFFFF),
+    onSurface = Color(0xFF1F1F1F),
+    surfaceVariant = Color(0xFFE1E3E1),
+    onSurfaceVariant = Color(0xFF444746),
+    surfaceTint = Color(0xFF0B57D0),
+    inverseSurface = Color(0xFF303030),
+    inverseOnSurface = Color(0xFFF2F2F2),
+    outline = Color(0xFF747775),
+    outlineVariant = Color(0xFFC4C7C5),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFFFFFFFF),
+    surfaceDim = Color(0xFFD3DBE5),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF8FAFD),
+    surfaceContainer = Color(0xFFF0F4F9),
+    surfaceContainerHigh = Color(0xFFE9EEF6),
+    surfaceContainerHighest = Color(0xFFDDE3EA)
+)
 
-val md_theme_dark_primary = Color(0xFFFFB3CA)
-val md_theme_dark_onPrimary = Color(0xFF650033)
-val md_theme_dark_primaryContainer = Color(0xFF8F1F4F)
-val md_theme_dark_onPrimaryContainer = Color(0xFFFFD9E4)
-val md_theme_dark_secondary = Color(0xFFE7BFC8)
-val md_theme_dark_onSecondary = Color(0xFF4A2A32)
-val md_theme_dark_secondaryContainer = Color(0xFF714551)
-val md_theme_dark_onSecondaryContainer = Color(0xFFFFDAE1)
-val md_theme_dark_tertiary = Color(0xFFF5C098)
-val md_theme_dark_onTertiary = Color(0xFF522A0C)
-val md_theme_dark_tertiaryContainer = Color(0xFF7F4825)
-val md_theme_dark_onTertiaryContainer = Color(0xFFFFDCC2)
-val md_theme_dark_error = Color(0xFFFFB4AB)
-val md_theme_dark_errorContainer = Color(0xFF93000A)
-val md_theme_dark_onError = Color(0xFF690005)
-val md_theme_dark_onErrorContainer = Color(0xFFFFDAD6)
-val md_theme_dark_background = Color(0xFF1A1114)
-val md_theme_dark_onBackground = Color(0xFFF0E0E2)
-val md_theme_dark_surface = Color(0xFF1A1114)
-val md_theme_dark_onSurface = Color(0xFFF0E0E2)
-val md_theme_dark_surfaceVariant = Color(0xFF534244)
-val md_theme_dark_onSurfaceVariant = Color(0xFFD7C1C4)
-val md_theme_dark_outline = Color(0xFFA08C8F)
-val md_theme_dark_inverseOnSurface = Color(0xFF1A1114)
-val md_theme_dark_inverseSurface = Color(0xFFF0E0E2)
-val md_theme_dark_inversePrimary = Color(0xFFB8336A)
-val md_theme_dark_surfaceTint = Color(0xFFFFB3CA)
-val md_theme_dark_outlineVariant = Color(0xFF534244)
-val md_theme_dark_scrim = Color(0xFF000000)
-
-val md_theme_light_surfaceContainer = Color(0xFFF7F2F3)
-val md_theme_light_surfaceContainerHigh = Color(0xFFF1ECEE)
-val md_theme_light_surfaceContainerHighest = Color(0xFFEBE6E8)
-val md_theme_light_surfaceContainerLow = Color(0xFFFDF8F9)
-val md_theme_light_surfaceContainerLowest = Color(0xFFFFFFFF)
-
-val md_theme_dark_surfaceContainer = Color(0xFF241D1F)
-val md_theme_dark_surfaceContainerHigh = Color(0xFF2F272A)
-val md_theme_dark_surfaceContainerHighest = Color(0xFF3A3235)
-val md_theme_dark_surfaceContainerLow = Color(0xFF211A1C)
-val md_theme_dark_surfaceContainerLowest = Color(0xFF0F0D0E)
-
+internal val DarkColors = darkColorScheme(
+    primary = Color(0xFFA8C7FA),
+    onPrimary = Color(0xFF062E6F),
+    primaryContainer = Color(0xFF0842A0),
+    onPrimaryContainer = Color(0xFFD3E3FD),
+    inversePrimary = Color(0xFF0B57D0),
+    secondary = Color(0xFF7FCFFF),
+    onSecondary = Color(0xFF003355),
+    secondaryContainer = Color(0xFF004A77),
+    onSecondaryContainer = Color(0xFFC2E7FF),
+    tertiary = Color(0xFF6DD58C),
+    onTertiary = Color(0xFF0A3818),
+    tertiaryContainer = Color(0xFF0F5223),
+    onTertiaryContainer = Color(0xFFC4EED0),
+    error = Color(0xFFF2B8B5),
+    onError = Color(0xFF601410),
+    errorContainer = Color(0xFF8C1D18),
+    onErrorContainer = Color(0xFFF9DEDC),
+    background = Color(0xFF131314),
+    onBackground = Color(0xFFE3E3E3),
+    surface = Color(0xFF131314),
+    onSurface = Color(0xFFE3E3E3),
+    surfaceVariant = Color(0xFF444746),
+    onSurfaceVariant = Color(0xFFC4C7C5),
+    surfaceTint = Color(0xFFA8C7FA),
+    inverseSurface = Color(0xFFE3E3E3),
+    inverseOnSurface = Color(0xFF303030),
+    outline = Color(0xFF8E918F),
+    outlineVariant = Color(0xFF444746),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFF37393B),
+    surfaceDim = Color(0xFF131314),
+    surfaceContainerLowest = Color(0xFF0E0E0E),
+    surfaceContainerLow = Color(0xFF1B1B1B),
+    surfaceContainer = Color(0xFF1E1F20),
+    surfaceContainerHigh = Color(0xFF282A2C),
+    surfaceContainerHighest = Color(0xFF333537)
+)

@@ -262,7 +262,7 @@ fun WallpaperScreen(
         Text(
             text = stringResource(R.string.wallpaper_effects_title),
             style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.padding(horizontal = AppSpacing.large, vertical = AppSpacing.small),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -283,7 +283,7 @@ fun WallpaperScreen(
                 Text(
                     text = stringResource(R.string.scaling),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -359,7 +359,7 @@ fun WallpaperScreen(
                 Text(
                     text = stringResource(R.string.visual_effects),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(bottom = AppSpacing.small),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -414,7 +414,7 @@ fun WallpaperScreen(
                     Text(
                         text = stringResource(R.string.interactive_effects),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(bottom = AppSpacing.small),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
@@ -539,7 +539,7 @@ private fun ScreenToggleCard(
         Column(Modifier.padding(AppSpacing.large), verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
             val contentColor = if (enabled) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
             Icon(icon, contentDescription = null, tint = contentColor)
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium,
                 color = if (enabled) contentColor else MaterialTheme.colorScheme.onSurface,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(stringResource(if (enabled) R.string.enabled else R.string.disabled),
@@ -561,7 +561,7 @@ private fun AlbumSelector(albumId: String?, albums: List<AlbumSummary>, label: S
         Row(Modifier.fillMaxWidth().padding(AppSpacing.large), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(album?.name ?: stringResource(if (albumId == null) R.string.no_album_selected else R.string.loading_placeholder),
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium,
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)

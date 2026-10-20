@@ -107,7 +107,7 @@ fun SettingsScreen(
                             Text(
                                 text = stringResource(R.string.current_mode),
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(AppSpacing.extraSmall))
@@ -207,7 +207,7 @@ fun SettingsScreen(
                             Text(
                                 text = stringResource(R.string.battery_optimization),
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(AppSpacing.extraSmall))
@@ -279,7 +279,7 @@ fun SettingsScreen(
                     Text(
                         text = stringResource(R.string.privacy_policy),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -308,7 +308,7 @@ fun SettingsScreen(
             ) {
                 Text(
                     text = stringResource(R.string.reset_all_data),
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Medium
                 )
             }
 
@@ -412,7 +412,7 @@ private fun SectionHeader(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Medium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )

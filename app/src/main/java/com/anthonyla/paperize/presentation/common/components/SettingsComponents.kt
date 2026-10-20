@@ -50,7 +50,7 @@ fun SettingSwitchItem(
                 ) {
                     Text(
                         text = title,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Medium,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,

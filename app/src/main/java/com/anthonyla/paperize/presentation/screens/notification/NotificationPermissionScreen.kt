@@ -102,7 +102,7 @@ fun NotificationPermissionScreen(
                         stringResource(R.string.allow)
                     },
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
                     modifier = Modifier.padding(vertical = AppSpacing.small)
                 )
             }

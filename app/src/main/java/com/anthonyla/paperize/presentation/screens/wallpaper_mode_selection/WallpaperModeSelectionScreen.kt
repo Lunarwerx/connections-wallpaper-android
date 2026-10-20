@@ -90,7 +90,7 @@ fun WallpaperModeSelectionScreen(
                 Text(
                     text = stringResource(R.string.continue_button),
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(vertical = AppSpacing.small)
                 )
             }
@@ -146,7 +146,7 @@ private fun ModeSelectionCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     color = if (isSelected)
                         MaterialTheme.colorScheme.onPrimaryContainer
                     else

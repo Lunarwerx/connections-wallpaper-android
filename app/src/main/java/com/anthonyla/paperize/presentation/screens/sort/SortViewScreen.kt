@@ -144,7 +144,7 @@ fun SortViewScreen(
                             Text(
                                 text = stringResource(R.string.folders),
                                 modifier = Modifier.padding(AppSpacing.small),
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
@@ -195,7 +195,7 @@ fun SortViewScreen(
                             Text(
                                 text = stringResource(R.string.wallpapers_sort),
                                 modifier = Modifier.padding(AppSpacing.small),
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }

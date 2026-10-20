@@ -1,50 +1,52 @@
 package com.anthonyla.paperize.connections
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
-import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Key
-import androidx.compose.material.icons.filled.PhotoAlbum
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Key
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,17 +59,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.toColorInt
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -76,166 +78,89 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.anthonyla.paperize.R
-import com.anthonyla.paperize.domain.model.AlbumSummary
-import com.anthonyla.paperize.presentation.common.components.AddAlbumDialog
-import com.anthonyla.paperize.presentation.common.theme.AppGrid
-import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
-/** The Connections tab: browse and search the public gallery, then add a wallpaper to an album. */
+/** Explore: the Connections gallery as a wall of pictures, with search and tag filters. Tap one to open the viewer. */
 @Composable
 fun ConnectionsScreen(
+    onOpen: (Int) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ConnectionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val albums by viewModel.albums.collectAsStateWithLifecycle()
-    val hasKey by viewModel.hasKey.collectAsStateWithLifecycle()
-    val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
-    var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
-    var showKeyDialog by rememberSaveable { mutableStateOf(false) }
-    val selected = state.wallpapers.firstOrNull { it.id == selectedId }
 
-    LaunchedEffect(viewModel) {
-        viewModel.messages.collect { message ->
-            val text = when (message) {
-                ConnectionsMessage.KeyNeeded -> {
-                    showKeyDialog = true
-                    null
-                }
-                is ConnectionsMessage.Saved -> context.getString(R.string.connections_saved, message.albumName)
-                ConnectionsMessage.AlreadyInAlbum -> context.getString(R.string.connections_already_in_album)
-                is ConnectionsMessage.KeyRefused -> context.getString(R.string.connections_key_refused, message.reason)
-                is ConnectionsMessage.Failed ->
-                    context.getString(R.string.connections_save_failed, message.reason ?: context.getString(R.string.connections_unknown_error))
-            }
-            if (text != null) {
-                if (message is ConnectionsMessage.Saved) selectedId = null
-                snackbarHostState.showSnackbar(text)
-            }
-        }
-    }
-
-    Scaffold(
-        modifier = modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            SearchRow(
-                query = state.query,
-                hasKey = hasKey,
-                onSearch = viewModel::search,
-                onKeyClick = { showKeyDialog = true }
-            )
-            TagRow(
-                tags = state.tags,
-                selectedTag = state.tag,
-                onSelect = viewModel::selectTag
-            )
-            Box(modifier = Modifier.fillMaxSize()) {
-                when {
-                    state.wallpapers.isEmpty() && state.loading ->
-                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                    state.wallpapers.isEmpty() && state.failed ->
-                        CenteredMessage(
-                            text = stringResource(R.string.connections_load_failed),
-                            action = stringResource(R.string.connections_retry),
-                            onAction = viewModel::retry,
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    state.wallpapers.isEmpty() ->
-                        CenteredMessage(
-                            text = stringResource(R.string.connections_empty),
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    else -> WallpaperGrid(
-                        wallpapers = state.wallpapers,
-                        loading = state.loading,
-                        failed = state.failed,
-                        onRetry = viewModel::retry,
-                        onLoadMore = viewModel::loadMore,
-                        onOpen = { selectedId = it.id }
-                    )
-                }
+    Column(modifier = modifier.fillMaxSize()) {
+        SearchPill(query = state.query, onSearch = viewModel::search)
+        TagRow(tags = state.tags, selectedTag = state.tag, onSelect = viewModel::selectTag)
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
+                state.wallpapers.isEmpty() && state.failed -> EmptyState(
+                    icon = Icons.Outlined.CloudOff,
+                    text = stringResource(R.string.connections_load_failed),
+                    action = stringResource(R.string.connections_retry),
+                    onAction = viewModel::retry
+                )
+                state.wallpapers.isEmpty() && state.loading -> SkeletonGrid()
+                state.wallpapers.isEmpty() -> EmptyState(
+                    icon = Icons.Outlined.SearchOff,
+                    text = stringResource(R.string.connections_empty)
+                )
+                else -> WallpaperGrid(
+                    wallpapers = state.wallpapers,
+                    loading = state.loading,
+                    failed = state.failed,
+                    onRetry = viewModel::retry,
+                    onLoadMore = viewModel::loadMore,
+                    onOpen = onOpen
+                )
             }
         }
-    }
-
-    if (selected != null) {
-        WallpaperSheet(
-            wallpaper = selected,
-            albums = albums,
-            hasKey = hasKey,
-            saving = state.savingId == selected.id,
-            onSave = { album -> viewModel.save(selected, album) },
-            onSaveToNewAlbum = { name -> viewModel.saveToNewAlbum(selected, name) },
-            onAddKey = { showKeyDialog = true },
-            onDismiss = { selectedId = null }
-        )
-    }
-
-    if (showKeyDialog) {
-        ConnectionsKeyDialog(
-            hasKey = hasKey,
-            onSave = { key ->
-                viewModel.saveKey(key)
-                showKeyDialog = false
-            },
-            onRemove = {
-                viewModel.clearKey()
-                showKeyDialog = false
-            },
-            onDismiss = { showKeyDialog = false }
-        )
     }
 }
 
 @Composable
-private fun SearchRow(
-    query: String,
-    hasKey: Boolean,
-    onSearch: (String) -> Unit,
-    onKeyClick: () -> Unit
-) {
+private fun SearchPill(query: String, onSearch: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf(query) }
     val focusManager = LocalFocusManager.current
-    Row(
+    val container = MaterialTheme.colorScheme.surfaceContainerHigh
+    TextField(
+        value = text,
+        onValueChange = { value ->
+            text = value
+            if (value.isEmpty()) onSearch("")
+        },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = AppSpacing.medium, end = AppSpacing.extraSmall, top = AppSpacing.small),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        OutlinedTextField(
-            value = text,
-            onValueChange = { value ->
-                text = value
-                if (value.isEmpty()) onSearch("")
-            },
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(stringResource(R.string.connections_search_hint)) },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            singleLine = true,
-            shape = MaterialTheme.shapes.extraLarge,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = {
-                onSearch(text.trim())
-                focusManager.clearFocus()
-            })
-        )
-        IconButton(onClick = onKeyClick) {
-            Icon(
-                imageVector = if (hasKey) Icons.Filled.Key else Icons.Outlined.Key,
-                contentDescription = stringResource(R.string.connections_key_title),
-                tint = if (hasKey) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        placeholder = { Text(stringResource(R.string.connections_search_hint)) },
+        leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+        trailingIcon = if (text.isEmpty()) null else {
+            {
+                IconButton(onClick = {
+                    text = ""
+                    onSearch("")
+                    focusManager.clearFocus()
+                }) {
+                    Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.connections_clear_search))
+                }
+            }
+        },
+        singleLine = true,
+        shape = CircleShape,
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = container,
+            unfocusedContainerColor = container,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = {
+            onSearch(text.trim())
+            focusManager.clearFocus()
+        })
+    )
 }
 
 @Composable
@@ -245,27 +170,41 @@ private fun TagRow(
     onSelect: (String?) -> Unit
 ) {
     if (tags.isEmpty()) return
+    val haptics = LocalHapticFeedback.current
     LazyRow(
-        contentPadding = PaddingValues(horizontal = AppSpacing.medium, vertical = AppSpacing.extraSmall),
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.small)
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(bottom = 8.dp)
     ) {
-        item(key = "all") {
-            FilterChip(
-                selected = selectedTag == null,
-                onClick = { onSelect(null) },
-                label = { Text(stringResource(R.string.connections_all)) }
-            )
+        item(key = ALL_TAGS_KEY) {
+            TagChip(label = stringResource(R.string.connections_all), selected = selectedTag == null) {
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                onSelect(null)
+            }
         }
         items(tags, key = { it.tag }) { tag ->
-            FilterChip(
-                selected = selectedTag == tag.tag,
-                onClick = { onSelect(if (selectedTag == tag.tag) null else tag.tag) },
-                label = { Text(tag.tag) }
-            )
+            TagChip(label = tag.tag.replaceFirstChar { it.titlecase() }, selected = selectedTag == tag.tag) {
+                haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                onSelect(if (selectedTag == tag.tag) null else tag.tag)
+            }
         }
     }
 }
 
+@Composable
+private fun TagChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(label) },
+        shape = CircleShape,
+        leadingIcon = if (selected) {
+            { Icon(Icons.Filled.Done, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+        } else null
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun WallpaperGrid(
     wallpapers: List<ConnectionsWallpaper>,
@@ -273,7 +212,7 @@ private fun WallpaperGrid(
     failed: Boolean,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit,
-    onOpen: (ConnectionsWallpaper) -> Unit
+    onOpen: (Int) -> Unit
 ) {
     val gridState = rememberLazyStaggeredGridState()
     LaunchedEffect(gridState) {
@@ -284,19 +223,19 @@ private fun WallpaperGrid(
     }
     LazyVerticalStaggeredGrid(
         state = gridState,
-        columns = StaggeredGridCells.Adaptive(AppGrid.itemMinSize),
-        contentPadding = PaddingValues(AppSpacing.gridPadding),
-        verticalItemSpacing = AppSpacing.gridSpacing,
-        horizontalArrangement = Arrangement.spacedBy(AppSpacing.gridSpacing),
+        columns = StaggeredGridCells.Adaptive(TILE_MIN_WIDTH),
+        contentPadding = GRID_PADDING,
+        verticalItemSpacing = TILE_GAP,
+        horizontalArrangement = Arrangement.spacedBy(TILE_GAP),
         modifier = Modifier.fillMaxSize()
     ) {
-        items(wallpapers, key = { it.id }) { wallpaper ->
-            WallpaperCard(wallpaper = wallpaper, onClick = { onOpen(wallpaper) })
+        itemsIndexed(wallpapers, key = { _, wallpaper -> wallpaper.id }) { index, wallpaper ->
+            Tile(wallpaper = wallpaper, onClick = { onOpen(index) })
         }
         if (loading || failed) {
-            item(key = "footer", span = StaggeredGridItemSpan.FullLine) {
-                Box(modifier = Modifier.fillMaxWidth().padding(AppSpacing.medium), contentAlignment = Alignment.Center) {
-                    if (loading) CircularProgressIndicator() else TextButton(onClick = onRetry) {
+            item(key = FOOTER_KEY, span = StaggeredGridItemSpan.FullLine) {
+                Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
+                    if (loading) LoadingIndicator() else FilledTonalButton(onClick = onRetry) {
                         Text(stringResource(R.string.connections_retry))
                     }
                 }
@@ -305,206 +244,107 @@ private fun WallpaperGrid(
     }
 }
 
+/** The picture and nothing else; it gives a little under the finger. */
 @Composable
-private fun WallpaperCard(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
-    Card(onClick = onClick, shape = MaterialTheme.shapes.medium) {
-        Preview(wallpaper = wallpaper, modifier = Modifier.fillMaxWidth())
-        Text(
-            text = wallpaper.title,
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = AppSpacing.small, end = AppSpacing.small, top = AppSpacing.small)
-        )
-        Text(
-            text = wallpaper.credit.orEmpty(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = AppSpacing.small, end = AppSpacing.small, bottom = AppSpacing.small)
-        )
-    }
-}
-
-@Composable
-private fun Preview(wallpaper: ConnectionsWallpaper, modifier: Modifier = Modifier) {
-    val placeholder = wallpaper.color
-        ?.let { runCatching { Color(it.toColorInt()) }.getOrNull() }
-        ?: MaterialTheme.colorScheme.surfaceVariant
+private fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) PRESSED_SCALE else 1f, label = "tile-press")
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(wallpaper.previewUrl)
             .crossfade(true)
             .build(),
         contentDescription = wallpaper.title,
-        placeholder = ColorPainter(placeholder),
+        placeholder = ColorPainter(wallpaper.swatch()),
         contentScale = ContentScale.Crop,
-        modifier = modifier.aspectRatio(wallpaper.previewWidth.toFloat() / wallpaper.previewHeight.coerceAtLeast(1))
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(wallpaper.previewRatio())
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(TILE_SHAPE)
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WallpaperSheet(
-    wallpaper: ConnectionsWallpaper,
-    albums: List<AlbumSummary>,
-    hasKey: Boolean,
-    saving: Boolean,
-    onSave: (AlbumSummary) -> Unit,
-    onSaveToNewAlbum: (String) -> Unit,
-    onAddKey: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    var showNewAlbum by rememberSaveable { mutableStateOf(false) }
-    val uriHandler = LocalUriHandler.current
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = AppSpacing.extraLarge)
-                .padding(bottom = AppSpacing.large),
-            verticalArrangement = Arrangement.spacedBy(AppSpacing.small)
-        ) {
-            Preview(
-                wallpaper = wallpaper,
+private fun SkeletonGrid() {
+    val pulse by rememberInfiniteTransition(label = "skeleton").animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 900), RepeatMode.Reverse),
+        label = "skeleton-alpha"
+    )
+    val color = MaterialTheme.colorScheme.surfaceContainerHigh
+    LazyVerticalStaggeredGrid(
+        columns = StaggeredGridCells.Adaptive(TILE_MIN_WIDTH),
+        contentPadding = GRID_PADDING,
+        verticalItemSpacing = TILE_GAP,
+        horizontalArrangement = Arrangement.spacedBy(TILE_GAP),
+        userScrollEnabled = false,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(SKELETON_RATIOS.size) { index ->
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(MaterialTheme.shapes.large)
+                    .aspectRatio(SKELETON_RATIOS[index])
+                    .graphicsLayer { alpha = pulse }
+                    .clip(TILE_SHAPE)
+                    .background(color)
             )
-            Text(text = wallpaper.title, style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = listOfNotNull(wallpaper.credit, licenseLabel(wallpaper.license), "${wallpaper.width} × ${wallpaper.height}")
-                    .joinToString(" · "),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            wallpaper.sourceUrl?.let { source ->
-                TextButton(onClick = { uriHandler.openUri(source) }, contentPadding = PaddingValues(0.dp)) {
-                    Text(stringResource(R.string.connections_view_source))
-                }
-            }
-            if (!hasKey) {
-                Text(
-                    text = stringResource(R.string.connections_key_needed),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Button(onClick = onAddKey) { Text(stringResource(R.string.connections_add_key)) }
-            } else {
-                Text(
-                    text = stringResource(R.string.connections_add_to_album),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = AppSpacing.small)
-                )
-                if (saving) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                albums.forEach { album ->
-                    ListItem(
-                        headlineContent = { Text(album.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        supportingContent = {
-                            Text(pluralStringResource(R.plurals.wallpaper_count, album.wallpaperCount, album.wallpaperCount))
-                        },
-                        leadingContent = { Icon(Icons.Filled.PhotoAlbum, contentDescription = null) },
-                        modifier = Modifier
-                            .clip(MaterialTheme.shapes.medium)
-                            .clickable(enabled = !saving) { onSave(album) }
-                    )
-                }
-                TextButton(onClick = { showNewAlbum = true }, enabled = !saving) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Text(
-                        text = stringResource(R.string.connections_new_album),
-                        modifier = Modifier.padding(start = AppSpacing.extraSmall)
-                    )
-                }
-            }
         }
-    }
-
-    if (showNewAlbum) {
-        val taken = stringResource(R.string.album_name_exists_error)
-        var error by remember { mutableStateOf<String?>(null) }
-        AddAlbumDialog(
-            onDismiss = { showNewAlbum = false },
-            onConfirm = { name ->
-                if (albums.any { it.name.equals(name, ignoreCase = true) }) {
-                    error = taken
-                } else {
-                    showNewAlbum = false
-                    onSaveToNewAlbum(name)
-                }
-            },
-            errorMessage = error,
-            isSaving = false
-        )
     }
 }
 
 @Composable
-private fun ConnectionsKeyDialog(
-    hasKey: Boolean,
-    onSave: (String) -> Unit,
-    onRemove: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    var value by rememberSaveable { mutableStateOf("") }
-    val uriHandler = LocalUriHandler.current
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.connections_key_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
-                Text(stringResource(if (hasKey) R.string.connections_key_saved_body else R.string.connections_key_body))
-                TextButton(onClick = { uriHandler.openUri(ConnectionsApi.KEYS_URL) }, contentPadding = PaddingValues(0.dp)) {
-                    Text(stringResource(R.string.connections_key_get))
-                }
-                OutlinedTextField(
-                    value = value,
-                    onValueChange = { value = it },
-                    label = { Text(stringResource(if (hasKey) R.string.connections_key_replace else R.string.connections_key_label)) },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false)
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSave(value) }, enabled = value.isNotBlank()) {
-                Text(stringResource(R.string.connections_key_save))
-            }
-        },
-        dismissButton = {
-            if (hasKey) {
-                TextButton(onClick = onRemove) { Text(stringResource(R.string.connections_key_remove)) }
-            } else {
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.connections_key_cancel)) }
-            }
-        }
-    )
-}
-
-@Composable
-private fun CenteredMessage(
+private fun EmptyState(
+    icon: ImageVector,
     text: String,
-    modifier: Modifier = Modifier,
     action: String? = null,
     onAction: () -> Unit = {}
 ) {
     Column(
-        modifier = modifier.padding(AppSpacing.extraLarge),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(AppSpacing.small)
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)
     ) {
-        Text(text = text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (action != null) TextButton(onClick = onAction) { Text(action) }
+        Icon(icon, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+        if (action != null) FilledTonalButton(onClick = onAction) { Text(action) }
     }
 }
 
+/** The gallery's own dominant colour, shown while the picture loads. */
 @Composable
-private fun licenseLabel(license: String): String = when (license) {
-    "cc0" -> stringResource(R.string.connections_license_cc0)
-    "public_domain" -> stringResource(R.string.connections_license_public_domain)
-    else -> stringResource(R.string.connections_license_original)
-}
+internal fun ConnectionsWallpaper.swatch(): Color =
+    color?.let { runCatching { Color(it.toColorInt()) }.getOrNull() } ?: MaterialTheme.colorScheme.surfaceContainerHigh
 
+internal fun ConnectionsWallpaper.previewRatio(): Float = ratioOf(previewWidth, previewHeight)
+
+internal fun ConnectionsWallpaper.ratio(): Float = ratioOf(width, height)
+
+private fun ratioOf(width: Int, height: Int): Float =
+    if (width > 0 && height > 0) (width.toFloat() / height).coerceIn(MIN_RATIO, MAX_RATIO) else 1f
+
+private val TILE_MIN_WIDTH = 160.dp
+private val TILE_GAP = 8.dp
+private val TILE_SHAPE = RoundedCornerShape(16.dp)
+private val GRID_PADDING = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp)
+private val SKELETON_RATIOS = listOf(1.45f, 0.8f, 1.25f, 1.5f, 0.75f, 1.3f, 1f, 1.4f)
+private const val PRESSED_SCALE = 0.96f
+private const val MIN_RATIO = 0.4f
+private const val MAX_RATIO = 2.5f
 private const val LOAD_MORE_THRESHOLD = 6
+private const val ALL_TAGS_KEY = "__all__"
+private const val FOOTER_KEY = "__footer__"

@@ -96,7 +96,7 @@ fun StartupScreen(
                             Text(
                                 text = stringResource(R.string.privacy_notice),
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
 
@@ -130,7 +130,7 @@ fun StartupScreen(
                 Text(
                     text = stringResource(R.string.agree),
                     style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(vertical = AppSpacing.small)
                 )
             }
