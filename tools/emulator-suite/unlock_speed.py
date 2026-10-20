@@ -50,8 +50,11 @@ def main() -> None:
             print(f"round {i + 1}: the lock wallpaper did not change")
         else:
             ms = (lock_written_at() - screen_off_at()) * 1000
-            took.append(ms)
-            print(f"round {i + 1}: new lock wallpaper {ms:.0f} ms after the screen went off", flush=True)
+            if ms < 0:
+                print(f"round {i + 1}: an earlier change landed instead (written {-ms:.0f} ms before this screen-off); not counted")
+            else:
+                took.append(ms)
+                print(f"round {i + 1}: new lock wallpaper {ms:.0f} ms after the screen went off", flush=True)
         cw.d.screen_on()
         time.sleep(0.6)
         cw.sh("shell", "wm", "dismiss-keyguard")

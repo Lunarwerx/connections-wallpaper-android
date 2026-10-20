@@ -1,10 +1,12 @@
-"""Connections Wallpaper end-to-end suite on the emulator. Each test prints PASS/FAIL with its time; a failure
+r"""Connections Wallpaper end-to-end suite on the emulator. Each test prints PASS/FAIL with its time; a failure
 saves shots/suite/FAIL-<test>.jpg and the labels on screen, then the run goes on.
 
-  adb install -r app/build/outputs/apk/release/app-release.apk
+  tools\emulator-suite\check.cmd                                (unit, lint, release build, device tests)
+  adb -s emulator-5554 install -r app/build/outputs/apk/release/app-release.apk
   python -X utf8 tools/emulator-suite/suite.py [test ...]      (no names: every test, in order)
+  python -X utf8 tools/emulator-suite/unlock_speed.py          (after lock_first_folder: screen-off to new lock picture)
 
-Each run wipes the app's data first (the same as a fresh install) and takes about four minutes.
+Each run wipes the app's data first (the same as a fresh install) and takes about six minutes.
 """
 import os
 import re
@@ -318,6 +320,29 @@ def t_effects():
     check(wait_until(lambda: not cw.is_gray(cw.wall_rgb("lock")), 20), f"and the lock wallpaper has its colour back {cw.wall_rgb('lock')}")
 
 
+def t_swipe_back():
+    """A back swipe from Settings slides the page away like the back arrow; it never shrinks into a card."""
+    open_tab("Wallpaper")
+    cw.tap("Settings")
+    check(cw.has("Appearance", timeout=5), "Settings opens")
+    time.sleep(0.6)
+    rest = cw.d(text="Appearance").info["bounds"]
+    w, h = cw.d.window_size()
+    cw.d.touch.down(2, h // 2)
+    for i in range(1, 9):
+        cw.d.touch.move(int(w * 0.05 * i), h // 2)
+        time.sleep(0.03)
+    time.sleep(0.5)
+    mid = cw.d(text="Appearance").info["bounds"]
+    cw.d.screenshot("shots/suite/swipe-back-mid.jpg")
+    cw.d.touch.up(int(w * 0.4), h // 2)
+    log(f"Appearance at rest {rest}, mid-swipe {mid}")
+    same_size = abs((mid["bottom"] - mid["top"]) - (rest["bottom"] - rest["top"])) <= 2
+    check(same_size and abs(mid["top"] - rest["top"]) <= 4, f"mid-swipe the page keeps its size and height: {rest} -> {mid}")
+    check(mid["left"] > rest["left"] + 4, f"and moves right with the finger: {rest['left']} -> {mid['left']}")
+    check(cw.has("Library", timeout=4) and not cw.has("Appearance"), "letting go finishes the back: the tabs show again")
+
+
 def t_shortcut():
     before = ids()
     cw.sh("shell", "am", "start", "-n", cw.SHORTCUT)
@@ -332,7 +357,7 @@ def t_explore():
 
 
 TESTS = [t_lock_first_folder, t_unlock_changes, t_timer_toggle, t_unlock_off, t_pause, t_effects,
-         t_library_folder_fills_both, t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_shortcut, t_explore]
+         t_library_folder_fills_both, t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore]
 
 
 def main() -> None:
