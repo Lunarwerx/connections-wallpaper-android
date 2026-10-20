@@ -31,6 +31,8 @@ PKG = "icu.connections.wallpaper"
 MAIN = f"{PKG}/com.anthonyla.paperize.presentation.MainActivity"
 SHORTCUT = f"{PKG}/com.anthonyla.paperize.service.shortcut.WallpaperShortcutActivity"
 SERIAL = os.environ.get("ANDROID_SERIAL", "emulator-5554")
+# No console window per adb call on Windows; any other OS refuses creation flags.
+NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 # The four solid test pictures, as RGB: far enough apart that JPEG noise never confuses two of them.
 COLORS = {"blue": (26, 115, 232), "gold": (249, 171, 0), "green": (30, 142, 62), "red": (217, 48, 37)}
 
@@ -38,7 +40,7 @@ d = None
 
 
 def sh(*args: str, check: bool = False) -> str:
-    r = subprocess.run([ADB, "-s", SERIAL, *args], capture_output=True, creationflags=0x08000000)
+    r = subprocess.run([ADB, "-s", SERIAL, *args], capture_output=True, creationflags=NO_WINDOW)
     out = r.stdout.decode("utf-8", "replace")
     if check and r.returncode:
         raise RuntimeError(f"adb {' '.join(args)}: {r.stderr.decode()[:300]}")
@@ -147,7 +149,7 @@ def wall_rgb(which: str = "lock") -> tuple:
     listing = sh("shell", "ls", "/data/system/users/0/")
     if name not in listing.split():
         name = "wallpaper"
-    r = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"], capture_output=True, creationflags=0x08000000)
+    r = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"], capture_output=True, creationflags=NO_WINDOW)
     im = Image.open(io.BytesIO(r.stdout)).convert("RGB")
     return im.getpixel((im.width // 2, im.height // 2))
 
@@ -175,7 +177,7 @@ def fresh_app(grant: bool = True) -> None:
     sh("shell", "am", "start", "-W", "-n", MAIN)
 
 
-def onboard(mode: str = "Static Mode") -> None:
+def onboard(mode: str = "Static") -> None:
     tap("Agree")
     tap(mode)
     tap("I'm In")

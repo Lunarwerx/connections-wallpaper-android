@@ -110,6 +110,8 @@ fun WallpaperScreen(
     val selectedScaling = if (wallpaperMode == WallpaperMode.LIVE) scheduleSettings.liveScalingType else scheduleSettings.homeScalingType
     val hasAlbumSelected = scheduleSettings.activeScreens(wallpaperMode).isNotEmpty()
     val allRequiredAlbumsSelected = scheduleSettings.hasRequiredAlbums(wallpaperMode)
+    // Nothing changes on its own while the changer is off, so when and how often show only while it is on.
+    val changing = allRequiredAlbumsSelected && scheduleSettings.enableChanger
 
     Column(
         modifier = modifier
@@ -171,7 +173,7 @@ fun WallpaperScreen(
                 onCheckedChange = onToggleChanger
             )
         }
-        if (hasAlbumSelected) {
+        if (changing) {
             changeRows.add {
                 SwitchRow(
                     icon = Icons.Outlined.LockOpen,
@@ -189,7 +191,7 @@ fun WallpaperScreen(
                 )
             }
             if (scheduleSettings.intervalEnabled) {
-                if (wallpaperMode == WallpaperMode.STATIC && scheduleSettings.enableChanger && homeEnabled && lockEnabled) {
+                if (wallpaperMode == WallpaperMode.STATIC && homeEnabled && lockEnabled) {
                     changeRows.add {
                         SwitchRow(
                             icon = Icons.Outlined.Tune,
@@ -218,7 +220,7 @@ fun WallpaperScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(start = SettingsRowTextStart, end = AppSpacing.medium, bottom = AppSpacing.small)
                             )
-                        } else if (!scheduleSettings.separateSchedules || !homeEnabled || !lockEnabled) {
+                        } else if (!scheduleSettings.appliesSeparateSchedules) {
                             TimeIntervalPicker(
                                 title = stringResource(R.string.interval_text),
                                 minutes = scheduleSettings.homeIntervalMinutes,
@@ -253,9 +255,9 @@ fun WallpaperScreen(
         if (wallpaperMode == WallpaperMode.STATIC) {
             // The phone beside the switch swipes its home pages, so the switch shows what it does.
             // The launcher slides only a filled picture; any other scaling sets one that fits the screen exactly.
-            // Only the home screen has pages to swipe, so the switch shows while Home rotates; its value is kept.
+            // Only the home screen has pages to swipe, so the switch shows while Home rotates an album; its value is kept.
             val slides = scheduleSettings.homeScrollingEnabled && scheduleSettings.scalingType(ScreenType.HOME) == ScalingType.FILL
-            if (homeEnabled) SettingsGroup({
+            if (homeEnabled && scheduleSettings.homeAlbumId != null) SettingsGroup({
                 Column {
                     SwitchRow(
                         icon = Icons.Outlined.SwapHoriz,
@@ -287,7 +289,7 @@ fun WallpaperScreen(
         }
 
         // How it looks. Visual effects are one switch here; their sliders and a preview are a page away.
-        SectionLabel(stringResource(R.string.wallpaper_effects_title))
+        // It all shapes the pictures an album sets, so it shows once one is picked.
         val lookRows = mutableListOf<@Composable () -> Unit>()
         lookRows.add {
             Column(
@@ -333,44 +335,45 @@ fun WallpaperScreen(
                 onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(shuffleEnabled = enabled)) }
             )
         }
-        if (wallpaperMode == WallpaperMode.LIVE || homeEnabled || lockEnabled) {
-            lookRows.add {
-                SwitchRow(
-                    icon = Icons.Outlined.PhotoFilter,
-                    title = stringResource(R.string.visual_effects),
-                    checked = scheduleSettings.visualEffectsEnabled,
-                    onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(visualEffectsEnabled = enabled)) }
-                )
-            }
-            if (scheduleSettings.visualEffectsEnabled) lookRows.add {
-                val chosen = chosenEffects(scheduleSettings, wallpaperMode).map { stringResource(it) }
-                SettingsRow(
-                    icon = Icons.Outlined.Tune,
-                    title = stringResource(R.string.adjust_visual_effects),
-                    onClick = onOpenVisualEffects,
-                    trailing = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = if (chosen.isEmpty()) stringResource(R.string.none) else chosen.joinToString(", "),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 140.dp)
-                            )
-                            Icon(
-                                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                )
-            }
+        lookRows.add {
+            SwitchRow(
+                icon = Icons.Outlined.PhotoFilter,
+                title = stringResource(R.string.visual_effects),
+                checked = scheduleSettings.visualEffectsEnabled,
+                onCheckedChange = { enabled -> updateSettingsImmediate(scheduleSettings.copy(visualEffectsEnabled = enabled)) }
+            )
         }
-        SettingsGroup(*lookRows.toTypedArray())
+        if (scheduleSettings.visualEffectsEnabled) lookRows.add {
+            val chosen = chosenEffects(scheduleSettings, wallpaperMode).map { stringResource(it) }
+            SettingsRow(
+                icon = Icons.Outlined.Tune,
+                title = stringResource(R.string.adjust_visual_effects),
+                onClick = onOpenVisualEffects,
+                trailing = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = if (chosen.isEmpty()) stringResource(R.string.none) else chosen.joinToString(", "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 140.dp)
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            )
+        }
+        if (hasAlbumSelected) {
+            SectionLabel(stringResource(R.string.wallpaper_effects_title))
+            SettingsGroup(*lookRows.toTypedArray())
+        }
 
-        if (wallpaperMode == WallpaperMode.LIVE) {
+        if (wallpaperMode == WallpaperMode.LIVE && hasAlbumSelected) {
             SectionLabel(stringResource(R.string.interactive_effects))
             SettingsGroup(
                 {

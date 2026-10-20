@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -32,6 +33,12 @@ class SettingsViewModel @Inject constructor(
 
     val wallpaperMode: StateFlow<WallpaperMode> =
         settingsRepository.getWallpaperModeFlow().stateWhileSubscribed(viewModelScope, WallpaperMode.STATIC)
+
+    /** True while wallpapers change on their own, the only time a restricted battery can delay a change. */
+    val rotating: StateFlow<Boolean> =
+        combine(settingsRepository.getScheduleSettingsFlow(), settingsRepository.getWallpaperModeFlow()) { settings, mode ->
+            settings.enableChanger && settings.hasRequiredAlbums(mode)
+        }.stateWhileSubscribed(viewModelScope, false)
 
     private val _isBusy = MutableStateFlow(false)
     val isBusy = _isBusy.asStateFlow()

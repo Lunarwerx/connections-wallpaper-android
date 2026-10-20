@@ -56,6 +56,7 @@ fun SettingsScreen(
     val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
     val failure by viewModel.failure.collectAsStateWithLifecycle()
     val wallpaperMode by viewModel.wallpaperMode.collectAsStateWithLifecycle()
+    val rotating by viewModel.rotating.collectAsStateWithLifecycle()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
     var showModeSheet by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
@@ -94,19 +95,21 @@ fun SettingsScreen(
             failure?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
             if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
-            // A restricted battery delays every scheduled change, so it is the one row that wears a
-            // problem colour and the one filled button on the page.
+            // A restricted battery delays every scheduled change, so while one is scheduled it is the one
+            // row that wears a problem colour and the one filled button on the page. With nothing
+            // scheduled it delays nothing, so it is a plain row that still opens the setting.
+            val batteryWarning = rotating && !isIgnoringBatteryOptimizations
             SectionLabel(stringResource(R.string.settings_section_wallpaper))
             SettingsGroup(
                 {
                     SettingsRow(
                         icon = if (isIgnoringBatteryOptimizations) Icons.Outlined.BatteryFull else Icons.Outlined.BatteryAlert,
-                        iconTint = if (isIgnoringBatteryOptimizations) null else MaterialTheme.colorScheme.error,
+                        iconTint = if (batteryWarning) MaterialTheme.colorScheme.error else null,
                         title = stringResource(R.string.battery_optimization),
                         supporting = stringResource(if (isIgnoringBatteryOptimizations) R.string.ignoring else R.string.optimizing),
-                        supportingColor = if (isIgnoringBatteryOptimizations) null else MaterialTheme.colorScheme.error,
+                        supportingColor = if (batteryWarning) MaterialTheme.colorScheme.error else null,
                         onClick = if (isIgnoringBatteryOptimizations) null else ({ requestIgnoreBatteryOptimizations(context) }),
-                        trailing = if (isIgnoringBatteryOptimizations) null else ({
+                        trailing = if (!batteryWarning) null else ({
                             Button(onClick = { requestIgnoreBatteryOptimizations(context) }) {
                                 Text(stringResource(R.string.battery_allow))
                             }

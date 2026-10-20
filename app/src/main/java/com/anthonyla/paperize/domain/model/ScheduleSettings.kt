@@ -32,8 +32,15 @@ data class ScheduleSettings(
     /** Off: only unlock, double tap, the widget and the shortcut change the wallpaper. */
     val intervalEnabled: Boolean = false
 ) {
+    /**
+     * Individual scheduling counts only while the timer it splits is running, the only time its switch
+     * shows; otherwise both screens change together and the choice is kept for later.
+     */
+    val appliesSeparateSchedules: Boolean
+        get() = separateSchedules && enableChanger && intervalEnabled && homeEnabled && lockEnabled
+
     val effectiveLockIntervalMinutes: Int
-        get() = if (homeEnabled && lockEnabled && separateSchedules) lockIntervalMinutes else homeIntervalMinutes
+        get() = if (appliesSeparateSchedules) lockIntervalMinutes else homeIntervalMinutes
 
     val appliesAdaptiveBrightness: Boolean
         get() = visualEffectsEnabled && adaptiveBrightness
@@ -59,7 +66,7 @@ data class ScheduleSettings(
         if (mode == WallpaperMode.LIVE) return if (liveAlbumId != null) setOf(ScreenType.LIVE) else emptySet()
         val home = homeEnabled && homeAlbumId != null
         val lock = lockEnabled && lockAlbumId != null
-        if (home && lock && homeAlbumId == lockAlbumId && !separateSchedules) return setOf(ScreenType.BOTH)
+        if (home && lock && homeAlbumId == lockAlbumId && !appliesSeparateSchedules) return setOf(ScreenType.BOTH)
         return buildSet {
             if (home) add(ScreenType.HOME)
             if (lock) add(ScreenType.LOCK)

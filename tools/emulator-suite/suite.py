@@ -80,6 +80,9 @@ def pick_folder(folder: str = FOLDER) -> None:
     d(textMatches="(?i)use this folder").click(timeout=5)
     d(textMatches="(?i)^allow$").click(timeout=5)
     check(wait_until(lambda: not d(packageName="com.google.android.documentsui").exists, 10), "picker closed")
+    # The first album added while signed out brings the one-time free-account note; the suite stays signed out.
+    if d(text="Not now").wait(timeout=3):
+        d(text="Not now").click()
 
 
 def ids() -> dict:
@@ -202,9 +205,12 @@ def t_pause():
     open_tab("Wallpaper")
     cw.tap("Wallpaper changing")
     check(wait_until(lambda: not watcher_running(), 6), "pausing stops the watcher")
+    check(wait_until(lambda: not cw.has("Change on unlock"), 4), "paused, when it changes is hidden")
+    cw.d.screenshot("shots/suite/wallpaper-tab-paused.jpg")
     open_tab("Wallpaper")
     cw.tap("Wallpaper changing")
     check(wait_until(watcher_running, 6), "resuming starts it again")
+    check(switch_state("Change on unlock"), "resumed, Change on unlock is back and still on")
 
 
 def t_library_folder_fills_both():

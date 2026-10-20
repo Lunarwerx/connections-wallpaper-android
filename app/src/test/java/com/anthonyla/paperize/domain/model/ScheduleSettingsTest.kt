@@ -2,6 +2,7 @@ package com.anthonyla.paperize.domain.model
 
 import com.anthonyla.paperize.core.ScalingType
 import com.anthonyla.paperize.core.ScreenType
+import com.anthonyla.paperize.core.WallpaperMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -56,6 +57,18 @@ class ScheduleSettingsTest {
         }
         assertFalse(off.appliesAdaptiveBrightness)
         assertTrue(on.appliesAdaptiveBrightness)
+    }
+
+    @Test
+    fun `individual scheduling splits one album only while the timer it splits is running`() {
+        val split = ScheduleSettings(
+            enableChanger = true, intervalEnabled = true, separateSchedules = true,
+            homeEnabled = true, lockEnabled = true, homeAlbumId = "album", lockAlbumId = "album"
+        )
+        assertEquals(setOf(ScreenType.HOME, ScreenType.LOCK), split.activeScreens(WallpaperMode.STATIC))
+        // Its switch is hidden with the timer or the changer off, so the kept choice must not split the picture then.
+        assertEquals(setOf(ScreenType.BOTH), split.copy(intervalEnabled = false).activeScreens(WallpaperMode.STATIC))
+        assertEquals(setOf(ScreenType.BOTH), split.copy(enableChanger = false).activeScreens(WallpaperMode.STATIC))
     }
 
     @Test

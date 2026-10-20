@@ -181,7 +181,8 @@ fun VisualEffectsContent(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            SingleChoiceSegmentedButtonRow(
+            // Only adaptive brightness draws light and dark differently, so the switch shows while it is on.
+            if (settings.adaptiveBrightness) SingleChoiceSegmentedButtonRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = AppSpacing.medium, end = AppSpacing.medium, top = AppSpacing.small)

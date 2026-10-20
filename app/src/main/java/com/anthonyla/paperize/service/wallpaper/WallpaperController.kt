@@ -41,7 +41,7 @@ class WallpaperController @Inject constructor(
         ScreenType.LOCK -> changeSelected(settings.lockAlbumId, screen, settings)
         ScreenType.BOTH -> {
             val home = settings.homeAlbumId
-            if (home != null && home == settings.lockAlbumId && !settings.separateSchedules) {
+            if (home != null && home == settings.lockAlbumId && !settings.appliesSeparateSchedules) {
                 changeSynchronized(home, settings)
             } else {
                 combine(changeSelected(home, ScreenType.HOME, settings), changeSelected(settings.lockAlbumId, ScreenType.LOCK, settings))
