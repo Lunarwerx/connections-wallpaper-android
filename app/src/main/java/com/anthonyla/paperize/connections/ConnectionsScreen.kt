@@ -52,11 +52,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -121,7 +121,8 @@ fun ConnectionsScreen(
 
 @Composable
 private fun SearchPill(query: String, onSearch: (String) -> Unit) {
-    var text by rememberSaveable { mutableStateOf(query) }
+    // Follows the gallery's query, which a restored process starts empty, so field and grid agree.
+    var text by remember { mutableStateOf(query) }
     val focusManager = LocalFocusManager.current
     val container = MaterialTheme.colorScheme.surfaceContainerHigh
     TextField(
@@ -216,10 +217,12 @@ private fun WallpaperGrid(
 ) {
     val gridState = rememberLazyStaggeredGridState()
     LaunchedEffect(gridState) {
+        // Keyed on the item count too, so a page that still leaves the end in view asks for the next.
         snapshotFlow {
             val info = gridState.layoutInfo
-            (info.visibleItemsInfo.lastOrNull()?.index ?: -1) >= info.totalItemsCount - LOAD_MORE_THRESHOLD
-        }.distinctUntilChanged().filter { it }.collect { onLoadMore() }
+            val nearEnd = (info.visibleItemsInfo.lastOrNull()?.index ?: -1) >= info.totalItemsCount - LOAD_MORE_THRESHOLD
+            nearEnd to info.totalItemsCount
+        }.distinctUntilChanged().filter { it.first }.collect { onLoadMore() }
     }
     LazyVerticalStaggeredGrid(
         state = gridState,
@@ -266,7 +269,7 @@ private fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
                 scaleY = scale
             }
             .clip(TILE_SHAPE)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
     )
 }
 

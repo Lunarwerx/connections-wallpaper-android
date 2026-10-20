@@ -1,7 +1,6 @@
 package com.anthonyla.paperize.presentation.screens.startup
 
 import androidx.appcompat.content.res.AppCompatResources
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -79,11 +78,7 @@ fun StartupScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    ),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
                     )
                 ) {
                     Row(
@@ -124,8 +119,7 @@ fun StartupScreen(
         actions = {
             Button(
                 onClick = onAgree,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
                     text = stringResource(R.string.agree),

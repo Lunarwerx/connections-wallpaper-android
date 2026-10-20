@@ -4,6 +4,7 @@ import android.app.WallpaperManager
 import android.content.ComponentName
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -52,6 +53,7 @@ import com.anthonyla.paperize.connections.ConnectionsMessage
 import com.anthonyla.paperize.connections.ConnectionsScreen
 import com.anthonyla.paperize.connections.ConnectionsViewModel
 import com.anthonyla.paperize.connections.ConnectionsViewer
+import com.anthonyla.paperize.connections.SignInStatus
 import com.anthonyla.paperize.connections.rememberSignIn
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.presentation.screens.home.components.HomeTopBar
@@ -95,6 +97,29 @@ fun HomeScreen(
     )
 
     val pagerState = rememberPagerState { tabItems.size }
+    val viewerVisibility = remember { MutableTransitionState(false) }
+    viewerVisibility.targetState = viewerOpen
+
+    // The browser hands sign-in back while this screen may show anything: a failure opens the
+    // account sheet with its reason, a success says who is signed in.
+    var finishingSignIn by remember { mutableStateOf(false) }
+    LaunchedEffect(signInStatus, accountState) {
+        val signedIn = accountState as? AccountState.SignedIn
+        when (signInStatus) {
+            SignInStatus.Finishing -> finishingSignIn = true
+            is SignInStatus.Failed -> {
+                finishingSignIn = false
+                showAccount = true
+            }
+            SignInStatus.Idle -> if (finishingSignIn && signedIn != null) {
+                finishingSignIn = false
+                showAccount = false
+                haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                val who = signedIn.session.label ?: context.getString(R.string.connections_account)
+                coroutineScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.connections_signed_in, who)) }
+            }
+        }
+    }
 
     LaunchedEffect(connectionsViewModel) {
         connectionsViewModel.messages.collect { message ->
@@ -156,7 +181,8 @@ fun HomeScreen(
                 }
             }
         },
-        snackbarHost = { if (!viewerOpen) SnackbarHost(snackbarHostState) }
+        // One host at a time: the viewer draws its own until its exit animation has finished.
+        snackbarHost = { if (!viewerVisibility.currentState && !viewerVisibility.targetState) SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
         HorizontalPager(
             state = pagerState,
@@ -204,7 +230,7 @@ fun HomeScreen(
     }
 
     AnimatedVisibility(
-        visible = viewerOpen,
+        visibleState = viewerVisibility,
         enter = fadeIn(tween(VIEWER_MS)) + scaleIn(tween(VIEWER_MS), initialScale = 0.94f),
         exit = fadeOut(tween(VIEWER_MS))
     ) {
@@ -227,7 +253,10 @@ fun HomeScreen(
                 accountViewModel.signOut()
                 showAccount = false
             },
-            onDismiss = { showAccount = false }
+            onDismiss = {
+                showAccount = false
+                accountViewModel.dismissSignInError()
+            }
         )
     }
 

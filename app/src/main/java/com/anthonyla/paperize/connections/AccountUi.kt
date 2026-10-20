@@ -24,7 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.CreditCardOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,7 +36,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -131,7 +132,7 @@ fun AccountSheet(
     onSignOut: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberBottomSheetState(SheetValue.Hidden, setOf(SheetValue.Hidden, SheetValue.Expanded))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -180,7 +181,7 @@ fun AccountSheet(
                     }
                 }
                 Perk(Icons.Outlined.Download, stringResource(R.string.connections_perk_full_size))
-                Perk(Icons.Outlined.Favorite, stringResource(R.string.connections_free_no_card))
+                Perk(Icons.Outlined.CreditCardOff, stringResource(R.string.connections_free_no_card))
                 SignInButton(status = status, onClick = onSignIn)
                 SignInError(status)
             }

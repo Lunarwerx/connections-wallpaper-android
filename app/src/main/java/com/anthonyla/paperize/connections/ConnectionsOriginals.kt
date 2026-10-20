@@ -63,8 +63,9 @@ class ConnectionsOriginals @Inject constructor(
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             arrayOf(MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME),
-            "${MediaStore.Images.Media.RELATIVE_PATH} = ? AND ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?",
-            arrayOf(RELATIVE_PATH, "$slug.%"),
+            "${MediaStore.Images.Media.RELATIVE_PATH} = ? AND ${MediaStore.Images.Media.DISPLAY_NAME} LIKE ? ESCAPE '\\'",
+            // A slug's own _ or % must match itself, not any character.
+            arrayOf(RELATIVE_PATH, slug.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + ".%"),
             null
         )?.use { cursor ->
             if (!cursor.moveToFirst()) return@use null

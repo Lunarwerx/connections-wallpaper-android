@@ -1,34 +1,47 @@
 package com.anthonyla.paperize.presentation.screens.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BatteryAlert
-import androidx.compose.material.icons.filled.BatteryFull
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Animation
+import androidx.compose.material.icons.outlined.BatteryAlert
+import androidx.compose.material.icons.outlined.BatteryFull
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.DeleteForever
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PrivacyTip
+import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.anthonyla.paperize.BuildConfig
 import com.anthonyla.paperize.R
+import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.util.BatteryOptimizationUtil.isIgnoringBatteryOptimizations
 import com.anthonyla.paperize.core.util.BatteryOptimizationUtil.requestIgnoreBatteryOptimizations
-import com.anthonyla.paperize.presentation.common.components.SettingSwitchItem
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,8 +56,8 @@ fun SettingsScreen(
     val isResetting by viewModel.isResetting.collectAsStateWithLifecycle()
     val resetFailed by viewModel.resetFailed.collectAsStateWithLifecycle()
     val wallpaperMode by viewModel.wallpaperMode.collectAsStateWithLifecycle()
-    var showResetDialog by remember { mutableStateOf(false) }
-    var pendingMode by remember { mutableStateOf<com.anthonyla.paperize.core.WallpaperMode?>(null) }
+    var showResetDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingMode by rememberSaveable { mutableStateOf<WallpaperMode?>(null) }
     val context = LocalContext.current
 
     var isIgnoringBatteryOptimizations by remember {
@@ -79,240 +92,114 @@ fun SettingsScreen(
         ) {
             if (resetFailed) Text(stringResource(R.string.reset_failed), color = MaterialTheme.colorScheme.error)
             if (isResetting) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            Spacer(modifier = Modifier.height(AppSpacing.large))
 
-            SectionHeader(
-                icon = Icons.Filled.Wallpaper,
-                title = stringResource(R.string.wallpaper_mode_setting)
-            )
-
-            Spacer(modifier = Modifier.height(AppSpacing.medium))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(AppSpacing.large)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.current_mode),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(AppSpacing.extraSmall))
-                            Text(
-                                text = when (wallpaperMode) {
-                                    com.anthonyla.paperize.core.WallpaperMode.STATIC -> stringResource(R.string.mode_static)
-                                    com.anthonyla.paperize.core.WallpaperMode.LIVE -> stringResource(R.string.mode_live_wallpaper)
-                                },
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-
-                        FilledTonalButton(
-                            enabled = !isResetting,
-                            onClick = {
-                                pendingMode = when (wallpaperMode) {
-                                    com.anthonyla.paperize.core.WallpaperMode.STATIC -> com.anthonyla.paperize.core.WallpaperMode.LIVE
-                                    com.anthonyla.paperize.core.WallpaperMode.LIVE -> com.anthonyla.paperize.core.WallpaperMode.STATIC
-                                }
+            // A restricted battery delays every scheduled change, so it is the one row that wears a
+            // problem colour and the one filled button on the page.
+            SectionLabel(stringResource(R.string.settings_section_wallpaper))
+            SettingsGroup(
+                {
+                    SettingsRow(
+                        icon = if (isIgnoringBatteryOptimizations) Icons.Outlined.BatteryFull else Icons.Outlined.BatteryAlert,
+                        iconTint = if (isIgnoringBatteryOptimizations) null else MaterialTheme.colorScheme.error,
+                        title = stringResource(R.string.battery_optimization),
+                        supporting = stringResource(if (isIgnoringBatteryOptimizations) R.string.ignoring else R.string.optimizing),
+                        supportingColor = if (isIgnoringBatteryOptimizations) null else MaterialTheme.colorScheme.error,
+                        onClick = if (isIgnoringBatteryOptimizations) null else ({ requestIgnoreBatteryOptimizations(context) }),
+                        trailing = if (isIgnoringBatteryOptimizations) null else ({
+                            Button(onClick = { requestIgnoreBatteryOptimizations(context) }) {
+                                Text(stringResource(R.string.battery_allow))
                             }
-                        ) {
-                            Text(stringResource(R.string.switch_button))
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(AppSpacing.small))
-
-                    Text(
-                        text = stringResource(R.string.mode_switch_warning),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        })
+                    )
+                },
+                {
+                    SettingsRow(
+                        icon = Icons.Outlined.Wallpaper,
+                        title = stringResource(R.string.wallpaper_mode_setting),
+                        supporting = stringResource(
+                            when (wallpaperMode) {
+                                WallpaperMode.STATIC -> R.string.mode_static
+                                WallpaperMode.LIVE -> R.string.mode_live_wallpaper
+                            }
+                        ),
+                        onClick = if (isResetting) null else ({
+                            pendingMode = when (wallpaperMode) {
+                                WallpaperMode.STATIC -> WallpaperMode.LIVE
+                                WallpaperMode.LIVE -> WallpaperMode.STATIC
+                            }
+                        })
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(AppSpacing.extraLarge))
-
-            SectionHeader(
-                icon = Icons.Filled.Palette,
-                title = stringResource(R.string.appearance)
             )
 
-            Spacer(modifier = Modifier.height(AppSpacing.medium))
-
-            SettingSwitchItem(
-                title = stringResource(R.string.dark_mode),
-                description = stringResource(R.string.easier_on_the_eyes),
-                checked = appSettings?.darkMode ?: isSystemInDarkTheme(),
-                onCheckedChange = { viewModel.updateDarkMode(it) }
+            SectionLabel(stringResource(R.string.appearance))
+            SettingsGroup(
+                {
+                    SwitchRow(
+                        icon = Icons.Outlined.DarkMode,
+                        title = stringResource(R.string.dark_mode),
+                        checked = appSettings?.darkMode ?: isSystemInDarkTheme(),
+                        onCheckedChange = { viewModel.updateDarkMode(it) }
+                    )
+                },
+                {
+                    SwitchRow(
+                        icon = Icons.Outlined.Palette,
+                        title = stringResource(R.string.dynamic_theming),
+                        supporting = stringResource(R.string.dynamic_theming_desc),
+                        checked = appSettings?.dynamicTheming ?: false,
+                        onCheckedChange = { viewModel.updateDynamicTheming(it) }
+                    )
+                },
+                {
+                    SwitchRow(
+                        icon = Icons.Outlined.Animation,
+                        title = stringResource(R.string.animation),
+                        checked = appSettings?.animate ?: true,
+                        onCheckedChange = { viewModel.updateAnimate(it) }
+                    )
+                }
             )
 
-            Spacer(modifier = Modifier.height(AppSpacing.extraSmall))
-
-            SettingSwitchItem(
-                title = stringResource(R.string.dynamic_theming),
-                description = stringResource(R.string.material_you),
-                checked = appSettings?.dynamicTheming ?: false,
-                onCheckedChange = { viewModel.updateDynamicTheming(it) }
-            )
-
-            Spacer(modifier = Modifier.height(AppSpacing.extraSmall))
-
-            SettingSwitchItem(
-                title = stringResource(R.string.animation),
-                description = stringResource(R.string.increase_visual_appeal),
-                checked = appSettings?.animate ?: true,
-                onCheckedChange = { viewModel.updateAnimate(it) }
-            )
-
-            Spacer(modifier = Modifier.height(AppSpacing.extraLarge))
-
-            SectionHeader(
-                icon = Icons.Default.Build,
-                title = stringResource(R.string.reliability)
-            )
-
-            Spacer(modifier = Modifier.height(AppSpacing.medium))
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(AppSpacing.large)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.battery_optimization),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface
+            SectionLabel(stringResource(R.string.about))
+            SettingsGroup(
+                {
+                    SettingsRow(
+                        icon = Icons.Outlined.PrivacyTip,
+                        title = stringResource(R.string.privacy_policy),
+                        onClick = onNavigateToPrivacy,
+                        trailing = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            Spacer(modifier = Modifier.height(AppSpacing.extraSmall))
-                            
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (isIgnoringBatteryOptimizations) 
-                                        Icons.Default.BatteryFull else Icons.Default.BatteryAlert,
-                                    contentDescription = null,
-                                    tint = if (isIgnoringBatteryOptimizations) 
-                                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (isIgnoringBatteryOptimizations)
-                                        stringResource(R.string.ignoring)
-                                    else
-                                        stringResource(R.string.optimizing),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = if (isIgnoringBatteryOptimizations)
-                                        MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
                         }
-
-                        if (!isIgnoringBatteryOptimizations) {
-                            Button(
-                                onClick = {
-                                    requestIgnoreBatteryOptimizations(context)
-                                }
-                            ) {
-                                Text(stringResource(R.string.check_status))
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(AppSpacing.small))
-
-                    Text(
-                        text = stringResource(R.string.battery_optimization_description),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                {
+                    SettingsRow(
+                        icon = Icons.Outlined.Info,
+                        title = stringResource(R.string.app_version),
+                        supporting = BuildConfig.VERSION_NAME
                     )
                 }
-            }
-
-            Spacer(modifier = Modifier.height(AppSpacing.extraLarge))
-
-            SectionHeader(
-                icon = Icons.Filled.Info,
-                title = stringResource(R.string.about)
             )
 
-            Spacer(modifier = Modifier.height(AppSpacing.medium))
-
-            Card(
-                onClick = onNavigateToPrivacy,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                )
-            ) {
-                Column(
-                    modifier = Modifier.padding(AppSpacing.large)
-                ) {
-                    Text(
-                        text = stringResource(R.string.privacy_policy),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(modifier = Modifier.height(AppSpacing.extraSmall))
-                    Text(
-                        text = stringResource(R.string.click_here_to_view_our_privacy_policy),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis
+            Spacer(modifier = Modifier.height(AppSpacing.large))
+            SettingsGroup(
+                {
+                    SettingsRow(
+                        icon = Icons.Outlined.DeleteForever,
+                        iconTint = MaterialTheme.colorScheme.error,
+                        title = stringResource(R.string.reset_all_data),
+                        titleColor = MaterialTheme.colorScheme.error,
+                        onClick = if (isResetting) null else ({ showResetDialog = true })
                     )
                 }
-            }
+            )
 
-            Spacer(modifier = Modifier.height(AppSpacing.large))
-
-            FilledTonalButton(
-                enabled = !isResetting,
-                onClick = { showResetDialog = true },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                )
-            ) {
-                Text(
-                    text = stringResource(R.string.reset_all_data),
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Spacer(modifier = Modifier.height(AppSpacing.large))
+            Spacer(modifier = Modifier.height(AppSpacing.extraLarge))
         }
 
         if (showResetDialog) {
@@ -340,16 +227,13 @@ fun SettingsScreen(
 
         if (pendingMode != null) {
             AlertDialog(
-                onDismissRequest = {
-
-                    pendingMode = null
-                },
-                title = { 
-                    val modeName = if (pendingMode == com.anthonyla.paperize.core.WallpaperMode.LIVE) 
-                        stringResource(R.string.mode_live_wallpaper) 
-                    else 
+                onDismissRequest = { pendingMode = null },
+                title = {
+                    val modeName = if (pendingMode == WallpaperMode.LIVE)
+                        stringResource(R.string.mode_live_wallpaper)
+                    else
                         stringResource(R.string.mode_static)
-                    Text(stringResource(R.string.switch_mode_dialog_title, modeName)) 
+                    Text(stringResource(R.string.switch_mode_dialog_title, modeName))
                 },
                 text = {
                     Text(stringResource(R.string.switch_mode_dialog_description))
@@ -358,7 +242,6 @@ fun SettingsScreen(
                     TextButton(
                         onClick = {
                             pendingMode?.let { viewModel.switchWallpaperMode(it) }
-
                             pendingMode = null
                         },
                         colors = ButtonDefaults.textButtonColors(
@@ -369,10 +252,7 @@ fun SettingsScreen(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = {
-
-                        pendingMode = null
-                    }) {
+                    TextButton(onClick = { pendingMode = null }) {
                         Text(stringResource(R.string.cancel))
                     }
                 }
@@ -382,40 +262,98 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SectionHeader(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(
-                horizontal = AppSpacing.large,
-                vertical = AppSpacing.medium
-            ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AppSpacing.medium)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
+private fun SectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = AppSpacing.large, top = AppSpacing.extraLarge, bottom = AppSpacing.small)
+    )
+}
+
+/** Rows of one section, joined into one rounded block: large outer corners, small inner ones. */
+@Composable
+private fun SettingsGroup(vararg rows: @Composable () -> Unit) {
+    val outer = 24.dp
+    val inner = 4.dp
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        rows.forEachIndexed { index, row ->
+            val shape: Shape = RoundedCornerShape(
+                topStart = if (index == 0) outer else inner,
+                topEnd = if (index == 0) outer else inner,
+                bottomStart = if (index == rows.lastIndex) outer else inner,
+                bottomEnd = if (index == rows.lastIndex) outer else inner
             )
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+            ) { row() }
         }
     }
+}
+
+@Composable
+private fun SettingsRow(
+    icon: ImageVector,
+    title: String,
+    modifier: Modifier = Modifier,
+    supporting: String? = null,
+    iconTint: Color? = null,
+    titleColor: Color? = null,
+    supportingColor: Color? = null,
+    onClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .heightIn(min = 64.dp)
+            .padding(horizontal = AppSpacing.large, vertical = AppSpacing.medium)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = iconTint ?: MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.width(AppSpacing.large))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = titleColor ?: MaterialTheme.colorScheme.onSurface
+            )
+            if (supporting != null) {
+                Text(
+                    text = supporting,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = supportingColor ?: MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(AppSpacing.medium))
+            trailing()
+        }
+    }
+}
+
+@Composable
+private fun SwitchRow(
+    icon: ImageVector,
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    supporting: String? = null
+) {
+    SettingsRow(
+        icon = icon,
+        title = title,
+        supporting = supporting,
+        modifier = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
+        trailing = { Switch(checked = checked, onCheckedChange = null) }
+    )
 }

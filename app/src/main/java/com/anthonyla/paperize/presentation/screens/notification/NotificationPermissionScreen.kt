@@ -61,11 +61,7 @@ fun NotificationPermissionScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-                    ),
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
                     )
                 ) {
                     Column(
@@ -110,7 +106,6 @@ fun NotificationPermissionScreen(
             FilledTonalButton(
                 onClick = onContinue,
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant

@@ -35,12 +35,8 @@
   <string name="are_you_sure_you_want_to_delete_this">确定要删除吗？</string>
   <string name="delete_album_question">删除相册？</string>
   <string name="animation">动画</string>
-  <string name="increase_visual_appeal">提升视觉观感</string>
   <string name="dark_mode">深色模式</string>
-  <string name="easier_on_the_eyes">更护眼</string>
-  <string name="material_you">Material You</string>
   <string name="dynamic_theming">动态取色</string>
-  <string name="click_here_to_view_our_privacy_policy">点击此处查看我们的隐私政策</string>
   <string name="appearance">外观</string>
   <string name="about">关于</string>
   <plurals name="wallpaper_count">
@@ -186,23 +182,17 @@
 
   <!-- Settings Mode Switcher -->
   <string name="wallpaper_mode_setting">壁纸模式</string>
-  <string name="current_mode">当前模式</string>
   <string name="mode_static">静态</string>
   <string name="mode_live_wallpaper">动态壁纸</string>
-  <string name="switch_button">切换</string>
-  <string name="mode_switch_warning">切换模式将重置所有相册、壁纸和设置，此操作无法撤销。</string>
   <string name="switch_mode_dialog_title">切换到%1$s模式？</string>
   <string name="switch_mode_dialog_description">这将重置所有相册、壁纸和定时设置，此操作无法撤销。\n\n你需要重新添加相册并配置壁纸设置。</string>
   <string name="switch_mode_button">切换模式</string>
   <string name="open_wallpaper_picker_instruction_newline">\n点击下方的「打开壁纸选择器」，在可用动态壁纸列表中选择 Connections Wallpaper。</string>
   <string name="loading_placeholder">…</string>
   <string name="album_name_exists_error">已存在同名相册</string>
-  <string name="battery_optimization">电池优化</string>
-  <string name="battery_optimization_description">关闭电池优化，以确保后台壁纸切换稳定可靠。</string>
-  <string name="check_status">检查状态</string>
-  <string name="ignoring">已忽略（推荐）</string>
-  <string name="optimizing">优化中（可能延迟切换）</string>
-  <string name="reliability">可靠性</string>
+  <string name="battery_optimization">电池</string>
+  <string name="ignoring">不受限制</string>
+  <string name="optimizing">可能延迟切换</string>
   <string name="change_wallpaper_now">立即更换壁纸</string>
   <string name="set_wallpaper">设为壁纸</string>
   <string name="home_and_lock_screens">主屏幕和锁屏</string>
@@ -257,6 +247,7 @@
   <string name="connections_sign_in_failed">登录未完成：%1$s</string>
   <string name="connections_sign_in_needed">登录后即可下载原图壁纸</string>
   <string name="connections_no_browser">此手机上没有可以打开 Connections 登录页面的浏览器</string>
+  <string name="connections_signed_in">已登录为 %1$s</string>
   <string name="connections_sign_out">退出登录</string>
   <string name="connections_free_account">免费 Connections 账号</string>
   <string name="connections_perk_full_size">原图壁纸</string>
@@ -274,5 +265,9 @@
   <!-- 下一张壁纸小组件 -->
   <string name="widget_next_wallpaper">下一张壁纸</string>
   <string name="widget_next_wallpaper_description">点按即可切换到下一张壁纸</string>
+  <string name="settings_section_wallpaper">壁纸切换</string>
+  <string name="dynamic_theming_desc">根据壁纸取色</string>
+  <string name="app_version">版本</string>
+  <string name="battery_allow">允许</string>
 </resources>
 

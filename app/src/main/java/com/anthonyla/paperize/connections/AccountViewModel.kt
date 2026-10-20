@@ -33,6 +33,8 @@ class AccountViewModel @Inject constructor(
 
     fun noBrowser(reason: String) = account.failSignIn(reason)
 
+    fun dismissSignInError() = account.clearFailure()
+
     fun signOut() {
         viewModelScope.launch { account.signOut() }
     }

@@ -48,6 +48,7 @@ import kotlin.time.Duration.Companion.hours
 private val Context.accountStore: DataStore<Preferences> by preferencesDataStore(name = "connections_account")
 private val SESSION = stringPreferencesKey("session")
 private val TRIAL_STARTED_AT = longPreferencesKey("trial_started_at")
+private val TRIAL_SEEN_AT = longPreferencesKey("trial_seen_at")
 private val PENDING_STATE = stringPreferencesKey("pending_state")
 private val PENDING_VERIFIER = stringPreferencesKey("pending_verifier")
 
@@ -136,14 +137,21 @@ class ConnectionsAccount @Inject constructor(
             session != null -> AccountState.SignedIn(session)
             started == null -> AccountState.Trial(TRIAL_DAYS)
             else -> {
-                val left = TRIAL_MS - (now - started).coerceAtLeast(0)
+                // The latest time this phone has shown: turning the clock back never returns the week.
+                val latest = maxOf(now, prefs[TRIAL_SEEN_AT] ?: started)
+                val left = TRIAL_MS - (latest - started).coerceAtLeast(0)
                 if (left > 0) AccountState.Trial(((left + DAY_MS - 1) / DAY_MS).toInt()) else AccountState.TrialOver
             }
         }
     }
 
+    /** Starts the free week on first launch, and on every launch records the latest clock seen. */
     suspend fun startTrialIfNew() {
-        store.edit { if (it[TRIAL_STARTED_AT] == null) it[TRIAL_STARTED_AT] = System.currentTimeMillis() }
+        val now = System.currentTimeMillis()
+        store.edit {
+            if (it[TRIAL_STARTED_AT] == null) it[TRIAL_STARTED_AT] = now
+            if (now > (it[TRIAL_SEEN_AT] ?: 0L)) it[TRIAL_SEEN_AT] = now
+        }
     }
 
     /** The intent that opens Connections sign-in in the phone's browser (never an in-app view). */
@@ -169,15 +177,36 @@ class ConnectionsAccount @Inject constructor(
 
     /** The browser came back to icu.connections.wallpaper://aegis-handoff?state=…&code=… */
     fun finishSignIn(uri: Uri) {
-        _signIn.value = SignInStatus.Finishing
         scope.launch {
-            _signIn.value = runCatchingCancellable { redeem(uri) }
+            // Only the link for the sign-in this phone started counts, and only once: a replayed or
+            // forged link finds no pending sign-in and changes nothing on screen.
+            val verifier = claimPending(uri.getQueryParameter("state")) ?: return@launch
+            _signIn.value = SignInStatus.Finishing
+            _signIn.value = runCatchingCancellable { redeem(uri, verifier) }
                 .fold(onSuccess = { SignInStatus.Idle }, onFailure = { SignInStatus.Failed(it.message) })
         }
     }
 
     fun failSignIn(reason: String) {
         _signIn.value = SignInStatus.Failed(reason)
+    }
+
+    /** The member has seen why sign-in failed; the reason stops reopening the account sheet. */
+    fun clearFailure() {
+        if (_signIn.value is SignInStatus.Failed) _signIn.value = SignInStatus.Idle
+    }
+
+    /** The verifier of the pending sign-in whose state this is, removed so it redeems once. */
+    private suspend fun claimPending(state: String?): String? {
+        var verifier: String? = null
+        store.edit {
+            if (state != null && state == it[PENDING_STATE]) {
+                verifier = it[PENDING_VERIFIER]
+                it.remove(PENDING_STATE)
+                it.remove(PENDING_VERIFIER)
+            }
+        }
+        return verifier
     }
 
     /** A live access token, refreshed when it is about to run out; null when nobody is signed in. */
@@ -193,11 +222,12 @@ class ConnectionsAccount @Inject constructor(
         val reply = try {
             call("POST", body)
         } catch (_: AccountRefusedException) {
-            store.edit { it.remove(SESSION) }
+            store.edit { if (it.session() == current) it.remove(SESSION) }
             return null
         }
+        // A sign-out or a new sign-in that landed while this refresh was in flight wins.
         val next = sessionOf(reply, previous = current)
-        store.edit { it[SESSION] = json.encodeToString(next) }
+        store.edit { if (it.session() == current) it[SESSION] = json.encodeToString(next) }
         next.accessToken
     }
 
@@ -213,26 +243,16 @@ class ConnectionsAccount @Inject constructor(
         }
     }
 
-    private suspend fun redeem(uri: Uri) {
+    private suspend fun redeem(uri: Uri, verifier: String) {
         val code = uri.getQueryParameter("code")
             ?: throw IOException(uri.getQueryParameter("error_description") ?: uri.getQueryParameter("error") ?: "No sign-in code came back")
-        val prefs = store.data.first()
-        val expected = prefs[PENDING_STATE]
-        val verifier = prefs[PENDING_VERIFIER]
-        if (expected == null || verifier == null || uri.getQueryParameter("state") != expected) {
-            throw IOException("This sign-in was not started on this phone")
-        }
         val reply = call("POST", buildJsonObject {
             put("code", code)
             put("codeVerifier", verifier)
             put("redirectUri", REDIRECT_URI)
         })
         val session = sessionOf(reply, previous = null)
-        store.edit {
-            it[SESSION] = json.encodeToString(session)
-            it.remove(PENDING_STATE)
-            it.remove(PENDING_VERIFIER)
-        }
+        store.edit { it[SESSION] = json.encodeToString(session) }
     }
 
     private fun sessionOf(reply: SessionReply, previous: ConnectionsSession?): ConnectionsSession {

@@ -1,24 +1,32 @@
 package com.anthonyla.paperize.presentation.screens.wallpaper.components
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -63,7 +71,7 @@ fun CurrentWallpaperPreview(
             .padding(horizontal = AppSpacing.small, vertical = AppSpacing.extraSmall),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         )
     ) {
         Column(
@@ -86,6 +94,8 @@ fun CurrentWallpaperPreview(
             ) {
                 WallpaperPreviewBox(
                     wallpaperUri = lockWallpaperUri,
+                    label = stringResource(R.string.lock),
+                    icon = Icons.Outlined.Lock,
                     aspectRatio = screenAspectRatio,
                     contentDescription = stringResource(R.string.content_desc_current_lock_wallpaper),
                     animate = animate,
@@ -94,6 +104,8 @@ fun CurrentWallpaperPreview(
 
                 WallpaperPreviewBox(
                     wallpaperUri = homeWallpaperUri,
+                    label = stringResource(R.string.home),
+                    icon = Icons.Outlined.Home,
                     aspectRatio = screenAspectRatio,
                     contentDescription = stringResource(R.string.content_desc_current_home_wallpaper),
                     animate = animate,
@@ -107,6 +119,8 @@ fun CurrentWallpaperPreview(
 @Composable
 private fun WallpaperPreviewBox(
     wallpaperUri: String?,
+    label: String,
+    icon: ImageVector,
     aspectRatio: Float,
     contentDescription: String,
     animate: Boolean,
@@ -114,26 +128,50 @@ private fun WallpaperPreviewBox(
 ) {
     val context = LocalContext.current
 
-    Box(
-        modifier = modifier
-            .aspectRatio(aspectRatio)
-            .border(
-                width = 3.dp,
-                color = Color.Black,
-                shape = MaterialTheme.shapes.small
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(aspectRatio)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        ) {
+            // A screen this app has not set yet shows its own glyph, not a blank tile.
+            if (wallpaperUri == null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            } else {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(wallpaperUri)
+                        .size(Size(Constants.PREVIEW_THUMBNAIL_WIDTH, Constants.PREVIEW_THUMBNAIL_HEIGHT))
+                        .crossfade(animate)
+                        .build(),
+                    contentDescription = contentDescription,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            }
+        }
+        Spacer(Modifier.height(AppSpacing.small))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            .clip(MaterialTheme.shapes.small)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-    ) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(wallpaperUri)
-                .size(Size(Constants.PREVIEW_THUMBNAIL_WIDTH, Constants.PREVIEW_THUMBNAIL_HEIGHT))
-                .crossfade(animate)
-                .build(),
-            contentDescription = contentDescription,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.matchParentSize()
-        )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
