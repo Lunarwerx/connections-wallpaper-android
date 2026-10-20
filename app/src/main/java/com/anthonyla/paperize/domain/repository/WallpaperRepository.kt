@@ -10,6 +10,9 @@ interface WallpaperRepository {
     /** Atomic, so concurrent wallpaper changes never receive the same item. */
     suspend fun getAndDequeueWallpaper(albumId: String, screenType: ScreenType): Wallpaper?
 
+    /** The item the next change of this queue will take, left in place. */
+    suspend fun peekNextWallpaper(albumId: String, screenType: ScreenType): Wallpaper?
+
     suspend fun removeWallpaperFromQueue(
         albumId: String,
         screenType: ScreenType,

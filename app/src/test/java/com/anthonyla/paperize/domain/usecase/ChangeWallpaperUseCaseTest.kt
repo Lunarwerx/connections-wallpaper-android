@@ -6,6 +6,7 @@ import com.anthonyla.paperize.core.NoValidWallpaperException
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.domain.model.PreparedWallpaper
+import com.anthonyla.paperize.domain.model.WallpaperImage
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
 import com.anthonyla.paperize.domain.source.WallpaperRenderer
@@ -124,7 +125,7 @@ class ChangeWallpaperUseCaseTest {
     }
 
     private fun preparedWallpaper() = PreparedWallpaper(
-        bitmap = mockk<Bitmap>(relaxed = true),
+        image = WallpaperImage.Drawn(mockk<Bitmap>(relaxed = true)),
         albumId = "album",
         screenType = ScreenType.HOME,
         wallpaperId = "wallpaper",

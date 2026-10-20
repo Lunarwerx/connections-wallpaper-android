@@ -159,7 +159,7 @@ def t_unlock_changes():
     seen = []
     for i in range(3):
         before = ids()["lock"]
-        time.sleep(3.2)  # the watcher ignores screen-offs closer than 3 s
+        time.sleep(1.2)  # the watcher ignores screen-offs closer than 1 s
         screen_off_on()
         changed = wait_until(lambda: ids()["lock"] != before, 8)
         seen.append(cw.wall_color("lock"))

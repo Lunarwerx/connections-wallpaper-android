@@ -12,6 +12,7 @@ import androidx.exifinterface.media.ExifInterface
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.anthonyla.paperize.core.ScalingType
+import com.anthonyla.paperize.domain.model.WallpaperImage
 import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -285,12 +286,12 @@ class WallpaperUtilInstrumentedTest {
         val blue = mutableBitmap(256, 256, Color.rgb(20, 20, 230))
 
         try {
-            wallpaperManager.setBitmapChecked(red, WallpaperManager.FLAG_SYSTEM)
+            wallpaperManager.setImageChecked(WallpaperImage.Drawn(red), WallpaperManager.FLAG_SYSTEM)
             val redPrimary = awaitPrimaryWallpaperColor(wallpaperManager) { color ->
                 Color.red(color) > Color.blue(color) * 2
             }
 
-            wallpaperManager.setBitmapChecked(blue, WallpaperManager.FLAG_SYSTEM)
+            wallpaperManager.setImageChecked(WallpaperImage.Drawn(blue), WallpaperManager.FLAG_SYSTEM)
             val bluePrimary = awaitPrimaryWallpaperColor(wallpaperManager) { color ->
                 Color.blue(color) > Color.red(color) * 2
             }

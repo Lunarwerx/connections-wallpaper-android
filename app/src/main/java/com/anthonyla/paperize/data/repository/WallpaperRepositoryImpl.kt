@@ -28,6 +28,9 @@ class WallpaperRepositoryImpl @Inject constructor(
     override suspend fun getAndDequeueWallpaper(albumId: String, screenType: ScreenType): Wallpaper? =
         wallpaperQueueDao.getAndDequeueWallpaper(albumId, screenType)?.toDomainModel()
 
+    override suspend fun peekNextWallpaper(albumId: String, screenType: ScreenType): Wallpaper? =
+        wallpaperQueueDao.getNextWallpaperInQueue(albumId, screenType)?.toDomainModel()
+
     override suspend fun removeWallpaperFromQueue(
         albumId: String,
         screenType: ScreenType,

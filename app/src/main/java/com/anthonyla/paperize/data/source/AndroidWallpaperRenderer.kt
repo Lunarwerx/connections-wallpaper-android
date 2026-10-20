@@ -21,11 +21,7 @@ class AndroidWallpaperRenderer @Inject constructor(
 ) : WallpaperRenderer {
     override suspend fun render(wallpaper: Wallpaper, screen: ScreenType, settings: ScheduleSettings): Bitmap? {
         currentCoroutineContext().ensureActive()
-        val scaling = when (screen) {
-            ScreenType.HOME, ScreenType.BOTH -> settings.homeScalingType
-            ScreenType.LOCK -> settings.lockScalingType
-            ScreenType.LIVE -> settings.liveScalingType
-        }
+        val scaling = settings.scalingType(screen)
         val size = getDeviceScreenSize(context)
         var bitmap = retrieveBitmap(context, wallpaper.uri.toUri(), size.width, size.height, scaling,
             usesLauncherManagedScrolling(screen, scaling, settings.homeScrollingEnabled)) ?: return null

@@ -55,7 +55,10 @@ fun NavigationGraph(
         enterTransition = enterForward,
         exitTransition = exitForward,
         popEnterTransition = enterBackward,
-        popExitTransition = exitBackward
+        popExitTransition = exitBackward,
+        // A swipe back plays the back arrow's slide, not the library's default shrink.
+        predictivePopEnterTransition = { enterBackward() },
+        predictivePopExitTransition = { exitBackward() }
     ) {
         composable<StartupRoute> {
             StartupScreen(

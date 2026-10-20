@@ -66,6 +66,21 @@ data class ScheduleSettings(
         }
     }
 
+    fun scalingType(screen: ScreenType): ScalingType = when (screen) {
+        ScreenType.HOME, ScreenType.BOTH -> homeScalingType
+        ScreenType.LOCK -> lockScalingType
+        ScreenType.LIVE -> liveScalingType
+    }
+
+    /** Everything here that changes how a picture is drawn on [screen]: equal looks draw the same bitmap. */
+    fun look(screen: ScreenType): WallpaperLook =
+        WallpaperLook(scalingType(screen), appliedEffects(screen), appliesAdaptiveBrightness, homeScrollingEnabled)
+
+    /** Home and lock draw a picture the same way, so one write sets both. */
+    val homeAndLockLookAlike: Boolean
+        get() = appliedEffects(ScreenType.HOME) == appliedEffects(ScreenType.LOCK) &&
+            homeScalingType == lockScalingType && !homeScrollingEnabled
+
     fun intervalMinutes(screen: ScreenType): Int = when (screen) {
         ScreenType.HOME, ScreenType.BOTH -> homeIntervalMinutes
         ScreenType.LOCK -> effectiveLockIntervalMinutes
@@ -117,3 +132,10 @@ data class ScheduleSettings(
  */
 fun usesVisibleLiveTimer(intervalMinutes: Int): Boolean =
     intervalMinutes in Constants.MIN_LIVE_INTERVAL_MINUTES until Constants.MIN_INTERVAL_MINUTES
+
+data class WallpaperLook(
+    val scaling: ScalingType,
+    val effects: WallpaperEffects,
+    val adaptiveBrightness: Boolean,
+    val homeScrolling: Boolean
+)

@@ -55,14 +55,20 @@ def connect(serial: str = SERIAL):
 
 
 def push_testwalls(folder: str) -> None:
-    """Put the four solid pictures in Pictures/<folder> on the device, so a test can tell which one is up by colour."""
+    """Put the four test pictures in Pictures/<folder> on the device, so a test can tell which one is up by colour.
+
+    Each is a 12-megapixel camera-sized photo of one colour with film grain, as heavy to decode as a
+    real photo, so timings measured here are the ones a phone sees.
+    """
     from PIL import Image
     sh("root")
     sh("wait-for-device")
+    grain = Image.effect_noise((3000, 4000), 14)
     with tempfile.TemporaryDirectory() as tmp:
         for name, rgb in COLORS.items():
             path = os.path.join(tmp, f"test_{name}.jpg")
-            Image.new("RGB", (1080, 2400), rgb).save(path, quality=95)
+            channels = [grain.point(lambda v, c=c: max(0, min(255, c + v - 128))) for c in rgb]
+            Image.merge("RGB", channels).save(path, quality=92)
             sh("push", path, f"/sdcard/Pictures/{folder}/test_{name}.jpg", check=True)
 
 

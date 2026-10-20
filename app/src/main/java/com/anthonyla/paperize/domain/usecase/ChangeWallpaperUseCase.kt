@@ -8,6 +8,7 @@ import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.core.runCatchingCancellable
 import com.anthonyla.paperize.domain.model.PreparedWallpaper
 import com.anthonyla.paperize.domain.model.Wallpaper
+import com.anthonyla.paperize.domain.model.WallpaperImage
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
 import com.anthonyla.paperize.domain.source.WallpaperRenderer
@@ -38,7 +39,7 @@ class ChangeWallpaperUseCase @Inject constructor(
             try {
                 val bitmap = renderer.render(candidate, screenType, settings)
                 if (bitmap != null) {
-                    return PreparedWallpaper(bitmap, albumId, screenType, candidate.id, settings.shuffleEnabled)
+                    return PreparedWallpaper(WallpaperImage.Drawn(bitmap), albumId, screenType, candidate.id, settings.shuffleEnabled)
                 }
             } catch (e: CancellationException) {
                 // Cancelling preparation must not consume the selected queue item.

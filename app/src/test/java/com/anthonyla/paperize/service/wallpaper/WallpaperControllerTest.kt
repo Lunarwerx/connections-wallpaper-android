@@ -7,6 +7,7 @@ import com.anthonyla.paperize.core.EmptyAlbumException
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.domain.model.PreparedWallpaper
 import com.anthonyla.paperize.domain.model.ScheduleSettings
+import com.anthonyla.paperize.domain.model.WallpaperImage
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.usecase.ChangeWallpaperUseCase
 import com.anthonyla.paperize.domain.usecase.ReapplyEffectsUseCase
@@ -16,17 +17,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
 import org.junit.Test
+import java.io.File
 import java.io.IOException
+import java.io.InputStream
 
 class WallpaperControllerTest {
     private val manager = mockk<WallpaperManager>()
     private val prepare = mockk<ChangeWallpaperUseCase>(relaxed = true)
     private val render = mockk<ReapplyEffectsUseCase>()
     private val settingsRepository = mockk<SettingsRepository>(relaxed = true)
-    private val controller = WallpaperController(mockk<Context>(), manager, prepare, render, settingsRepository)
+    private val ready = mockk<ReadyWallpapers> {
+        coEvery { takeNext(any(), any(), any()) } returns null
+        coEvery { take(any(), any(), any()) } returns null
+    }
+    private val controller = WallpaperController(mockk<Context>(), manager, prepare, render, settingsRepository, ready)
     private val settings = ScheduleSettings(homeAlbumId = "album", lockAlbumId = "album")
     private val bitmap = mockk<Bitmap>(relaxed = true)
-    private val prepared = PreparedWallpaper(bitmap, "album", ScreenType.HOME, "image", false)
+    private val prepared = PreparedWallpaper(WallpaperImage.Drawn(bitmap), "album", ScreenType.HOME, "image", false)
 
     @Test fun `matching screens use one write and commit both only after acceptance`() = runTest {
         coEvery { prepare("album", ScreenType.HOME) } returns prepared
@@ -39,6 +46,17 @@ class WallpaperControllerTest {
             bitmap.recycle()
         }
         coVerify(exactly = 0) { prepare.restore(any()) }
+    }
+
+    @Test fun `a wallpaper drawn ahead goes to Android as its file, without drawing it again`() = runTest {
+        val file = File.createTempFile("ready", ".png").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        val drawnAhead = PreparedWallpaper(WallpaperImage.Encoded(file), "album", ScreenType.HOME, "image", false)
+        coEvery { ready.takeNext("album", ScreenType.HOME, settings) } returns drawnAhead
+        every { manager.setStream(any<InputStream>(), null, true, 3) } returns 1
+        assertTrue(controller.change(ScreenType.BOTH, settings).changed)
+        coVerify(exactly = 0) { prepare(any(), any()) }
+        coVerify { prepare.complete(drawnAhead, ScreenType.HOME); prepare.complete(drawnAhead, ScreenType.LOCK) }
+        assertFalse("the file is removed once Android has it", file.exists())
     }
 
     @Test fun `platform rejection restores prepared item and releases bitmap`() = runTest {
