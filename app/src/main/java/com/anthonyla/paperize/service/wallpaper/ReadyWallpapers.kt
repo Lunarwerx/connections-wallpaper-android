@@ -95,7 +95,12 @@ class ReadyWallpapers @Inject constructor(
     suspend fun takeNext(albumId: String, queue: ScreenType, settings: ScheduleSettings): PreparedWallpaper? {
         val next = wallpaperRepository.peekNextWallpaper(albumId, queue) ?: return null
         val file = take(next.id, queue, settings) ?: return null
-        val taken = wallpaperRepository.getAndDequeueWallpaper(albumId, queue)
+        val taken = try {
+            wallpaperRepository.getAndDequeueWallpaper(albumId, queue)
+        } catch (e: Exception) {
+            file.delete()
+            throw e
+        }
         if (taken?.id != next.id) {
             // The queue moved while the drawing finished (an album refresh): its new head is drawn as usual.
             file.delete()
