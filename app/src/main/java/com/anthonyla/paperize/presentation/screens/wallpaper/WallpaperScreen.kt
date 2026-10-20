@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -64,6 +65,7 @@ import com.anthonyla.paperize.presentation.common.components.SettingsRow
 import com.anthonyla.paperize.presentation.common.components.ScrollingDemo
 import com.anthonyla.paperize.presentation.common.components.SettingsRowTextStart
 import com.anthonyla.paperize.presentation.common.components.SwitchRow
+import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.AlbumSelectionBottomSheet
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.CurrentWallpaperPreview
@@ -117,6 +119,9 @@ fun WallpaperScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            // The whole width scrolls; the cards keep a readable column in a wide window.
+            .wrapContentWidth(Alignment.CenterHorizontally)
+            .widthIn(max = AppLayout.contentMaxWidth)
             .padding(start = AppSpacing.medium, end = AppSpacing.medium, top = 4.dp, bottom = AppSpacing.medium),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {

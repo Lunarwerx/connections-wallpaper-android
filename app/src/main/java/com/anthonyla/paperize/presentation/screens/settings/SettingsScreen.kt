@@ -41,6 +41,7 @@ import com.anthonyla.paperize.presentation.common.components.SectionLabel
 import com.anthonyla.paperize.presentation.common.components.SettingsGroup
 import com.anthonyla.paperize.presentation.common.components.SettingsRow
 import com.anthonyla.paperize.presentation.common.components.SwitchRow
+import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.wallpaper_mode_selection.WallpaperModeOptions
 
@@ -90,6 +91,9 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
+                // The whole width scrolls; the rows keep a readable column in a wide window.
+                .wrapContentWidth(Alignment.CenterHorizontally)
+                .widthIn(max = AppLayout.contentMaxWidth)
                 .padding(horizontal = AppSpacing.medium)
         ) {
             failure?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }

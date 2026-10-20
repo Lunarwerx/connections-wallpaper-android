@@ -1,6 +1,7 @@
 package com.anthonyla.paperize.core.util
 
 import android.app.WallpaperManager
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -155,7 +156,9 @@ class WallpaperUtilInstrumentedTest {
 
     @Test
     fun android17FoldableSizingIncludesInactiveBuiltInPanel() {
+        // Only a foldable has a second built-in panel; an Android 17 laptop or tablet has one.
         assumeTrue(Build.VERSION.SDK_INT >= 37)
+        assumeTrue(context.packageManager.hasSystemFeature(PackageManager.FEATURE_SENSOR_HINGE_ANGLE))
         val displayManager = context.getSystemService(DisplayManager::class.java)
         val builtInDisplays = displayManager.getDisplays(
             "android.hardware.display.category.BUILT_IN_DISPLAYS"
