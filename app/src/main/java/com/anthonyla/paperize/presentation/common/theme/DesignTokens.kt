@@ -16,6 +16,16 @@ object AppGrid {
     val itemMinSize = 160.dp
 }
 
+/** Widths that keep a screen readable on a tablet or a laptop window. */
+object AppLayout {
+    /** Material's expanded window: from here the tabs move to a side rail. */
+    val expandedWidth = 840.dp
+    /** A settings-style column, centred in anything wider. */
+    val contentMaxWidth = 720.dp
+    /** A phone-width column for onboarding cards and their buttons. */
+    val narrowMaxWidth = 560.dp
+}
+
 object AppIconSizes {
     val medium = 32.dp
     val large = 48.dp

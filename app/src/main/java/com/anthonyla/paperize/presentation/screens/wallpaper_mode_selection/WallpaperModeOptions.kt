@@ -18,8 +18,10 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -27,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.WallpaperMode
+import com.anthonyla.paperize.core.util.canPickLiveWallpaper
 import com.anthonyla.paperize.presentation.common.components.LiveModeDemo
 import com.anthonyla.paperize.presentation.common.components.StaticModeDemo
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
@@ -56,20 +59,30 @@ fun WallpaperModeOptions(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val context = LocalContext.current
+    val liveAvailable = remember(context) { canPickLiveWallpaper(context) }
     Column(modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(AppSpacing.small)) {
         WallpaperMode.entries.forEach { mode ->
-            ModeOption(mode, mode == selected, animate, enabled) { onSelect(mode) }
+            val available = mode != WallpaperMode.LIVE || liveAvailable
+            ModeOption(mode, mode == selected, animate, enabled, available) { onSelect(mode) }
         }
     }
 }
 
 @Composable
-private fun ModeOption(mode: WallpaperMode, selected: Boolean, animate: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun ModeOption(
+    mode: WallpaperMode,
+    selected: Boolean,
+    animate: Boolean,
+    enabled: Boolean,
+    available: Boolean,
+    onClick: () -> Unit
+) {
     val copy = copyOf(mode)
     Surface(
         selected = selected,
         onClick = onClick,
-        enabled = enabled,
+        enabled = enabled && available,
         shape = MaterialTheme.shapes.large,
         color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth().semantics { role = Role.RadioButton }
@@ -82,13 +95,20 @@ private fun ModeOption(mode: WallpaperMode, selected: Boolean, animate: Boolean,
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(copy.title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                    RadioButton(selected = selected, onClick = null, enabled = enabled)
+                    RadioButton(selected = selected, onClick = null, enabled = enabled && available)
                 }
                 Text(
                     stringResource(copy.tagline),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (!available) {
+                    Text(
+                        stringResource(R.string.mode_live_unavailable),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
                 Spacer(Modifier.height(AppSpacing.extraSmall))
                 copy.features.forEach { feature ->
                     Row(Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {

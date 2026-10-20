@@ -9,6 +9,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -60,11 +61,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
@@ -86,6 +95,7 @@ import com.anthonyla.paperize.R
 import com.anthonyla.paperize.domain.model.AlbumSummary
 import com.anthonyla.paperize.presentation.common.components.AddAlbumDialog
 import com.anthonyla.paperize.presentation.common.theme.ViewerTheme
+import kotlinx.coroutines.launch
 
 private enum class ViewerSheet { Target, Album }
 
@@ -122,12 +132,30 @@ fun ConnectionsViewer(
             if (page >= wallpapers.size - LOAD_AHEAD) viewModel.loadMore()
         }
     }
+    // A keyboard pages too (a laptop, a tablet's keyboard case); Escape already closes, as Back.
+    val scope = rememberCoroutineScope()
+    val keys = remember { FocusRequester() }
+    LaunchedEffect(keys) { keys.requestFocus() }
 
     ViewerTheme {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                .focusRequester(keys)
+                .focusable()
+                .onKeyEvent { event ->
+                    val step = when (event.key) {
+                        Key.DirectionLeft -> -1
+                        Key.DirectionRight -> 1
+                        else -> return@onKeyEvent false
+                    }
+                    if (event.type == KeyEventType.KeyDown) {
+                        val page = (pagerState.currentPage + step).coerceIn(0, wallpapers.lastIndex)
+                        scope.launch { pagerState.animateScrollToPage(page) }
+                    }
+                    true
+                }
         ) {
             HorizontalPager(
                 state = pagerState,

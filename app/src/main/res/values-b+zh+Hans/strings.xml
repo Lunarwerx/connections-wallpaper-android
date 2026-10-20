@@ -279,6 +279,7 @@
   <string name="animation_desc">应用内页面切换时的滑动与淡入淡出</string>
   <string name="mode_static_tagline">按你的计划切换图片</string>
   <string name="mode_live_tagline">图片淡入，并随你移动</string>
+  <string name="mode_live_unavailable">这台设备没有动态壁纸选择器，无法在这里开启动态模式。</string>
   <string name="mode_static_feature_screens">主屏幕和锁屏可用不同图片</string>
   <string name="mode_static_feature_battery">最省电</string>
   <string name="mode_live_feature_fade">平滑淡入每张新图片</string>

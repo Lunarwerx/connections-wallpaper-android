@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.anthonyla.paperize.presentation.common.navigation.util.NavConstants
+import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 
 @Composable
@@ -62,8 +64,10 @@ fun OnboardingLayout(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top // Top here, centering happens in inner Column
         ) {
+            // A phone-width column, centred: on a tablet or a laptop window a card and its button stay readable.
             Column(
                 modifier = Modifier
+                    .widthIn(max = AppLayout.narrowMaxWidth)
                     .fillMaxWidth()
                     .heightIn(min = maxHeight - (AppSpacing.extraLarge * 2)),
                 horizontalAlignment = Alignment.CenterHorizontally,

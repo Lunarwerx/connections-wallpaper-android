@@ -18,6 +18,15 @@
     <uses-permission
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
+    <!-- Live mode asks whether this device has a screen that turns on a live wallpaper (canPickLiveWallpaper). -->
+    <queries>
+        <intent>
+            <action android:name="android.service.wallpaper.CHANGE_LIVE_WALLPAPER" />
+        </intent>
+        <intent>
+            <action android:name="android.service.wallpaper.LIVE_WALLPAPER_CHOOSER" />
+        </intent>
+    </queries>
     <!-- Features -->
     <uses-feature
         android:name="android.software.wallpaper"

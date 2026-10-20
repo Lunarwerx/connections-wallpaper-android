@@ -9,8 +9,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,9 +78,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -162,9 +168,9 @@ fun ConnectionsScreen(
 private fun rememberDeviceFit(): DeviceFit {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
-    return remember(context, configuration) {
+    val density = LocalDensity.current.density
+    return remember(context, configuration, density) {
         val bounds = context.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
-        val density = context.resources.displayMetrics.density
         val packages = context.packageManager
         DeviceFit.of(
             widthDp = bounds.width() / density,
@@ -396,12 +402,25 @@ private fun EndOfShape(onShowAllShapes: () -> Unit) {
     }
 }
 
-/** The picture and nothing else; it gives a little under the finger. */
+/**
+ * The picture and nothing else; it gives a little under the finger and lifts a little under a mouse, and a
+ * keyboard's focus rings it (a laptop window, a tablet's keyboard case).
+ */
 @Composable
 private fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) PRESSED_SCALE else 1f, label = "tile-press")
+    val hovered by interaction.collectIsHoveredAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val scale by animateFloatAsState(
+        when {
+            pressed -> PRESSED_SCALE
+            hovered -> HOVERED_SCALE
+            else -> 1f
+        },
+        label = "tile-press"
+    )
+    val ring = MaterialTheme.colorScheme.primary
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
             .data(wallpaper.previewUrl)
@@ -418,7 +437,9 @@ private fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
                 scaleY = scale
             }
             .clip(TILE_SHAPE)
+            .then(if (focused) Modifier.border(FOCUS_RING, ring, TILE_SHAPE) else Modifier)
             .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
+            .pointerHoverIcon(PointerIcon.Hand)
     )
 }
 
@@ -495,6 +516,8 @@ private val TILE_SHAPE = RoundedCornerShape(16.dp)
 private val GRID_PADDING = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp)
 private val SKELETON_RATIOS = listOf(1.45f, 0.8f, 1.25f, 1.5f, 0.75f, 1.3f, 1f, 1.4f)
 private const val PRESSED_SCALE = 0.96f
+private const val HOVERED_SCALE = 1.02f
+private val FOCUS_RING = 3.dp
 private const val MIN_RATIO = 0.4f
 private const val MAX_RATIO = 2.5f
 private const val LOAD_MORE_THRESHOLD = 6

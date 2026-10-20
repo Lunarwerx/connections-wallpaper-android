@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -23,6 +24,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -41,12 +44,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anthonyla.paperize.R
+import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.connections.AccountSheet
 import com.anthonyla.paperize.connections.AccountState
 import com.anthonyla.paperize.connections.AccountViewModel
@@ -200,6 +206,21 @@ fun HomeScreen(
         }
     }
 
+    // Material's expanded window (a tablet held wide, a laptop window) gets a side rail instead of a bottom bar.
+    val wide = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } >= AppLayout.expandedWidth
+    val selectTab = { index: Int ->
+        if (index != pagerState.currentPage) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
+        coroutineScope.launch { pagerState.scrollToPage(index) }
+        Unit
+    }
+    val tabIcon = @Composable { index: Int ->
+        val item = tabItems[index]
+        Icon(
+            imageVector = if (index == pagerState.currentPage) item.filledIcon else item.unfilledIcon,
+            contentDescription = null
+        )
+    }
+
     Scaffold(
         topBar = {
             HomeTopBar(
@@ -210,83 +231,92 @@ fun HomeScreen(
             )
         },
         bottomBar = {
-            NavigationBar {
-                tabItems.forEachIndexed { index, item ->
-                    val selected = index == pagerState.currentPage
-                    NavigationBarItem(
-                        selected = selected,
-                        onClick = {
-                            if (!selected) haptics.performHapticFeedback(HapticFeedbackType.SegmentTick)
-                            coroutineScope.launch { pagerState.scrollToPage(index) }
-                        },
-                        icon = {
-                            Icon(
-                                imageVector = if (selected) item.filledIcon else item.unfilledIcon,
-                                contentDescription = null
-                            )
-                        },
-                        label = { Text(item.title) }
-                    )
+            if (!wide) {
+                NavigationBar {
+                    tabItems.forEachIndexed { index, item ->
+                        NavigationBarItem(
+                            selected = index == pagerState.currentPage,
+                            onClick = { selectTab(index) },
+                            icon = { tabIcon(index) },
+                            label = { Text(item.title) }
+                        )
+                    }
                 }
             }
         },
         // One host at a time: the viewer draws its own until its exit animation has finished.
         snackbarHost = { if (!viewerVisibility.currentState && !viewerVisibility.targetState) SnackbarHost(snackbarHostState) }
     ) { paddingValues ->
-        HorizontalPager(
-            state = pagerState,
-            userScrollEnabled = false,
-            beyondViewportPageCount = tabItems.size - 1,
+        Row(
             modifier = modifier
                 .padding(paddingValues)
                 .consumeWindowInsets(paddingValues)
-        ) { page ->
-            when (page) {
-                0 -> {
-                    val mode = wallpaperMode
-                    if (mode == null) {
-                        Box(modifier = Modifier.fillMaxSize())
-                    } else {
-                        WallpaperScreen(
-                            albums = albums,
-                            persistedScheduleSettings = scheduleSettings,
-                            appSettings = appSettings,
-                            wallpaperMode = mode,
-                            onToggleChanger = viewModel::setChangerEnabled,
-                            onSelectAlbum = viewModel::selectAlbum,
-                            onUpdateScheduleSettings = viewModel::updateScheduleSettings,
-                            onUpdateScheduleSettingsDebounced = viewModel::updateScheduleSettingsDebounced,
-                            onChangeWallpaperNow = viewModel::changeWallpaperNow,
-                            onAddFolder = { addFolder(it) },
-                            onOpenVisualEffects = onNavigateToVisualEffects,
-                            homeWallpaperUri = currentHomeWallpaperUri,
-                            lockWallpaperUri = currentLockWallpaperUri,
-                            liveWallpaperUri = currentLiveWallpaperUri,
-                            sponsored = banner?.let { ad ->
-                                @Composable {
-                                    SponsoredBanner(
-                                        ad = ad,
-                                        onViewed = { adsViewModel.viewed(ad, ConnectionsAds.BANNER_SLOT) },
-                                        onTapped = { adsViewModel.tapped(ad, ConnectionsAds.BANNER_SLOT) }
-                                    )
-                                }
-                            }
+        ) {
+            if (wide) {
+                NavigationRail {
+                    tabItems.forEachIndexed { index, item ->
+                        NavigationRailItem(
+                            selected = index == pagerState.currentPage,
+                            onClick = { selectTab(index) },
+                            icon = { tabIcon(index) },
+                            label = { Text(item.title) }
                         )
                     }
                 }
-                1 -> LibraryScreen(
-                    albums = albums,
-                    onViewAlbum = onNavigateToAlbum,
-                    onAddFolder = { addFolder(null) },
-                    onAddPhotos = { photoPicker.launch(arrayOf("image/*")) }
-                )
-                else -> ConnectionsScreen(
-                    onOpen = { index ->
-                        viewerStart = index
-                        viewerOpen = true
-                    },
-                    viewModel = connectionsViewModel
-                )
+            }
+            HorizontalPager(
+                state = pagerState,
+                userScrollEnabled = false,
+                beyondViewportPageCount = tabItems.size - 1,
+                modifier = Modifier.weight(1f)
+            ) { page ->
+                when (page) {
+                    0 -> {
+                        val mode = wallpaperMode
+                        if (mode == null) {
+                            Box(modifier = Modifier.fillMaxSize())
+                        } else {
+                            WallpaperScreen(
+                                albums = albums,
+                                persistedScheduleSettings = scheduleSettings,
+                                appSettings = appSettings,
+                                wallpaperMode = mode,
+                                onToggleChanger = viewModel::setChangerEnabled,
+                                onSelectAlbum = viewModel::selectAlbum,
+                                onUpdateScheduleSettings = viewModel::updateScheduleSettings,
+                                onUpdateScheduleSettingsDebounced = viewModel::updateScheduleSettingsDebounced,
+                                onChangeWallpaperNow = viewModel::changeWallpaperNow,
+                                onAddFolder = { addFolder(it) },
+                                onOpenVisualEffects = onNavigateToVisualEffects,
+                                homeWallpaperUri = currentHomeWallpaperUri,
+                                lockWallpaperUri = currentLockWallpaperUri,
+                                liveWallpaperUri = currentLiveWallpaperUri,
+                                sponsored = banner?.let { ad ->
+                                    @Composable {
+                                        SponsoredBanner(
+                                            ad = ad,
+                                            onViewed = { adsViewModel.viewed(ad, ConnectionsAds.BANNER_SLOT) },
+                                            onTapped = { adsViewModel.tapped(ad, ConnectionsAds.BANNER_SLOT) }
+                                        )
+                                    }
+                                }
+                            )
+                        }
+                    }
+                    1 -> LibraryScreen(
+                        albums = albums,
+                        onViewAlbum = onNavigateToAlbum,
+                        onAddFolder = { addFolder(null) },
+                        onAddPhotos = { photoPicker.launch(arrayOf("image/*")) }
+                    )
+                    else -> ConnectionsScreen(
+                        onOpen = { index ->
+                            viewerStart = index
+                            viewerOpen = true
+                        },
+                        viewModel = connectionsViewModel
+                    )
+                }
             }
         }
     }

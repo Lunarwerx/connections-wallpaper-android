@@ -282,6 +282,7 @@
   <string name="animation_desc">Slides and fades between screens in this app</string>
   <string name="mode_static_tagline">Switches pictures on your schedule</string>
   <string name="mode_live_tagline">Pictures fade in and move with you</string>
+  <string name="mode_live_unavailable">This device has no live wallpaper picker, so live mode can\'t start here.</string>
   <string name="mode_static_feature_screens">Different pictures for home and lock</string>
   <string name="mode_static_feature_battery">Lightest on battery</string>
   <string name="mode_live_feature_fade">Fades smoothly into each new picture</string>
