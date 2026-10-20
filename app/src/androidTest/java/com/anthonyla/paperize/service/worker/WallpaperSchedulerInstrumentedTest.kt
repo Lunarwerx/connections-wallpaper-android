@@ -94,6 +94,7 @@ class WallpaperSchedulerInstrumentedTest {
             ScreenType.HOME,
             ScheduleSettings(
                 enableChanger = true,
+                intervalEnabled = true,
                 separateSchedules = true,
                 homeEnabled = true,
                 lockEnabled = true,
@@ -121,7 +122,7 @@ class WallpaperSchedulerInstrumentedTest {
         val lock = awaitEnqueued(Constants.WORK_NAME_LOCK)
 
         val settings = ScheduleSettings(
-            enableChanger = true, homeEnabled = true, lockEnabled = true,
+            enableChanger = true, intervalEnabled = true, homeEnabled = true, lockEnabled = true,
             homeAlbumId = "home", lockAlbumId = "lock", separateSchedules = true,
             homeIntervalMinutes = 15, lockIntervalMinutes = 15
         )

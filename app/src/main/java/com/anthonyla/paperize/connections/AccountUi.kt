@@ -1,6 +1,5 @@
 package com.anthonyla.paperize.connections
 
-import android.app.Activity
 import android.content.ActivityNotFoundException
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -47,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -193,7 +193,7 @@ fun SignInWall(viewModel: AccountViewModel) {
     val showcase by viewModel.showcase.collectAsStateWithLifecycle()
     val status by viewModel.signIn.collectAsStateWithLifecycle()
     val signIn = rememberSignIn(viewModel)
-    val activity = LocalContext.current as? Activity
+    val activity = LocalActivity.current
     LaunchedEffect(viewModel) { viewModel.loadShowcase() }
     BackHandler { activity?.finish() }
 

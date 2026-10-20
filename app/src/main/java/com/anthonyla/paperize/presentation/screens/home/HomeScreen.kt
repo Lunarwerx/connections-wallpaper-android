@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -90,6 +91,7 @@ fun HomeScreen(
     val signIn = rememberSignIn(accountViewModel)
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
+    val resources = LocalResources.current
     val haptics = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
     var viewerOpen by rememberSaveable { mutableStateOf(false) }
@@ -105,7 +107,7 @@ fun HomeScreen(
         folderTarget = null
     }
     val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris: List<Uri> ->
-        if (uris.isNotEmpty()) viewModel.addPhotosAlbum(uris.map { it.toString() }, context.getString(R.string.photos_album_name))
+        if (uris.isNotEmpty()) viewModel.addPhotosAlbum(uris.map { it.toString() }, resources.getString(R.string.photos_album_name))
     }
     val addFolder: (ScreenType?) -> Unit = { target ->
         folderTarget = target
@@ -115,7 +117,7 @@ fun HomeScreen(
     LaunchedEffect(importError) {
         importError?.let {
             viewModel.dismissImportError()
-            snackbarHostState.showSnackbar(context.getString(it))
+            snackbarHostState.showSnackbar(resources.getString(it))
         }
     }
 
@@ -144,8 +146,8 @@ fun HomeScreen(
                 finishingSignIn = false
                 showAccount = false
                 haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                val who = signedIn.session.label ?: context.getString(R.string.connections_account)
-                coroutineScope.launch { snackbarHostState.showSnackbar(context.getString(R.string.connections_signed_in, who)) }
+                val who = signedIn.session.label ?: resources.getString(R.string.connections_account)
+                coroutineScope.launch { snackbarHostState.showSnackbar(resources.getString(R.string.connections_signed_in, who)) }
             }
         }
     }
@@ -155,25 +157,25 @@ fun HomeScreen(
             when (message) {
                 is ConnectionsMessage.WallpaperSet -> {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    snackbarHostState.showSnackbar(context.getString(R.string.connections_set_done))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_set_done))
                 }
                 is ConnectionsMessage.Saved -> {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    snackbarHostState.showSnackbar(context.getString(R.string.connections_saved, message.albumName))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_saved, message.albumName))
                 }
                 ConnectionsMessage.AlreadyInAlbum ->
-                    snackbarHostState.showSnackbar(context.getString(R.string.connections_already_in_album))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_already_in_album))
                 ConnectionsMessage.SignInNeeded -> {
                     val result = snackbarHostState.showSnackbar(
-                        message = context.getString(R.string.connections_sign_in_needed),
-                        actionLabel = context.getString(R.string.connections_sign_in_action)
+                        message = resources.getString(R.string.connections_sign_in_needed),
+                        actionLabel = resources.getString(R.string.connections_sign_in_action)
                     )
                     if (result == SnackbarResult.ActionPerformed) showAccount = true
                 }
                 is ConnectionsMessage.Failed -> {
                     haptics.performHapticFeedback(HapticFeedbackType.Reject)
                     snackbarHostState.showSnackbar(
-                        context.getString(R.string.connections_failed, message.reason ?: context.getString(R.string.connections_unknown_error))
+                        resources.getString(R.string.connections_failed, message.reason ?: resources.getString(R.string.connections_unknown_error))
                     )
                 }
             }
