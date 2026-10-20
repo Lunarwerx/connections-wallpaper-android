@@ -26,24 +26,19 @@ gallery, a home-screen button, and a new name.
   full-screen viewer. Set a picture on the home screen, the lock screen or both, or add it to any
   album so it joins the rotation.
 
-## Free, with a free Connections account
+## Sign in with Connections
 
-The app is free. For the first 7 days everything works without an account; after that, the app
-asks for a free Connections sign-in before showing its screens. Wallpaper rotation never stops,
-signed in or not.
+For the first 7 days everything works without signing in; after that, the app asks you to sign in
+with Connections before showing its screens. Wallpaper rotation never stops, signed in or not.
 
-Full-size pictures from the gallery (Set wallpaper, Add to album) need a sign-in from day one,
-because the gallery serves originals to members only. Browsing never does.
-
-Sign-in opens Connections in the phone's own browser. When it finishes, the wallpaper site's
-callback page hands the app a one-time code through the `icu.connections.wallpaper://aegis-handoff`
-link, and the app redeems it (PKCE) for an access token it keeps in its private storage. Pictures
-you download are saved to `Pictures/Connections Wallpaper` and reused, so each downloads once.
+Full-size pictures from the gallery (Set wallpaper, Add to album) need a sign-in from day one.
+Browsing never does. Pictures you download are saved to `Pictures/Connections Wallpaper` and
+reused, so each downloads once.
 
 ## What changed from Paperize
 
-- New Explore tab and viewer (`connections/`): gallery client, Connections sign-in with a 7-day
-  free start, and setting or saving originals through the system photo library.
+- New Explore tab and viewer (`connections/`): gallery client, Connections sign-in after a 7-day
+  start, and setting or saving originals through the system photo library.
 - A Google Material 3 look: Google Sans Flex, a blue-and-neutral palette that steps surfaces in
   tone, bottom navigation, pill search and chips. Dynamic color still follows the wallpaper when
   it is on in Settings.
@@ -86,8 +81,11 @@ The Paperize architecture is unchanged; see its notes below. The Connections tab
 - `ConnectionsApi` calls `wallpaper.connectionsapi.com`: `GET /v1/wallpapers`, `GET /v1/tags`, and
   `POST /v1/wallpapers/download` with the member's access token.
 - `ConnectionsAccount` holds the sign-in: the PKCE start, the code redeem and token refresh at
-  `accounts.connectionsapi.com/auth/refresh`, sign-out, and the free-week clock.
-  `SignInReturnActivity` is the link the browser comes back to.
+  `accounts.connectionsapi.com/auth/refresh` (every call carries `Origin: https://wallpaper.connections.icu`),
+  sign-out, and the 7-day clock. The code is bound to the phone browser's own Connections session,
+  so sign-out only drops the app's tokens: revoking them would sign the browser out too.
+  `SignInReturnActivity` is the link the browser comes back to; a link whose state is not the
+  pending one is ignored, and a matching one redeems once.
 - `ConnectionsOriginals` downloads an original into the photo library once, then adds it to an
   album through `AlbumRepository` or sets it through `WallpaperManager`.
 - The widget opens the same invisible activity as the launcher shortcut, which starts

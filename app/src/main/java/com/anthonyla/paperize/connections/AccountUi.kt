@@ -23,8 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.CreditCardOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -46,8 +44,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.ColorPainter
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -55,7 +53,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -122,7 +119,7 @@ fun AccountAvatar(session: ConnectionsSession, size: Dp, modifier: Modifier = Mo
     }
 }
 
-/** Who is signed in (and Sign out), or what a free account gets and how long the free week has left. */
+/** Who is signed in (and Sign out), or what signing in does here and when it becomes required. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountSheet(
@@ -169,7 +166,7 @@ fun AccountSheet(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     AppMark(size = 56.dp)
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.connections_free_account), style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.connections_sign_in_needed), style = MaterialTheme.typography.titleLarge)
                         Text(
                             text = when (state) {
                                 is AccountState.Trial -> pluralStringResource(R.plurals.connections_trial_days_left, state.daysLeft, state.daysLeft)
@@ -180,8 +177,6 @@ fun AccountSheet(
                         )
                     }
                 }
-                Perk(Icons.Outlined.Download, stringResource(R.string.connections_perk_full_size))
-                Perk(Icons.Outlined.CreditCardOff, stringResource(R.string.connections_free_no_card))
                 SignInButton(status = status, onClick = onSignIn)
                 SignInError(status)
             }
@@ -223,15 +218,6 @@ fun SignInWall(viewModel: AccountViewModel) {
                 modifier = Modifier.padding(top = 8.dp)
             )
             SignInButton(status = status, onClick = signIn, modifier = Modifier.padding(top = 32.dp))
-            Text(
-                text = stringResource(R.string.connections_free_no_card),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-            )
             SignInError(status, modifier = Modifier.padding(top = 8.dp))
         }
     }
@@ -289,14 +275,6 @@ private fun AppMark(size: Dp, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Perk(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Text(text, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-@Composable
 private fun SignInButton(status: SignInStatus, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val finishing = status == SignInStatus.Finishing
     Button(
@@ -305,10 +283,21 @@ private fun SignInButton(status: SignInStatus, onClick: () -> Unit, modifier: Mo
             .fillMaxWidth()
             .height(56.dp)
     ) {
-        if (finishing) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
-            Spacer(Modifier.width(12.dp))
+        // The Connections mark sits on a white disc, the way Google's button carries its G.
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(28.dp)
+                .clip(CircleShape)
+                .background(Color.White)
+        ) {
+            if (finishing) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+            } else {
+                Image(painterResource(R.drawable.connections_mark), contentDescription = null, modifier = Modifier.size(20.dp))
+            }
         }
+        Spacer(Modifier.width(12.dp))
         Text(
             text = stringResource(if (finishing) R.string.connections_signing_in else R.string.connections_sign_in),
             style = MaterialTheme.typography.titleMedium

@@ -46,11 +46,11 @@
   <string name="privacy_intro_title">Introduction</string>
   <string name="privacy_intro_content">Welcome to %1$s! This privacy notice outlines how we collect, use, and protect your personal information when you use our mobile application. By using %1$s, you agree to the terms described in this notice.</string>
   <string name="privacy_data_collection_title">Data Collection</string>
-  <string name="privacy_data_collection_content">Notifications: %1$s requests permission to display its own wallpaper-change, background-operation, and error notifications. It does not read notifications from other apps or use them to recommend wallpapers.\n\nLocal Files: %1$s accesses the images and folders you select so it can set them as wallpapers. We do not upload or transfer these files to any external servers.\n\nConnections gallery: when you open the Connections tab, %1$s loads wallpaper previews from wallpaper.connectionsapi.com. When you add one to an album, it uses your Connections key to download the full-size picture and saves it to Pictures/Connections Wallpaper.</string>
+  <string name="privacy_data_collection_content">Notifications: %1$s requests permission to display its own wallpaper-change, background-operation, and error notifications. It does not read notifications from other apps or use them to recommend wallpapers.\n\nLocal Files: %1$s accesses the images and folders you select so it can set them as wallpapers. We do not upload or transfer these files to any external servers.\n\nConnections gallery: when you open the Explore tab, %1$s loads wallpaper previews from wallpaper.connectionsapi.com. When you set one as your wallpaper or add it to an album, it downloads the full-size picture with your Connections sign-in and saves it to Pictures/Connections Wallpaper.</string>
   <string name="privacy_information_usage_title">Information Usage</string>
-  <string name="privacy_information_usage_content">Personal Data: We do not collect or store any personal data such as names, email addresses, or phone numbers.\n\nUsage Analytics: %1$s does not track your usage behavior or collect analytics data.</string>
+  <string name="privacy_information_usage_content">Personal Data: if you sign in with Connections, your name, email address and profile picture are kept on this phone to show who is signed in. %1$s does not send them anywhere else, and collects no other personal data.\n\nUsage Analytics: %1$s does not track your usage behavior or collect analytics data.</string>
   <string name="privacy_data_security_title">Data Security</string>
-  <string name="privacy_data_security_content">On-Device Storage: your albums, settings and Connections key stay on your device. %1$s only goes online when you browse or add Connections wallpapers.</string>
+  <string name="privacy_data_security_content">On-Device Storage: your albums, settings and sign-in stay on your device. %1$s only goes online when you browse or download Connections wallpapers, or sign in.</string>
   <string name="no_albums_found">No albums found</string>
   <string name="empty_album">Empty Album</string>
   <string name="empty_album_message">This album has no wallpapers. Please add wallpapers to the album before selecting it.</string>
@@ -251,18 +251,15 @@
   <string name="connections_no_browser">No browser on this phone can open Connections sign-in</string>
   <string name="connections_signed_in">Signed in as %1$s</string>
   <string name="connections_sign_out">Sign out</string>
-  <string name="connections_free_account">Free Connections account</string>
-  <string name="connections_perk_full_size">Full-size wallpapers</string>
-  <string name="connections_free_no_card">Free · No card</string>
-  <string name="connections_trial_over">Your free week is over</string>
+  <string name="connections_trial_over">Needed to keep using the app</string>
   <string name="connections_wall_title">Sign in to keep going</string>
-  <string name="connections_wall_body">Your free week is over. Your wallpapers keep changing either way.</string>
+  <string name="connections_wall_body">Your wallpapers keep changing either way.</string>
   <string name="connections_license_public_domain">Public domain</string>
   <string name="connections_license_original">Original</string>
   <string name="connections_license_cc0" translatable="false">CC0</string>
   <plurals name="connections_trial_days_left">
-    <item quantity="one">%d day left in your free week</item>
-    <item quantity="other">%d days left in your free week</item>
+    <item quantity="one">Needed in %d day to keep using the app</item>
+    <item quantity="other">Needed in %d days to keep using the app</item>
   </plurals>
 
   <!-- Next-wallpaper widget -->

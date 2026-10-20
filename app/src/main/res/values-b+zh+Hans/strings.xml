@@ -45,11 +45,11 @@
   <string name="privacy_intro_title">简介</string>
   <string name="privacy_intro_content">欢迎使用 %1$s！本隐私声明说明我们在你使用本应用时如何收集、使用和保护你的个人信息。使用 %1$s 即表示你同意本声明所述的条款。</string>
   <string name="privacy_data_collection_title">数据收集</string>
-  <string name="privacy_data_collection_content">通知：%1$s 会请求发送通知的权限，用于显示壁纸更换、后台操作和错误通知。它不会读取其他应用的通知，也不会根据这些通知推荐壁纸。\n\n本地文件：%1$s 会访问你选择的图片和文件夹，以便将图片设为壁纸。我们不会把这些文件上传或传输到任何外部服务器。\n\nConnections 图库：打开 Connections 标签页时，%1$s 会从 wallpaper.connectionsapi.com 加载壁纸预览。把壁纸添加到相册时，它会使用你的 Connections 密钥下载原图，并保存到「图片/Connections Wallpaper」。</string>
+  <string name="privacy_data_collection_content">通知：%1$s 会请求发送通知的权限，用于显示壁纸更换、后台操作和错误通知。它不会读取其他应用的通知，也不会根据这些通知推荐壁纸。\n\n本地文件：%1$s 会访问你选择的图片和文件夹，以便将图片设为壁纸。我们不会把这些文件上传或传输到任何外部服务器。\n\nConnections 图库：打开「探索」标签页时，%1$s 会从 wallpaper.connectionsapi.com 加载壁纸预览。把壁纸设为桌面或添加到相册时，它会凭你的 Connections 登录下载原图，并保存到「图片/Connections Wallpaper」。</string>
   <string name="privacy_information_usage_title">信息使用</string>
-  <string name="privacy_information_usage_content">个人数据：我们不收集或存储任何个人数据，例如姓名、电子邮箱地址或电话号码。\n\n使用情况分析：%1$s 不会跟踪你的使用行为，也不会收集分析数据。</string>
+  <string name="privacy_information_usage_content">个人数据：如果你使用 Connections 登录，你的姓名、电子邮箱地址和头像会保存在这部手机上，用于显示当前登录的账号。%1$s 不会把它们发送到其他地方，也不收集其他个人数据。\n\n使用情况分析：%1$s 不会跟踪你的使用行为，也不会收集分析数据。</string>
   <string name="privacy_data_security_title">数据安全</string>
-  <string name="privacy_data_security_content">设备本地存储：你的相册、设置和 Connections 密钥都只保存在你的设备上。只有在你浏览或添加 Connections 壁纸时，%1$s 才会联网。</string>
+  <string name="privacy_data_security_content">设备本地存储：你的相册、设置和登录信息都只保存在你的设备上。只有在你浏览或下载 Connections 壁纸、或登录时，%1$s 才会联网。</string>
   <string name="no_albums_found">未找到相册</string>
   <string name="empty_album">空相册</string>
   <string name="empty_album_message">这个相册里还没有壁纸。请先向相册中添加壁纸，然后再选择它。</string>
@@ -249,17 +249,14 @@
   <string name="connections_no_browser">此手机上没有可以打开 Connections 登录页面的浏览器</string>
   <string name="connections_signed_in">已登录为 %1$s</string>
   <string name="connections_sign_out">退出登录</string>
-  <string name="connections_free_account">免费 Connections 账号</string>
-  <string name="connections_perk_full_size">原图壁纸</string>
-  <string name="connections_free_no_card">免费 · 无需银行卡</string>
-  <string name="connections_trial_over">免费试用周已结束</string>
+  <string name="connections_trial_over">需要登录才能继续使用</string>
   <string name="connections_wall_title">登录以继续使用</string>
-  <string name="connections_wall_body">免费试用周已结束。你的壁纸仍会照常更换。</string>
+  <string name="connections_wall_body">你的壁纸仍会照常更换。</string>
   <string name="connections_license_public_domain">公共领域</string>
   <string name="connections_license_original">原创</string>
   <plurals name="connections_trial_days_left">
-    <item quantity="one">免费试用还剩 %d 天</item>
-    <item quantity="other">免费试用还剩 %d 天</item>
+    <item quantity="one">%d 天后需要登录才能继续使用</item>
+    <item quantity="other">%d 天后需要登录才能继续使用</item>
   </plurals>
 
   <!-- 下一张壁纸小组件 -->

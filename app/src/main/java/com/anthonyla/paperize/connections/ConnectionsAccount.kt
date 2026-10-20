@@ -122,10 +122,12 @@ class ConnectionsAccount @Inject constructor(
 
     val session: Flow<ConnectionsSession?> = store.data.map { it.session() }
 
-    /** Re-reads the clock hourly, so the free week ends while the app is open too. */
+    /** Re-reads the clock hourly, so the week ends while the app is open too; it never runs backwards. */
     private val clock = flow {
+        var latest = 0L
         while (true) {
-            emit(System.currentTimeMillis())
+            latest = maxOf(latest, System.currentTimeMillis())
+            emit(latest)
             delay(1.hours)
         }
     }
@@ -220,7 +222,7 @@ class ConnectionsAccount @Inject constructor(
             current.deviceId?.let { put("deviceId", it) }
         }
         val reply = try {
-            call("POST", body)
+            call(body)
         } catch (_: AccountRefusedException) {
             store.edit { if (it.session() == current) it.remove(SESSION) }
             return null
@@ -231,22 +233,19 @@ class ConnectionsAccount @Inject constructor(
         next.accessToken
     }
 
-    /** Forgets the session here first, then asks Connections to revoke it (best effort). */
+    /**
+     * Signs this app out and nothing else. The sign-in code was bound to the phone browser's own
+     * Connections session, so revoking the switch token would sign the browser out too; like any
+     * "Sign in with" app, this only forgets its own tokens.
+     */
     suspend fun signOut() {
-        val current = session.first() ?: return
         store.edit { it.remove(SESSION) }
-        runCatchingCancellable {
-            call("DELETE", buildJsonObject {
-                put("switchToken", current.switchToken)
-                current.deviceId?.let { put("deviceId", it) }
-            })
-        }
     }
 
     private suspend fun redeem(uri: Uri, verifier: String) {
         val code = uri.getQueryParameter("code")
             ?: throw IOException(uri.getQueryParameter("error_description") ?: uri.getQueryParameter("error") ?: "No sign-in code came back")
-        val reply = call("POST", buildJsonObject {
+        val reply = call(buildJsonObject {
             put("code", code)
             put("codeVerifier", verifier)
             put("redirectUri", REDIRECT_URI)
@@ -265,7 +264,8 @@ class ConnectionsAccount @Inject constructor(
             accessToken = reply.accessToken,
             accessExpiresAt = System.currentTimeMillis() + reply.expiresIn * 1000,
             switchToken = reply.switchToken ?: previous?.switchToken ?: throw IOException("Connections sent no switch token"),
-            deviceId = reply.deviceId ?: previous?.deviceId,
+            // Refresh must send the device id the sign-in returned, so the first one is kept.
+            deviceId = previous?.deviceId ?: reply.deviceId,
             name = fullName ?: previous?.name,
             email = claim("email") ?: previous?.email,
             picture = claim("picture") ?: previous?.picture
@@ -279,11 +279,11 @@ class ConnectionsAccount @Inject constructor(
         }.getOrNull()
     }
 
-    private suspend fun call(method: String, body: JsonObject): SessionReply = withContext(Dispatchers.IO) {
+    private suspend fun call(body: JsonObject): SessionReply = withContext(Dispatchers.IO) {
         val connection = (URL(REFRESH_URL).openConnection() as HttpURLConnection).apply {
             connectTimeout = TIMEOUT_MS
             readTimeout = TIMEOUT_MS
-            requestMethod = method
+            requestMethod = "POST"
             doOutput = true
             setRequestProperty("content-type", "application/json")
             setRequestProperty("accept", "application/json")
@@ -296,7 +296,7 @@ class ConnectionsAccount @Inject constructor(
             val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
             if (status == 401) throw AccountRefusedException(refusal(text) ?: "Connections signed this phone out")
             if (status !in 200..299) throw IOException(refusal(text) ?: "Connections answered HTTP $status")
-            if (method == "DELETE") SessionReply(accessToken = "", userSub = "") else json.decodeFromString(text)
+            json.decodeFromString(text)
         } finally {
             connection.disconnect()
         }
