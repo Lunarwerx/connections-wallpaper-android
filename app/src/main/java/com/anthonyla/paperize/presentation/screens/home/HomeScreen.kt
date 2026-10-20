@@ -1,8 +1,5 @@
 package com.anthonyla.paperize.presentation.screens.home
 
-import android.app.WallpaperManager
-import android.content.ComponentName
-import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,6 +50,11 @@ import com.anthonyla.paperize.R
 import com.anthonyla.paperize.connections.AccountSheet
 import com.anthonyla.paperize.connections.AccountState
 import com.anthonyla.paperize.connections.AccountViewModel
+import com.anthonyla.paperize.connections.FreeAppNotice
+import com.anthonyla.paperize.connections.ads.AdsViewModel
+import com.anthonyla.paperize.connections.ads.ConnectionsAds
+import com.anthonyla.paperize.connections.ads.SponsoredBanner
+import com.anthonyla.paperize.connections.ads.SponsoredPopup
 import com.anthonyla.paperize.connections.ConnectionsMessage
 import com.anthonyla.paperize.connections.ConnectionsScreen
 import com.anthonyla.paperize.connections.ConnectionsViewModel
@@ -61,6 +63,8 @@ import com.anthonyla.paperize.connections.SignInStatus
 import com.anthonyla.paperize.connections.rememberSignIn
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
+import com.anthonyla.paperize.core.util.openLiveWallpaperPicker
+import com.anthonyla.paperize.presentation.screens.album_view.ImportProgress
 import com.anthonyla.paperize.presentation.screens.album_view.components.ImportProgressDialog
 import com.anthonyla.paperize.presentation.screens.home.components.HomeTopBar
 import com.anthonyla.paperize.presentation.screens.home.components.getTabItems
@@ -77,7 +81,8 @@ fun HomeScreen(
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     connectionsViewModel: ConnectionsViewModel = hiltViewModel(),
-    accountViewModel: AccountViewModel = hiltViewModel()
+    accountViewModel: AccountViewModel = hiltViewModel(),
+    adsViewModel: AdsViewModel = hiltViewModel()
 ) {
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     val scheduleSettings by viewModel.scheduleSettings.collectAsStateWithLifecycle()
@@ -86,6 +91,11 @@ fun HomeScreen(
     val showLiveWallpaperPrompt by viewModel.showLiveWallpaperPrompt.collectAsStateWithLifecycle()
     val currentHomeWallpaperUri by viewModel.currentHomeWallpaperUri.collectAsStateWithLifecycle()
     val currentLockWallpaperUri by viewModel.currentLockWallpaperUri.collectAsStateWithLifecycle()
+    val currentLiveWallpaperUri by viewModel.currentLiveWallpaperUri.collectAsStateWithLifecycle()
+    val albumAdded by viewModel.albumAdded.collectAsStateWithLifecycle()
+    val freeNotice by accountViewModel.freeNotice.collectAsStateWithLifecycle()
+    val banner by adsViewModel.banner.collectAsStateWithLifecycle()
+    val popup by adsViewModel.popup.collectAsStateWithLifecycle()
     val accountState by accountViewModel.state.collectAsStateWithLifecycle()
     val signInStatus by accountViewModel.signIn.collectAsStateWithLifecycle()
     val signIn = rememberSignIn(accountViewModel)
@@ -112,6 +122,14 @@ fun HomeScreen(
     val addFolder: (ScreenType?) -> Unit = { target ->
         folderTarget = target
         folderPicker.launch(null)
+    }
+
+    // The first album added while signed out brings the one-time note that the app is free.
+    LaunchedEffect(albumAdded) {
+        if (albumAdded) {
+            viewModel.consumeAlbumAdded()
+            accountViewModel.offerFreeNotice()
+        }
     }
 
     LaunchedEffect(importError) {
@@ -242,7 +260,17 @@ fun HomeScreen(
                             onAddFolder = { addFolder(it) },
                             onOpenVisualEffects = onNavigateToVisualEffects,
                             homeWallpaperUri = currentHomeWallpaperUri,
-                            lockWallpaperUri = currentLockWallpaperUri
+                            lockWallpaperUri = currentLockWallpaperUri,
+                            liveWallpaperUri = currentLiveWallpaperUri,
+                            sponsored = banner?.let { ad ->
+                                @Composable {
+                                    SponsoredBanner(
+                                        ad = ad,
+                                        onViewed = { adsViewModel.viewed(ad, ConnectionsAds.BANNER_SLOT) },
+                                        onTapped = { adsViewModel.tapped(ad, ConnectionsAds.BANNER_SLOT) }
+                                    )
+                                }
+                            }
                         )
                     }
                 }
@@ -296,7 +324,33 @@ fun HomeScreen(
         )
     }
 
-    if (showLiveWallpaperPrompt && wallpaperMode == WallpaperMode.LIVE) {
+    val livePromptShowing = showLiveWallpaperPrompt && wallpaperMode == WallpaperMode.LIVE
+    val importing = importProgress != ImportProgress.Idle
+    // Only during the free week: a member who signed in meanwhile, or whose week is over, never sees it.
+    val trial = accountState as? AccountState.Trial
+    val freeNoticeShowing = freeNotice && trial != null && !livePromptShowing && !importing && !showAccount
+    if (freeNoticeShowing && trial != null) {
+        FreeAppNotice(
+            daysLeft = trial.daysLeft,
+            onSignIn = {
+                accountViewModel.dismissFreeNotice()
+                signIn()
+            },
+            onLater = accountViewModel::dismissFreeNotice
+        )
+    }
+    popup?.let { ad ->
+        if (!freeNoticeShowing && !livePromptShowing && !importing && !showAccount && !viewerOpen) {
+            SponsoredPopup(
+                ad = ad,
+                onViewed = { adsViewModel.viewed(ad, ConnectionsAds.POPUP_SLOT) },
+                onTapped = { adsViewModel.tapped(ad, ConnectionsAds.POPUP_SLOT) },
+                onDismiss = adsViewModel::dismissPopup
+            )
+        }
+    }
+
+    if (livePromptShowing) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissLiveWallpaperPrompt() },
             title = {
@@ -318,26 +372,7 @@ fun HomeScreen(
                 Button(
                     onClick = {
                         viewModel.dismissLiveWallpaperPrompt()
-                        try {
-                            val intent = Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).apply {
-                                putExtra(
-                                    WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                                    ComponentName(
-                                        context.packageName,
-                                        "com.anthonyla.paperize.service.livewallpaper.PaperizeLiveWallpaperService"
-                                    )
-                                )
-                            }
-                            context.startActivity(intent)
-                        } catch (_: Exception) {
-                            try {
-                                val fallbackIntent = Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
-                                context.startActivity(fallbackIntent)
-                            } catch (_: Exception) {
-                                val settingsIntent = Intent(android.provider.Settings.ACTION_SETTINGS)
-                                context.startActivity(settingsIntent)
-                            }
-                        }
+                        openLiveWallpaperPicker(context)
                     }
                 ) {
                     Text(stringResource(R.string.open_wallpaper_picker))

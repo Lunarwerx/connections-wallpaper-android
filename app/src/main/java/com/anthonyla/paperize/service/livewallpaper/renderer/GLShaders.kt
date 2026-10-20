@@ -71,24 +71,27 @@ object GLShaders {
         uniform float u_vignetteFactor;
         uniform float u_grayscaleFactor;
         uniform float u_adaptiveBrightnessFactor;
+        uniform vec2 u_resolution;
         varying vec2 v_texCoord;
-        varying vec2 v_imageCoord;
- 
+
+        // Same rule as vignetteDarkness() in core/util/Vignette.kt, in screen pixels.
+        // u_vignetteFactor is the strength, percent / 100 (0 when the vignette is off).
+        float vignetteDarkness(vec2 p, vec2 size, float strength) {
+            float band = min(size.x, size.y) * (0.12 + 0.38 * strength);
+            vec2 edge = max(vec2(0.0), vec2(band) - min(p, size - p)) / band;
+            float t = clamp(length(edge) / 1.41421356, 0.0, 1.0);
+            return (0.3 + 0.5 * strength) * t * t * (3.0 - 2.0 * t);
+        }
+
         void main() {
             vec4 color = texture2D(u_texture, v_texCoord);
- 
+
             color.rgb *= (1.0 - u_darkenFactor);
- 
-            // 2. Apply vignette — matches drawVignette gradient stops in WallpaperUtil:
-            //    [0% dark at center] → [10% dark at 70% of radius] → [80% dark at edge]
-            //    radius is normalized to 0.5 UV (image edge along shorter axis)
-            vec2 vignetteCenter = v_imageCoord - 0.5;
-            float dist = length(vignetteCenter);
-            float t = clamp(dist / 0.5, 0.0, 1.0);
-            float innerDark = smoothstep(0.0, 0.7, t) * 0.1;
-            float outerDark = smoothstep(0.7, 1.0, t) * 0.7;
-            float darkAmount = innerDark + outerDark;
-            color.rgb *= (1.0 - darkAmount * u_vignetteFactor);
+
+            // 2. Apply vignette: a band along the screen edges, from gl_FragCoord so it stays put while parallax pans
+            if (u_vignetteFactor > 0.0) {
+                color.rgb *= 1.0 - vignetteDarkness(gl_FragCoord.xy, u_resolution, u_vignetteFactor);
+            }
  
             // 3. Apply grayscale (branchless - mix handles factor 0 correctly)
             // ITU-R BT.709 standard luminance calculation

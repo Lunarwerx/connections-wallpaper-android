@@ -36,11 +36,13 @@ import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.util.BatteryOptimizationUtil.isIgnoringBatteryOptimizations
 import com.anthonyla.paperize.core.util.BatteryOptimizationUtil.requestIgnoreBatteryOptimizations
+import com.anthonyla.paperize.core.util.openLiveWallpaperPicker
 import com.anthonyla.paperize.presentation.common.components.SectionLabel
 import com.anthonyla.paperize.presentation.common.components.SettingsGroup
 import com.anthonyla.paperize.presentation.common.components.SettingsRow
 import com.anthonyla.paperize.presentation.common.components.SwitchRow
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
+import com.anthonyla.paperize.presentation.screens.wallpaper_mode_selection.WallpaperModeOptions
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,11 +53,11 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
-    val isResetting by viewModel.isResetting.collectAsStateWithLifecycle()
-    val resetFailed by viewModel.resetFailed.collectAsStateWithLifecycle()
+    val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
+    val failure by viewModel.failure.collectAsStateWithLifecycle()
     val wallpaperMode by viewModel.wallpaperMode.collectAsStateWithLifecycle()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
-    var pendingMode by rememberSaveable { mutableStateOf<WallpaperMode?>(null) }
+    var showModeSheet by rememberSaveable { mutableStateOf(false) }
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -89,8 +91,8 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = AppSpacing.medium)
         ) {
-            if (resetFailed) Text(stringResource(R.string.reset_failed), color = MaterialTheme.colorScheme.error)
-            if (isResetting) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            failure?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+            if (isBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
             // A restricted battery delays every scheduled change, so it is the one row that wears a
             // problem colour and the one filled button on the page.
@@ -121,12 +123,7 @@ fun SettingsScreen(
                                 WallpaperMode.LIVE -> R.string.mode_live_wallpaper
                             }
                         ),
-                        onClick = if (isResetting) null else ({
-                            pendingMode = when (wallpaperMode) {
-                                WallpaperMode.STATIC -> WallpaperMode.LIVE
-                                WallpaperMode.LIVE -> WallpaperMode.STATIC
-                            }
-                        })
+                        onClick = if (isBusy) null else ({ showModeSheet = true })
                     )
                 }
             )
@@ -154,6 +151,7 @@ fun SettingsScreen(
                     SwitchRow(
                         icon = Icons.Outlined.Animation,
                         title = stringResource(R.string.animation),
+                        supporting = stringResource(R.string.animation_desc),
                         checked = appSettings?.animate ?: true,
                         onCheckedChange = { viewModel.updateAnimate(it) }
                     )
@@ -193,7 +191,7 @@ fun SettingsScreen(
                         iconTint = MaterialTheme.colorScheme.error,
                         title = stringResource(R.string.reset_all_data),
                         titleColor = MaterialTheme.colorScheme.error,
-                        onClick = if (isResetting) null else ({ showResetDialog = true })
+                        onClick = if (isBusy) null else ({ showResetDialog = true })
                     )
                 }
             )
@@ -258,38 +256,38 @@ fun SettingsScreen(
             )
         }
 
-        if (pendingMode != null) {
-            AlertDialog(
-                onDismissRequest = { pendingMode = null },
-                title = {
-                    val modeName = if (pendingMode == WallpaperMode.LIVE)
-                        stringResource(R.string.mode_live_wallpaper)
-                    else
-                        stringResource(R.string.mode_static)
-                    Text(stringResource(R.string.switch_mode_dialog_title, modeName))
-                },
-                text = {
-                    Text(stringResource(R.string.switch_mode_dialog_description))
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            pendingMode?.let { viewModel.switchWallpaperMode(it) }
-                            pendingMode = null
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text(stringResource(R.string.switch_mode_button))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { pendingMode = null }) {
-                        Text(stringResource(R.string.cancel))
-                    }
+        // Every mode with what it looks like; picking one switches at once and keeps albums and settings.
+        if (showModeSheet) {
+            ModalBottomSheet(onDismissRequest = { showModeSheet = false }) {
+                Column(
+                    Modifier
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = AppSpacing.medium)
+                        .padding(bottom = AppSpacing.large)
+                ) {
+                    Text(stringResource(R.string.wallpaper_mode_setting), style = MaterialTheme.typography.titleLarge)
+                    Spacer(Modifier.height(AppSpacing.medium))
+                    WallpaperModeOptions(
+                        selected = wallpaperMode,
+                        animate = appSettings?.animate ?: true,
+                        enabled = !isBusy,
+                        onSelect = { mode ->
+                            showModeSheet = false
+                            if (mode != wallpaperMode) {
+                                viewModel.switchWallpaperMode(mode) { needsLivePicker ->
+                                    if (needsLivePicker) openLiveWallpaperPicker(context)
+                                }
+                            }
+                        }
+                    )
+                    Spacer(Modifier.height(AppSpacing.small))
+                    Text(
+                        stringResource(R.string.mode_switch_keeps),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            )
+            }
         }
     }
 }

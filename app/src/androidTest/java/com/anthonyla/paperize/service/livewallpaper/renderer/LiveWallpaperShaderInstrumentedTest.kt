@@ -257,6 +257,7 @@ class LiveWallpaperShaderInstrumentedTest {
             GLES20.glGetUniformLocation(program, "u_adaptiveBrightnessFactor"),
             adaptiveBrightness
         )
+        GLES20.glUniform2f(GLES20.glGetUniformLocation(program, "u_resolution"), SIZE.toFloat(), SIZE.toFloat())
         finishDraw(program)
     }
 

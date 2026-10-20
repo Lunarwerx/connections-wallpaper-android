@@ -17,7 +17,6 @@ import android.graphics.Paint
 import android.graphics.PixelFormat
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
-import android.graphics.RadialGradient
 import android.graphics.RenderEffect
 import android.graphics.RenderNode
 import android.graphics.RectF
@@ -314,24 +313,26 @@ private fun applyExifOrientation(source: Bitmap, uri: Uri, context: Context): Bi
     }
 }
 
+/**
+ * Darkens the edges of the frame with a band that follows the rectangle (see [vignetteDarkness]). The
+ * darkness is sampled into a small black alpha mask, one cell per ~1/96th of the short side, and
+ * stretched over the frame.
+ */
 private fun drawVignette(canvas: Canvas, width: Int, height: Int, percent: Int) {
-    val centerX = width / 2f
-    val centerY = height / 2f
-    val radius = (kotlin.math.hypot(centerX, centerY) *
-        (1 - percent.coerceIn(0, 100) / Constants.VIGNETTE_DIVISOR))
-        .coerceAtLeast(Constants.VIGNETTE_MIN_RADIUS)
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = RadialGradient(
-            centerX, centerY, radius,
-            intArrayOf(
-                Color.TRANSPARENT,
-                Color.argb((Constants.VIGNETTE_INNER_ALPHA * 255).toInt(), 0, 0, 0),
-                Color.argb((Constants.VIGNETTE_OUTER_ALPHA * 255).toInt(), 0, 0, 0)
-            ),
-            Constants.VIGNETTE_GRADIENT_POSITIONS, Shader.TileMode.CLAMP
-        )
+    val cellSize = minOf(width, height).toFloat() / Constants.VIGNETTE_MASK_CELLS
+    val cols = (width / cellSize).fastRoundToInt().coerceAtLeast(1)
+    val rows = (height / cellSize).fastRoundToInt().coerceAtLeast(1)
+    val pixels = IntArray(cols * rows) { index ->
+        val x = (index % cols + 0.5f) * width / cols
+        val y = (index / cols + 0.5f) * height / rows
+        val alpha = (vignetteDarkness(x, y, width.toFloat(), height.toFloat(), percent) * 255f).fastRoundToInt()
+        Color.argb(alpha, 0, 0, 0)
     }
-    canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
+    // Not recycled here: a RenderNode canvas only records the draw, and reads the mask when it renders.
+    // The mask is a few thousand pixels, so the collector frees it.
+    val mask = createBitmap(cols, rows)
+    mask.setPixels(pixels, 0, cols, 0, 0, cols, rows)
+    canvas.drawBitmap(mask, null, RectF(0f, 0f, width.toFloat(), height.toFloat()), Paint(Paint.FILTER_BITMAP_FLAG))
 }
 
 /**
@@ -357,28 +358,29 @@ fun adjustBitmapBrightness(source: Bitmap, brightnessFactor: Float): Bitmap {
     return source
 }
 
-fun getAdaptiveBrightnessMultiplier(context: Context, brightness: Float): Float {
-    val isDarkMode = (context.resources.configuration.uiMode and
-        Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-    return BrightnessCalculator.getAdaptiveMultiplier(isDarkMode, brightness)
-}
+/** Whether the system is in dark mode right now. */
+fun isNightMode(context: Context): Boolean =
+    (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
-fun adaptiveBrightnessAdjustment(context: Context, source: Bitmap): Bitmap {
-    val brightness = BrightnessCalculator.calculateBitmapBrightness(source)
-    return adjustBitmapBrightness(source, getAdaptiveBrightnessMultiplier(context, brightness))
-}
+fun getAdaptiveBrightnessMultiplier(context: Context, brightness: Float, isNight: Boolean = isNightMode(context)): Float =
+    BrightnessCalculator.getAdaptiveMultiplier(isNight, brightness)
 
 /**
  * [effects], then adaptive brightness, in the order a wallpaper gets them; consumes [source] when it
  * returns another bitmap. [blurScale] shrinks the blur radius for a picture smaller than the screen.
+ * [isNight] is the mode the picture is drawn for; the preview passes the mode it shows.
  */
 fun applyWallpaperEffects(
     context: Context,
     source: Bitmap,
     effects: WallpaperEffects,
     adaptiveBrightness: Boolean,
-    blurScale: Float = 1f
+    blurScale: Float = 1f,
+    isNight: Boolean = isNightMode(context)
 ): Bitmap {
+    // Measured on the picture itself, before its effects, as the live renderer measures it, so a static
+    // wallpaper, the preview and the live wallpaper dim alike.
+    val brightness = if (adaptiveBrightness) BrightnessCalculator.calculateBitmapBrightness(source) else 0f
     var bitmap = processBitmap(
         source = source,
         enableDarken = effects.enableDarken, darkenPercent = effects.darkenPercentage,
@@ -389,7 +391,7 @@ fun applyWallpaperEffects(
     )
     if (bitmap !== source) source.recycle()
     if (adaptiveBrightness) {
-        val adjusted = adaptiveBrightnessAdjustment(context, bitmap)
+        val adjusted = adjustBitmapBrightness(bitmap, getAdaptiveBrightnessMultiplier(context, brightness, isNight))
         if (adjusted !== bitmap) bitmap.recycle()
         bitmap = adjusted
     }

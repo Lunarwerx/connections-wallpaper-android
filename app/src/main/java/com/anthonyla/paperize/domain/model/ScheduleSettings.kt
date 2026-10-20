@@ -66,6 +66,31 @@ data class ScheduleSettings(
         }
     }
 
+    /**
+     * These settings in [mode]: when [mode] has no album of its own, it takes the one the other mode
+     * rotates, so switching modes keeps the pictures that were showing. Albums it already has stay.
+     */
+    fun carriedInto(mode: WallpaperMode): ScheduleSettings = when (mode) {
+        WallpaperMode.LIVE -> if (liveAlbumId != null) this else copy(
+            liveAlbumId = when {
+                homeEnabled && homeAlbumId != null -> homeAlbumId
+                lockEnabled && lockAlbumId != null -> lockAlbumId
+                else -> homeAlbumId ?: lockAlbumId
+            }
+        )
+        WallpaperMode.STATIC -> if (liveAlbumId == null || hasRequiredAlbums(WallpaperMode.STATIC)) this else {
+            val noneOn = !homeEnabled && !lockEnabled
+            val home = homeEnabled || noneOn
+            val lock = lockEnabled || noneOn
+            copy(
+                homeEnabled = home,
+                lockEnabled = lock,
+                homeAlbumId = if (home) homeAlbumId ?: liveAlbumId else homeAlbumId,
+                lockAlbumId = if (lock) lockAlbumId ?: liveAlbumId else lockAlbumId
+            )
+        }
+    }
+
     fun scalingType(screen: ScreenType): ScalingType = when (screen) {
         ScreenType.HOME, ScreenType.BOTH -> homeScalingType
         ScreenType.LOCK -> lockScalingType

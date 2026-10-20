@@ -67,18 +67,19 @@ object Constants {
     const val LUMINANCE_GREEN = 0.7152
     const val LUMINANCE_BLUE = 0.0722
 
-    // Adaptive brightness thresholds (based on WallYou implementation)
-    const val LIGHT_BRIGHTNESS_MIN = 0.8f
-    const val DARK_BRIGHTNESS_MAX = 0.3f
-    const val TARGET_BRIGHTNESS_DARK = 0.7f
-    const val TARGET_BRIGHTNESS_LIGHT = 0.4f
+    // Adaptive brightness: in dark mode a picture is scaled so its average luminance lands near this
+    // target, clamped so it is always at least 25% dimmer and never brightened (light mode is untouched).
+    const val DARK_MODE_TARGET_LUMINANCE = 0.38f
+    const val DARK_MODE_MIN_MULTIPLIER = 0.4f
+    const val DARK_MODE_MAX_MULTIPLIER = 0.75f
 
-    // Vignette effect
-    const val VIGNETTE_DIVISOR = 150f
-    const val VIGNETTE_MIN_RADIUS = 1f  // guards against zero-radius RadialGradient crash
-    const val VIGNETTE_INNER_ALPHA = 0.1f
-    const val VIGNETTE_OUTER_ALPHA = 0.8f
-    val VIGNETTE_GRADIENT_POSITIONS = floatArrayOf(0f, 0.7f, 1f)
+    // Vignette: a band along each screen edge, sized from the short side (GLSL copy in GLShaders)
+    const val VIGNETTE_BAND_BASE = 0.12f
+    const val VIGNETTE_BAND_RANGE = 0.38f
+    const val VIGNETTE_MAX_DARK_BASE = 0.3f
+    const val VIGNETTE_MAX_DARK_RANGE = 0.5f
+    /** Cells along the short side of the bitmap vignette mask; the mask is stretched over the frame. */
+    const val VIGNETTE_MASK_CELLS = 96
 
     // Input validation
     const val MAX_DAYS_INPUT_LENGTH = 3

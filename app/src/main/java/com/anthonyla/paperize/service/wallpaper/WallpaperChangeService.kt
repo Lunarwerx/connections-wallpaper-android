@@ -15,6 +15,7 @@ import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.NoValidWallpaperException
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
+import com.anthonyla.paperize.connections.analytics.ConnectionsAnalytics
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
@@ -40,6 +41,7 @@ class WallpaperChangeService : Service() {
     @Inject lateinit var wallpaperChangeLock: WallpaperChangeLock
     @Inject lateinit var wallpaperScheduler: WallpaperScheduler
     @Inject lateinit var wallpaperRepository: WallpaperRepository
+    @Inject lateinit var analytics: ConnectionsAnalytics
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -74,6 +76,7 @@ class WallpaperChangeService : Service() {
 
     /** Without a [screen], changes every screen the current settings rotate. */
     private suspend fun changeWallpaper(screen: ScreenType?) {
+        analytics.hintTrigger("manual")
         val mode = settingsRepository.getWallpaperMode()
         val targets = screen?.let(::setOf) ?: settingsRepository.getScheduleSettings().activeScreens(mode)
         for (target in targets) {
@@ -90,6 +93,7 @@ class WallpaperChangeService : Service() {
         require(screen != ScreenType.LIVE && mode == WallpaperMode.STATIC) { getString(R.string.static_mode_required) }
         val wallpaper = wallpaperRepository.getWallpaperById(wallpaperId)
             ?: error(getString(R.string.wallpaper_not_found))
+        analytics.hintTrigger("wallpaper_view")
         val settings = settingsRepository.getScheduleSettings()
         wallpaperController.applySpecific(wallpaper.albumId, wallpaper.id, screen, settings)
         wallpaperScheduler.resetAfterManualChange(screen, settings, mode)

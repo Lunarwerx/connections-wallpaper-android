@@ -15,6 +15,7 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.anthonyla.paperize.R
+import com.anthonyla.paperize.connections.analytics.ConnectionsAnalytics
 import com.anthonyla.paperize.core.EmptyAlbumException
 import com.anthonyla.paperize.core.ScalingType
 import com.anthonyla.paperize.core.ScreenType
@@ -51,6 +52,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
 
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var changeWallpaperUseCase: ChangeWallpaperUseCase
+    @Inject lateinit var analytics: ConnectionsAnalytics
 
     companion object {
         private const val TAG = "PaperizeLiveWallpaper"
@@ -122,6 +124,15 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
             }
         }
 
+        // The engine draws on request, so a dark/light switch only reaches the picture through this.
+        private val configurationReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_CONFIGURATION_CHANGED) {
+                    renderer.updateNightMode()
+                }
+            }
+        }
+
         override fun onCreate(surfaceHolder: SurfaceHolder) {
             super.onCreate(surfaceHolder)
             Log.d(TAG, "Engine created")
@@ -157,6 +168,13 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                 screenOffFilter,
                 ContextCompat.RECEIVER_NOT_EXPORTED
             )
+
+            ContextCompat.registerReceiver(
+                applicationContext,
+                configurationReceiver,
+                IntentFilter(Intent.ACTION_CONFIGURATION_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
         }
 
         /** Dequeue the next readable live wallpaper. Queue and database errors reach the controller. */
@@ -177,6 +195,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                 // transient. AlbumRefreshWorker prunes documents that are actually gone.
                 if (candidate.uri.toUri().isValid(contentResolver)) {
                     currentWallpaper = candidate
+                    analytics.liveWallpaperShown(albumId, candidate)
                     return ContentUriImageLoader(contentResolver, candidate.uri.toUri(), settings.liveScalingType)
                 }
             }
@@ -299,6 +318,11 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                 applicationContext.unregisterReceiver(screenOffReceiver)
             } catch (e: Exception) {
                 Log.e(TAG, "Error unregistering screen-off receiver", e)
+            }
+            try {
+                applicationContext.unregisterReceiver(configurationReceiver)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering configuration receiver", e)
             }
 
             renderer.cancelLoading()

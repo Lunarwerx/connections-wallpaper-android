@@ -116,10 +116,11 @@ class SettingsCoordinator @Inject constructor(
             previous = current
             // Album selection and pause/resume have their own actions. A delayed effect edit
             // must not overwrite changes those actions made after this draft was captured.
+            // A screen switched off keeps its album for when it is on again; activeScreens skips it.
             draft.copy(
                 enableChanger = current.enableChanger,
-                homeAlbumId = if (draft.homeEnabled) current.homeAlbumId else null,
-                lockAlbumId = if (draft.lockEnabled) current.lockAlbumId else null,
+                homeAlbumId = current.homeAlbumId,
+                lockAlbumId = current.lockAlbumId,
                 liveAlbumId = current.liveAlbumId
             ).validate()
         }
@@ -140,30 +141,50 @@ class SettingsCoordinator @Inject constructor(
     /** Change every screen the current settings rotate, or reload the live wallpaper. */
     fun changeWallpaperNow() = WallpaperChangeService.changeWallpaper(context)
 
-    /** Stop rotation if the user replaced Paperize's live wallpaper outside the app. */
+    /**
+     * Pause rotation if the user replaced Paperize's live wallpaper outside the app. The album stays
+     * selected, so resuming only asks for the live wallpaper again.
+     */
     suspend fun disableIfLiveWallpaperReplaced() = mutex.withLock {
         val settings = settingsRepository.getScheduleSettings()
         if (settingsRepository.getWallpaperMode() == WallpaperMode.LIVE && settings.liveAlbumId != null &&
             settings.enableChanger && !PaperizeLiveWallpaperService.isActive(context)
         ) {
-            settingsRepository.updateAlbumId(ScreenType.LIVE, null)
             settingsRepository.updateEnableChanger(false)
             scheduler.cancelAllWallpaperChanges()
         }
     }
 
-    /** Delete the library and settings; a non-null [mode] keeps appearance settings and switches mode. */
-    suspend fun resetData(mode: WallpaperMode?) = mutex.withLock {
+    /**
+     * Switch to [mode] keeping the library and every setting; a mode without an album takes the one
+     * rotating now. Returns true when live mode now needs Paperize picked as the live wallpaper.
+     */
+    suspend fun switchMode(mode: WallpaperMode): Boolean = mutex.withLock {
+        val previous = settingsRepository.getWallpaperMode()
+        val settings = settingsRepository.updateScheduleSettings { it.carriedInto(mode) }
+        if (previous != mode) {
+            // The old mode's jobs and live timer stop before the new mode's start.
+            scheduler.cancelAllWallpaperChanges()
+            settingsRepository.updateWallpaperMode(mode)
+        }
+        scheduler.updateSchedules(settings, mode)
+        if (!settings.enableChanger || !settings.hasRequiredAlbums(mode)) return@withLock false
+        when (mode) {
+            WallpaperMode.STATIC -> {
+                if (previous != mode) WallpaperChangeService.changeWallpaper(context)
+                false
+            }
+            WallpaperMode.LIVE -> !PaperizeLiveWallpaperService.isActive(context)
+        }
+    }
+
+    /** Delete the library and every setting. */
+    suspend fun resetData() = mutex.withLock {
         // Stop both the visible live timer and background jobs before deleting their source.
         settingsRepository.updateEnableChanger(false)
         scheduler.cancelAllWallpaperChanges()
         albumRepository.deleteAllAlbums()
-        if (mode == null) {
-            settingsRepository.clearAllSettings()
-        } else {
-            settingsRepository.clearScheduleSettings()
-            settingsRepository.updateWallpaperMode(mode)
-        }
+        settingsRepository.clearAllSettings()
     }
 
     private companion object {

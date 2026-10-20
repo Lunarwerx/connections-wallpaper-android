@@ -95,12 +95,17 @@ class HomeViewModelTest {
         coVerify(exactly = 1) { settings.updateScheduleSettings(any<(ScheduleSettings) -> ScheduleSettings>()) }
     }
 
-    @Test fun `disabling one screen clears only its current selection`() = runTest {
+    @Test fun `a screen switched off and on again keeps its album`() = runTest {
         stored.value = stored.value.copy(lockEnabled = true, lockAlbumId = "lock")
         viewModel.updateScheduleSettings(stored.value.copy(homeEnabled = false))
         advanceUntilIdle()
-        assertNull(stored.value.homeAlbumId)
+        assertFalse(ScreenType.HOME in stored.value.activeScreens(WallpaperMode.STATIC))
         assertEquals("lock", stored.value.lockAlbumId)
+
+        viewModel.updateScheduleSettings(stored.value.copy(homeEnabled = true))
+        advanceUntilIdle()
+        assertEquals("old", stored.value.homeAlbumId)
+        assertTrue(ScreenType.HOME in stored.value.activeScreens(WallpaperMode.STATIC))
     }
 
     @Test fun `rapid edits keep scheduling side effects in persistence order`() = runTest {

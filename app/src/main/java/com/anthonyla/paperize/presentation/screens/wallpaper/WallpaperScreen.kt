@@ -36,9 +36,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,11 +61,13 @@ import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.presentation.common.components.SectionLabel
 import com.anthonyla.paperize.presentation.common.components.SettingsGroup
 import com.anthonyla.paperize.presentation.common.components.SettingsRow
+import com.anthonyla.paperize.presentation.common.components.ScrollingDemo
 import com.anthonyla.paperize.presentation.common.components.SettingsRowTextStart
 import com.anthonyla.paperize.presentation.common.components.SwitchRow
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.AlbumSelectionBottomSheet
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.CurrentWallpaperPreview
+import com.anthonyla.paperize.presentation.screens.wallpaper.components.ScalingPicker
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.SettingSwitchWithSlider
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.TimeIntervalPicker
 
@@ -91,7 +90,10 @@ fun WallpaperScreen(
     onOpenVisualEffects: () -> Unit,
     homeWallpaperUri: String?,
     lockWallpaperUri: String?,
-    modifier: Modifier = Modifier
+    liveWallpaperUri: String?,
+    modifier: Modifier = Modifier,
+    /** Shown just above Change wallpaper now, which stays the last thing on the page. */
+    sponsored: (@Composable () -> Unit)? = null
 ) {
     var albumPickerScreen by rememberSaveable { mutableStateOf<ScreenType?>(null) }
     var showEmptyAlbumWarning by rememberSaveable { mutableStateOf(false) }
@@ -105,12 +107,6 @@ fun WallpaperScreen(
     val homeEnabled = scheduleSettings.homeEnabled
     val lockEnabled = scheduleSettings.lockEnabled
 
-    val scalingOptions = listOf(
-        ScalingType.FILL to stringResource(R.string.fill),
-        ScalingType.FIT to stringResource(R.string.fit),
-        ScalingType.STRETCH to stringResource(R.string.stretch),
-        ScalingType.NONE to stringResource(R.string.none)
-    )
     val selectedScaling = if (wallpaperMode == WallpaperMode.LIVE) scheduleSettings.liveScalingType else scheduleSettings.homeScalingType
     val hasAlbumSelected = scheduleSettings.activeScreens(wallpaperMode).isNotEmpty()
     val allRequiredAlbumsSelected = scheduleSettings.hasRequiredAlbums(wallpaperMode)
@@ -254,23 +250,33 @@ fun WallpaperScreen(
         }
         if (changeRows.isNotEmpty()) SettingsGroup(*changeRows.toTypedArray())
 
-        if (hasAlbumSelected) {
-            Button(onClick = onChangeWallpaperNow, modifier = Modifier.fillMaxWidth()) {
-                Text(text = stringResource(R.string.change_wallpaper_now))
-            }
-        }
-
         if (wallpaperMode == WallpaperMode.STATIC) {
+            // The phone beside the switch swipes its home pages, so the switch shows what it does.
+            // The launcher slides only a filled picture; any other scaling sets one that fits the screen exactly.
+            val slides = scheduleSettings.homeScrollingEnabled && scheduleSettings.scalingType(ScreenType.HOME) == ScalingType.FILL
             SettingsGroup({
-                SwitchRow(
-                    icon = Icons.Outlined.SwapHoriz,
-                    title = stringResource(R.string.horizontal_wallpaper_scrolling),
-                    supporting = stringResource(R.string.horizontal_scrolling_supporting),
-                    checked = scheduleSettings.homeScrollingEnabled,
-                    onCheckedChange = { enabled ->
-                        updateSettingsImmediate(scheduleSettings.copy(homeScrollingEnabled = enabled))
-                    }
-                )
+                Column {
+                    SwitchRow(
+                        icon = Icons.Outlined.SwapHoriz,
+                        title = stringResource(R.string.horizontal_wallpaper_scrolling),
+                        supporting = stringResource(
+                            when {
+                                slides -> R.string.horizontal_scrolling_on
+                                scheduleSettings.homeScrollingEnabled -> R.string.horizontal_scrolling_fill_only
+                                else -> R.string.horizontal_scrolling_off
+                            }
+                        ),
+                        checked = scheduleSettings.homeScrollingEnabled,
+                        onCheckedChange = { enabled ->
+                            updateSettingsImmediate(scheduleSettings.copy(homeScrollingEnabled = enabled))
+                        }
+                    )
+                    ScrollingDemo(
+                        scrolling = slides,
+                        animate = appSettings.animate,
+                        modifier = Modifier.padding(start = SettingsRowTextStart, bottom = AppSpacing.medium)
+                    )
+                }
             })
             CurrentWallpaperPreview(
                 homeWallpaperUri = homeWallpaperUri,
@@ -297,25 +303,25 @@ fun WallpaperScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    scalingOptions.forEachIndexed { index, (scalingType, label) ->
-                        SegmentedButton(
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = scalingOptions.size),
-                            onClick = {
-                                updateSettingsImmediate(
-                                    if (wallpaperMode == WallpaperMode.LIVE) {
-                                        scheduleSettings.copy(liveScalingType = scalingType)
-                                    } else {
-                                        scheduleSettings.copy(homeScalingType = scalingType, lockScalingType = scalingType)
-                                    }
-                                )
-                            },
-                            selected = scalingType == selectedScaling
-                        ) {
-                            Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
+                // Each choice drawn with the wallpaper showing now, as the lock screen shows it.
+                ScalingPicker(
+                    selected = selectedScaling,
+                    wallpaperUri = when {
+                        wallpaperMode == WallpaperMode.LIVE -> liveWallpaperUri
+                        lockEnabled -> lockWallpaperUri ?: homeWallpaperUri
+                        else -> homeWallpaperUri ?: lockWallpaperUri
+                    },
+                    animate = appSettings.animate,
+                    onSelect = { scalingType ->
+                        updateSettingsImmediate(
+                            if (wallpaperMode == WallpaperMode.LIVE) {
+                                scheduleSettings.copy(liveScalingType = scalingType)
+                            } else {
+                                scheduleSettings.copy(homeScalingType = scalingType, lockScalingType = scalingType)
+                            }
+                        )
                     }
-                }
+                )
             }
         }
         lookRows.add {
@@ -400,6 +406,14 @@ fun WallpaperScreen(
                     )
                 }
             )
+        }
+
+        // Last on the page: what is sponsored, then the one action that acts at once.
+        sponsored?.invoke()
+        if (hasAlbumSelected) {
+            Button(onClick = onChangeWallpaperNow, modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.small)) {
+                Text(text = stringResource(R.string.change_wallpaper_now))
+            }
         }
     }
 

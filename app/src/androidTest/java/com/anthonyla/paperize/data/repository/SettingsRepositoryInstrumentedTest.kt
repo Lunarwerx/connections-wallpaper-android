@@ -3,10 +3,8 @@ package com.anthonyla.paperize.data.repository
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.anthonyla.paperize.core.ScreenType
-import com.anthonyla.paperize.core.ScalingType
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.domain.model.ScheduleSettings
-import com.anthonyla.paperize.domain.model.WallpaperEffects
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -33,36 +31,6 @@ class SettingsRepositoryInstrumentedTest {
             assertEquals(initial.copy(homeAlbumId = "new-home", homeIntervalMinutes = 50), preferences.getScheduleSettings())
         } finally {
             preferences.updateScheduleSettings(previousSettings)
-        }
-    }
-
-    @Test fun resettingSchedulesPreservesAppearanceAndWallpaperMode() = runBlocking {
-        val preferences = SettingsRepositoryImpl(ApplicationProvider.getApplicationContext<Context>())
-        val previousSettings = preferences.getScheduleSettings()
-        val previousMode = preferences.getWallpaperMode()
-        val appearance = preferences.getAppSettings()
-        try {
-            preferences.updateWallpaperMode(WallpaperMode.LIVE)
-            val effects = WallpaperEffects(
-                enableBlur = true, blurPercentage = 30, enableDarken = true, darkenPercentage = 20,
-                enableVignette = true, vignettePercentage = 40, enableGrayscale = true, grayscalePercentage = 50,
-                enableDoubleTap = true, enableParallax = true, parallaxIntensity = 60
-            )
-            preferences.updateScheduleSettings(ScheduleSettings(
-                enableChanger = true, separateSchedules = true, shuffleEnabled = true,
-                homeEnabled = true, lockEnabled = true, homeAlbumId = "home", lockAlbumId = "lock", liveAlbumId = "live",
-                homeIntervalMinutes = 25, lockIntervalMinutes = 35, liveIntervalMinutes = 45,
-                homeScalingType = ScalingType.FIT, lockScalingType = ScalingType.STRETCH, liveScalingType = ScalingType.NONE,
-                homeScrollingEnabled = true, homeEffects = effects, lockEffects = effects, liveEffects = effects,
-                adaptiveBrightness = true
-            ))
-            preferences.clearScheduleSettings()
-            assertEquals(ScheduleSettings(), preferences.getScheduleSettings())
-            assertEquals(appearance, preferences.getAppSettings())
-            assertEquals(WallpaperMode.LIVE, preferences.getWallpaperMode())
-        } finally {
-            preferences.updateScheduleSettings(previousSettings)
-            preferences.updateWallpaperMode(previousMode)
         }
     }
 

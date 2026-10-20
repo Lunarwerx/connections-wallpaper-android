@@ -2,14 +2,15 @@ package com.anthonyla.paperize.presentation.screens.settings
 
 import android.util.Log
 import androidx.lifecycle.ViewModelStore
+import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.domain.model.AppSettings
+import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.repository.AlbumRepository
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.service.SettingsCoordinator
 import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import io.mockk.*
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -43,42 +44,47 @@ class SettingsViewModelTest {
         unmockkAll()
     }
 
-    @Test fun `mode switch waits for deletion and persistence before navigating`() = runTest {
-        val deletion = CompletableDeferred<Unit>()
-        coEvery { albums.deleteAllAlbums() } coAnswers { deletion.await() }
-        var completed = false
-        viewModel.switchWallpaperMode(WallpaperMode.LIVE) { completed = true }
-        runCurrent()
-        assertTrue(viewModel.isResetting.value)
-        assertFalse(completed)
-        viewModel.switchWallpaperMode(WallpaperMode.STATIC)
-        deletion.complete(Unit)
-        advanceUntilIdle()
-        coVerifyOrder {
-            settings.updateEnableChanger(false)
-            scheduler.cancelAllWallpaperChanges()
-            albums.deleteAllAlbums()
-            settings.clearScheduleSettings()
-            settings.updateWallpaperMode(WallpaperMode.LIVE)
+    @Test fun `mode switch keeps the library and carries the rotating album into the new mode`() = runTest {
+        var stored = ScheduleSettings(lockEnabled = true, lockAlbumId = "album")
+        coEvery { settings.getWallpaperMode() } returns WallpaperMode.STATIC
+        coEvery { settings.updateScheduleSettings(any<(ScheduleSettings) -> ScheduleSettings>()) } answers {
+            stored = firstArg<(ScheduleSettings) -> ScheduleSettings>()(stored)
+            stored
         }
-        coVerify(exactly = 1) { albums.deleteAllAlbums() }
-        assertTrue(completed)
-        assertFalse(viewModel.isResetting.value)
+        var needsLivePicker: Boolean? = null
+        viewModel.switchWallpaperMode(WallpaperMode.LIVE) { needsLivePicker = it }
+        runCurrent()
+        // A second tap while the first switch runs is ignored.
+        viewModel.switchWallpaperMode(WallpaperMode.STATIC)
+        advanceUntilIdle()
+
+        coVerify(exactly = 1) { settings.updateWallpaperMode(any()) }
+        coVerify { settings.updateWallpaperMode(WallpaperMode.LIVE) }
+        coVerify(exactly = 0) { albums.deleteAllAlbums(); settings.clearAllSettings() }
+        assertEquals("album", stored.liveAlbumId)
+        assertEquals("album", stored.lockAlbumId)
+        assertEquals(false, needsLivePicker)
+        assertNull(viewModel.failure.value)
+        assertFalse(viewModel.isBusy.value)
     }
 
-    @Test fun `failed deletion preserves settings and allows retry`() = runTest {
+    @Test fun `failed reset keeps settings and allows retry`() = runTest {
         coEvery { albums.deleteAllAlbums() } throws IllegalStateException("Database unavailable")
-        var completed = false
-        viewModel.switchWallpaperMode(WallpaperMode.LIVE) { completed = true }
+        viewModel.resetAllData()
         advanceUntilIdle()
-        assertTrue(viewModel.resetFailed.value)
-        assertFalse(completed)
-        coVerify(exactly = 0) { settings.clearScheduleSettings(); settings.updateWallpaperMode(any()) }
+        assertEquals(R.string.reset_failed, viewModel.failure.value)
+        coVerify(exactly = 0) { settings.clearAllSettings() }
 
         coEvery { albums.deleteAllAlbums() } just Runs
         viewModel.resetAllData()
         advanceUntilIdle()
-        assertFalse(viewModel.resetFailed.value)
-        coVerify(exactly = 1) { settings.clearAllSettings() }
+        assertNull(viewModel.failure.value)
+        // Rotation stops before the albums it reads from are deleted.
+        coVerifyOrder {
+            settings.updateEnableChanger(false)
+            scheduler.cancelAllWallpaperChanges()
+            albums.deleteAllAlbums()
+            settings.clearAllSettings()
+        }
     }
 }

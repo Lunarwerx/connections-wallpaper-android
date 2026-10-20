@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Base64
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -51,6 +52,7 @@ private val TRIAL_STARTED_AT = longPreferencesKey("trial_started_at")
 private val TRIAL_SEEN_AT = longPreferencesKey("trial_seen_at")
 private val PENDING_STATE = stringPreferencesKey("pending_state")
 private val PENDING_VERIFIER = stringPreferencesKey("pending_verifier")
+private val FREE_NOTICE_SHOWN = booleanPreferencesKey("free_notice_shown")
 
 /** A signed-in Connections member as this phone holds them: AEGIS tokens and who they are. */
 @Serializable
@@ -154,6 +156,21 @@ class ConnectionsAccount @Inject constructor(
             if (it[TRIAL_STARTED_AT] == null) it[TRIAL_STARTED_AT] = now
             if (now > (it[TRIAL_SEEN_AT] ?: 0L)) it[TRIAL_SEEN_AT] = now
         }
+    }
+
+    /**
+     * True once: the first time it is asked while nobody is signed in, the note that the app is free
+     * and asks only for an account is due. Later asks, or asks while signed in, answer false.
+     */
+    suspend fun claimFreeNotice(): Boolean {
+        var due = false
+        store.edit {
+            if (it.session() == null && it[FREE_NOTICE_SHOWN] != true) {
+                it[FREE_NOTICE_SHOWN] = true
+                due = true
+            }
+        }
+        return due
     }
 
     /** The intent that opens Connections sign-in in the phone's browser (never an in-app view). */

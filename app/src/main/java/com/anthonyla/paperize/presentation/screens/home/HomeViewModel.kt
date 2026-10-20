@@ -76,6 +76,10 @@ class HomeViewModel @Inject constructor(
     private val _importError = MutableStateFlow<Int?>(null)
     val importError: StateFlow<Int?> = _importError.asStateFlow()
 
+    private val _albumAdded = MutableStateFlow(false)
+    /** A folder or photos just became an album; the screen reads it once and calls [consumeAlbumAdded]. */
+    val albumAdded: StateFlow<Boolean> = _albumAdded.asStateFlow()
+
     private var pendingSettingsJob: Job? = null
     private var pendingSettings: ScheduleSettings? = null
     private var importJob: Job? = null
@@ -112,6 +116,10 @@ class HomeViewModel @Inject constructor(
         _importError.value = null
     }
 
+    fun consumeAlbumAdded() {
+        _albumAdded.value = false
+    }
+
     private fun import(start: ImportProgress, screen: ScreenType?, create: suspend () -> Album) {
         if (importJob?.isActive == true) return
         _importError.value = null
@@ -120,6 +128,7 @@ class HomeViewModel @Inject constructor(
             try {
                 val album = create()
                 if (coordinator.adoptNewAlbum(album.id, screen)) _showLiveWallpaperPrompt.value = true
+                _albumAdded.value = true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SecurityException) {

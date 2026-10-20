@@ -25,8 +25,24 @@ class AccountViewModel @Inject constructor(
     /** A handful of gallery pictures for the sign-in screen. */
     val showcase: StateFlow<List<ConnectionsWallpaper>> = _showcase.asStateFlow()
 
+    private val _freeNotice = MutableStateFlow(false)
+    /** The one-time note that the app is free and asks only for an account is showing. */
+    val freeNotice: StateFlow<Boolean> = _freeNotice.asStateFlow()
+
     init {
         viewModelScope.launch { account.startTrialIfNew() }
+    }
+
+    /** Something worth keeping was just added: say once, while signed out, that the app is free. */
+    fun offerFreeNotice() {
+        viewModelScope.launch {
+            // A storage error only skips the notice.
+            if (runCatchingCancellable { account.claimFreeNotice() }.getOrDefault(false)) _freeNotice.value = true
+        }
+    }
+
+    fun dismissFreeNotice() {
+        _freeNotice.value = false
     }
 
     suspend fun signInIntent(): Intent = account.signInIntent()

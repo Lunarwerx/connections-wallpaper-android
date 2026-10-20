@@ -59,6 +59,7 @@ class PaperizeWallpaperRenderer(
     private var uVignetteFactorHandle = 0
     private var uGrayscaleFactorHandle = 0
     private var uAdaptiveBrightnessFactorHandle = 0
+    private var uEffectsResolutionHandle = 0
 
     private var blurPositionHandle = 0
     private var blurTexCoordHandle = 0
@@ -88,6 +89,9 @@ class PaperizeWallpaperRenderer(
     @Volatile private var currentScalingType = ScalingType.FILL
 
     @Volatile private var adaptiveBrightnessEnabled = false
+
+    // The dark/light mode the last redraw was for; see updateNightMode().
+    @Volatile private var drawnNightMode = com.anthonyla.paperize.core.util.isNightMode(context)
 
     // Retain the latest request, including images still decoding or waiting for upload,
     // so a fold/unfold cannot replace it with the previously displayed wallpaper.
@@ -275,6 +279,7 @@ class PaperizeWallpaperRenderer(
             if (currentEffects.enableGrayscale) currentEffects.grayscalePercentage / Constants.PERCENTAGE_DIVISOR else 0f
         )
         GLES20.glUniform1f(uAdaptiveBrightnessFactorHandle, adaptiveBrightnessFactor(picture))
+        GLES20.glUniform2f(uEffectsResolutionHandle, surfaceWidth.toFloat(), surfaceHeight.toFloat())
 
     }
 
@@ -336,9 +341,11 @@ class PaperizeWallpaperRenderer(
         uVignetteFactorHandle = GLES20.glGetUniformLocation(effectsProgram, "u_vignetteFactor")
         uGrayscaleFactorHandle = GLES20.glGetUniformLocation(effectsProgram, "u_grayscaleFactor")
         uAdaptiveBrightnessFactorHandle = GLES20.glGetUniformLocation(effectsProgram, "u_adaptiveBrightnessFactor")
+        uEffectsResolutionHandle = GLES20.glGetUniformLocation(effectsProgram, "u_resolution")
 
         Log.d(TAG, "Effects uniform locations: alpha=$uAlphaHandle, darken=$uDarkenFactorHandle, " +
-                "vignette=$uVignetteFactorHandle, grayscale=$uGrayscaleFactorHandle, adaptiveBrightness=$uAdaptiveBrightnessFactorHandle")
+                "vignette=$uVignetteFactorHandle, grayscale=$uGrayscaleFactorHandle, adaptiveBrightness=$uAdaptiveBrightnessFactorHandle, " +
+                "resolution=$uEffectsResolutionHandle")
 
         blurPositionHandle = GLES20.glGetAttribLocation(blurProgram, "a_position")
         blurTexCoordHandle = GLES20.glGetAttribLocation(blurProgram, "a_texCoord")
@@ -531,6 +538,16 @@ class PaperizeWallpaperRenderer(
         if (adaptiveBrightnessEnabled != enabled) {
             adaptiveBrightnessEnabled = enabled
             Log.d(TAG, "Adaptive brightness updated: $enabled")
+            callbacks.requestRender()
+        }
+    }
+
+    /** Call when the system config changes: redraws only if dark or light mode flipped, so adaptive brightness follows it. */
+    fun updateNightMode() {
+        val night = com.anthonyla.paperize.core.util.isNightMode(context)
+        if (night != drawnNightMode) {
+            drawnNightMode = night
+            Log.d(TAG, "Night mode changed: $night")
             callbacks.requestRender()
         }
     }

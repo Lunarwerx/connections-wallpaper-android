@@ -1,8 +1,10 @@
 package com.anthonyla.paperize.presentation.screens.settings
 
 import android.util.Log
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.domain.model.AppSettings
 import com.anthonyla.paperize.domain.repository.SettingsRepository
@@ -31,10 +33,12 @@ class SettingsViewModel @Inject constructor(
     val wallpaperMode: StateFlow<WallpaperMode> =
         settingsRepository.getWallpaperModeFlow().stateWhileSubscribed(viewModelScope, WallpaperMode.STATIC)
 
-    private val _isResetting = MutableStateFlow(false)
-    val isResetting = _isResetting.asStateFlow()
-    private val _resetFailed = MutableStateFlow(false)
-    val resetFailed = _resetFailed.asStateFlow()
+    private val _isBusy = MutableStateFlow(false)
+    val isBusy = _isBusy.asStateFlow()
+
+    /** What the last mode switch or reset could not finish, as a message, or null. */
+    private val _failure = MutableStateFlow<Int?>(null)
+    val failure = _failure.asStateFlow()
 
     /** null follows the phone's theme; true or false pins dark or light. */
     fun updateDarkMode(dark: Boolean?) {
@@ -53,25 +57,26 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.updateFirstLaunch(isFirstLaunch) }
     }
 
-    fun switchWallpaperMode(newMode: WallpaperMode, onSuccess: () -> Unit = {}) = resetData(newMode, onSuccess)
+    /** Albums and settings stay; [onSwitched] hears whether live mode now needs its live wallpaper picked. */
+    fun switchWallpaperMode(newMode: WallpaperMode, onSwitched: (needsLivePicker: Boolean) -> Unit = {}) =
+        perform(R.string.mode_switch_failed) { onSwitched(coordinator.switchMode(newMode)) }
 
-    fun resetAllData() = resetData(mode = null)
+    fun resetAllData() = perform(R.string.reset_failed) { coordinator.resetData() }
 
-    private fun resetData(mode: WallpaperMode?, onSuccess: () -> Unit = {}) {
-        if (_isResetting.value) return
-        _isResetting.value = true
-        _resetFailed.value = false
+    private fun perform(@StringRes failureMessage: Int, action: suspend () -> Unit) {
+        if (_isBusy.value) return
+        _isBusy.value = true
+        _failure.value = null
         viewModelScope.launch {
             try {
-                coordinator.resetData(mode)
-                onSuccess()
+                action()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Could not reset app data", e)
-                _resetFailed.value = true
+                Log.e(TAG, "Could not finish a mode switch or reset", e)
+                _failure.value = failureMessage
             } finally {
-                _isResetting.value = false
+                _isBusy.value = false
             }
         }
     }

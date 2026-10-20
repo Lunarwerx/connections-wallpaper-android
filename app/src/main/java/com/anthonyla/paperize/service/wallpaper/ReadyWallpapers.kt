@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.util.Log
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.util.getDeviceScreenSize
+import com.anthonyla.paperize.core.util.isNightMode
 import com.anthonyla.paperize.domain.model.PreparedWallpaper
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.model.Wallpaper
@@ -30,7 +31,8 @@ class ReadyWallpapers @Inject constructor(
     private val wallpaperRepository: WallpaperRepository,
     private val renderer: WallpaperRenderer
 ) {
-    private data class Key(val wallpaperId: String, val screen: ScreenType, val look: WallpaperLook, val width: Int, val height: Int)
+    /** [night]: adaptive brightness draws a picture for one mode, so one drawn before a dark/light switch is not taken after it. */
+    private data class Key(val wallpaperId: String, val screen: ScreenType, val look: WallpaperLook, val width: Int, val height: Int, val night: Boolean)
 
     /** One picture being drawn or drawn; [file] and [dropped] are guarded by [drawings]. */
     private class Drawing {
@@ -132,7 +134,7 @@ class ReadyWallpapers @Inject constructor(
 
     private fun key(wallpaperId: String, screen: ScreenType, settings: ScheduleSettings): Key {
         val size = getDeviceScreenSize(context)
-        return Key(wallpaperId, screen, settings.look(screen), size.width, size.height)
+        return Key(wallpaperId, screen, settings.look(screen), size.width, size.height, isNightMode(context))
     }
 
     /** Call holding [drawings]. */

@@ -11,6 +11,7 @@ import android.util.Log
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,13 +41,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -156,6 +163,10 @@ fun VisualEffectsContent(
         if (debounced) draft.updateDebounced(updated) else draft.update(updated)
     }
 
+    // Which mode the preview is drawn for; it starts on the phone's own mode and is only a preview.
+    val systemNight = isSystemInDarkTheme()
+    var previewNight by rememberSaveable { mutableStateOf(systemNight) }
+
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -170,6 +181,26 @@ fun VisualEffectsContent(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = AppSpacing.medium, end = AppSpacing.medium, top = AppSpacing.small)
+            ) {
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    onClick = { previewNight = false },
+                    selected = !previewNight
+                ) {
+                    Text(stringResource(R.string.preview_light_mode))
+                }
+                SegmentedButton(
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    onClick = { previewNight = true },
+                    selected = previewNight
+                ) {
+                    Text(stringResource(R.string.preview_dark_mode))
+                }
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -180,17 +211,19 @@ fun VisualEffectsContent(
                     EffectPreview(
                         wallpaperUri = liveWallpaperUri, effects = settings.liveEffects,
                         adaptiveBrightness = settings.adaptiveBrightness, scaling = settings.liveScalingType,
-                        description = R.string.preview_wallpaper
+                        night = previewNight, description = R.string.preview_wallpaper
                     )
                 } else {
                     if (lockEnabled) EffectPreview(
                         wallpaperUri = lockWallpaperUri, effects = settings.lockEffects,
                         adaptiveBrightness = settings.adaptiveBrightness, scaling = settings.lockScalingType,
+                        night = previewNight,
                         description = R.string.preview_lock_screen, label = R.string.lock, icon = Icons.Outlined.Lock
                     )
                     if (homeEnabled) EffectPreview(
                         wallpaperUri = homeWallpaperUri, effects = settings.homeEffects,
                         adaptiveBrightness = settings.adaptiveBrightness, scaling = settings.homeScalingType,
+                        night = previewNight,
                         description = R.string.preview_home_screen, label = R.string.home, icon = Icons.Outlined.Home
                     )
                 }
@@ -252,6 +285,7 @@ private fun EffectPreview(
     effects: WallpaperEffects,
     adaptiveBrightness: Boolean,
     scaling: ScalingType,
+    night: Boolean,
     @StringRes description: Int,
     @StringRes label: Int? = null,
     icon: ImageVector? = null
@@ -262,12 +296,12 @@ private fun EffectPreview(
         value = withContext(Dispatchers.IO) { loadPicture(context, wallpaperUri, frame, scaling) }
     }
     // Each change starts a new drawing and drops the one in progress; the last finished one stays up meanwhile.
-    val shown by produceState<Bitmap?>(null, picture, effects, adaptiveBrightness) {
+    val shown by produceState<Bitmap?>(null, picture, effects, adaptiveBrightness, night) {
         val source = picture ?: return@produceState
         value = withContext(previewDrawing) {
             // A copy the system cannot make (low memory) skips this redraw; the last one stays up.
             val copy: Bitmap = source.copy(Bitmap.Config.ARGB_8888, true) ?: return@withContext value
-            applyWallpaperEffects(context, copy, effects, adaptiveBrightness, frame.blurScale)
+            applyWallpaperEffects(context, copy, effects, adaptiveBrightness, frame.blurScale, night)
         }
     }
     val descriptionText = stringResource(description)

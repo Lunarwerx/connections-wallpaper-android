@@ -6,6 +6,7 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.anthonyla.paperize.core.ScreenType
+import com.anthonyla.paperize.connections.analytics.ConnectionsAnalytics
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.service.WallpaperChangeLock
@@ -21,7 +22,8 @@ class WallpaperChangeWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val wallpaperController: WallpaperController,
     private val settingsRepository: SettingsRepository,
-    private val wallpaperChangeLock: WallpaperChangeLock
+    private val wallpaperChangeLock: WallpaperChangeLock,
+    private val analytics: ConnectionsAnalytics
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -31,6 +33,7 @@ class WallpaperChangeWorker @AssistedInject constructor(
                 ?: ScreenType.HOME
 
             Log.d(TAG, "Starting wallpaper change for $screenType")
+            analytics.hintTrigger("interval")
             wallpaperChangeLock.mutex.withLock {
                 wallpaperController.change(screenType, settingsRepository.getScheduleSettings())
             }

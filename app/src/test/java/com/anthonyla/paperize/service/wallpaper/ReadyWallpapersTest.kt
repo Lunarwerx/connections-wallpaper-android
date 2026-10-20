@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.util.Size
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.util.getDeviceScreenSize
+import com.anthonyla.paperize.core.util.isNightMode
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.model.Wallpaper
 import com.anthonyla.paperize.domain.model.WallpaperImage
@@ -33,6 +34,7 @@ class ReadyWallpapersTest {
     private val picture = Wallpaper.empty(id = "next", albumId = "album")
     private val settings = ScheduleSettings(homeEnabled = true, lockEnabled = true, homeAlbumId = "album", lockAlbumId = "album")
     private lateinit var ready: ReadyWallpapers
+    private var night = false
 
     @Before fun setUp() {
         mockkStatic("com.anthonyla.paperize.core.util.WallpaperUtilKt")
@@ -40,6 +42,7 @@ class ReadyWallpapersTest {
             every { width } returns 1080
             every { height } returns 2400
         }
+        every { isNightMode(any()) } answers { night }
         coEvery { renderer.render(any(), any(), any()) } answers {
             mockk<Bitmap>(relaxed = true) {
                 every { compress(any(), any(), any()) } answers { thirdArg<OutputStream>().write(byteArrayOf(1, 2, 3)); true }
@@ -57,6 +60,9 @@ class ReadyWallpapersTest {
 
     @Test fun `a picture drawn ahead is used once, and only while the settings still draw it that way`() = runTest {
         ready.prepare(listOf(ScreenType.BOTH), settings)
+        night = true
+        assertNull("dark mode came on since: adaptive brightness draws it again", ready.takeNext("album", ScreenType.HOME, settings))
+        night = false
         val gray = settings.homeEffects.copy(enableGrayscale = true, grayscalePercentage = 100)
         val grayscale = settings.copy(visualEffectsEnabled = true, homeEffects = gray, lockEffects = gray)
         assertNull("effects turned on since: the change draws it again", ready.takeNext("album", ScreenType.HOME, grayscale))

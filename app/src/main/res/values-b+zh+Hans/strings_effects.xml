@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="preview_light_mode">浅色</string>
+  <string name="preview_dark_mode">深色</string>
+</resources>

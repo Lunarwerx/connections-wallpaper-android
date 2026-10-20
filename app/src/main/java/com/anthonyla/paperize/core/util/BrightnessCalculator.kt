@@ -2,6 +2,7 @@ package com.anthonyla.paperize.core.util
 
 import android.graphics.Bitmap
 import com.anthonyla.paperize.core.constants.Constants
+import kotlin.math.max
 
 object BrightnessCalculator {
 
@@ -35,19 +36,14 @@ object BrightnessCalculator {
         return (totalLuminance / pixelCount).toFloat()
     }
 
-    fun getAdaptiveMultiplier(isDarkMode: Boolean, brightness: Float): Float {
-        val lightBrightnessMin = Constants.LIGHT_BRIGHTNESS_MIN
-        val darkBrightnessMax = Constants.DARK_BRIGHTNESS_MAX
-        val targetBrightnessDark = Constants.TARGET_BRIGHTNESS_DARK
-        val targetBrightnessLight = Constants.TARGET_BRIGHTNESS_LIGHT
-
-        // Avoid issues with very dark items or division by zero
-        if (brightness < 0.01f) return 1.0f
-
-        return when {
-            isDarkMode && brightness > lightBrightnessMin -> targetBrightnessDark / brightness
-            !isDarkMode && brightness < darkBrightnessMax -> targetBrightnessLight / brightness
-            else -> 1.0f
-        }
+    /**
+     * Brightness multiplier for a picture of average luminance [averageLuminance] (0..1). In dark mode
+     * the picture is dimmed to a target luminance, by at least 25%; light mode leaves it as it is.
+     */
+    fun getAdaptiveMultiplier(isNight: Boolean, averageLuminance: Float): Float {
+        if (!isNight) return 1f
+        // Floor on the luminance so a black picture divides safely; the clamp keeps it from brightening.
+        val multiplier = Constants.DARK_MODE_TARGET_LUMINANCE / max(averageLuminance, 0.01f)
+        return multiplier.coerceIn(Constants.DARK_MODE_MIN_MULTIPLIER, Constants.DARK_MODE_MAX_MULTIPLIER)
     }
 }

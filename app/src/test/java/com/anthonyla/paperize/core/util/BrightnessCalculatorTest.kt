@@ -1,21 +1,33 @@
 package com.anthonyla.paperize.core.util
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class BrightnessCalculatorTest {
     @Test
-    fun `adaptive brightness changes only images at odds with the system theme`() {
-        assertEquals(0.7f, 0.9f * BrightnessCalculator.getAdaptiveMultiplier(true, 0.9f), 0.001f)
-        assertEquals(0.4f, 0.2f * BrightnessCalculator.getAdaptiveMultiplier(false, 0.2f), 0.001f)
-        assertEquals(1f, BrightnessCalculator.getAdaptiveMultiplier(true, 0.5f), 0.001f)
-        assertEquals(1f, BrightnessCalculator.getAdaptiveMultiplier(false, 0.5f), 0.001f)
+    fun `dark mode dims a bright picture to the target luminance`() {
+        // 0.38 / 0.9, inside the clamp, so the picture lands on the target.
+        assertEquals(0.38f / 0.9f, BrightnessCalculator.getAdaptiveMultiplier(true, 0.9f), 0.001f)
     }
 
     @Test
-    fun `near black images are not amplified or divided by zero`() {
+    fun `dark mode dims a mid-grey picture`() {
+        assertEquals(0.75f, BrightnessCalculator.getAdaptiveMultiplier(true, 0.5f), 0.001f)
+        assertTrue(BrightnessCalculator.getAdaptiveMultiplier(true, 0.5f) < 1f)
+    }
+
+    @Test
+    fun `light mode leaves every picture as it is`() {
+        assertEquals(1f, BrightnessCalculator.getAdaptiveMultiplier(false, 0.9f), 0f)
+        assertEquals(1f, BrightnessCalculator.getAdaptiveMultiplier(false, 0.2f), 0f)
+    }
+
+    @Test
+    fun `near black pictures are not amplified or divided by zero`() {
         listOf(0f, 0.005f).forEach { brightness ->
-            assertEquals(1f, BrightnessCalculator.getAdaptiveMultiplier(false, brightness), 0f)
+            val multiplier = BrightnessCalculator.getAdaptiveMultiplier(true, brightness)
+            assertEquals(0.75f, multiplier, 0.001f)
         }
     }
 }

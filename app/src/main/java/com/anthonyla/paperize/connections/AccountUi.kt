@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -33,6 +34,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -166,7 +168,7 @@ fun AccountSheet(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     AppMark(size = 56.dp)
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.connections_sign_in_needed), style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.connections_free_title), style = MaterialTheme.typography.titleLarge)
                         Text(
                             text = when (state) {
                                 is AccountState.Trial -> pluralStringResource(R.plurals.connections_trial_days_left, state.daysLeft, state.daysLeft)
@@ -182,6 +184,22 @@ fun AccountSheet(
             }
         }
     }
+}
+
+/**
+ * Said once, after the first album is added while signed out: the app is free, and all it asks is a
+ * free Connections account before the free week ends. Later is a fine answer.
+ */
+@Composable
+fun FreeAppNotice(daysLeft: Int, onSignIn: () -> Unit, onLater: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onLater,
+        icon = { AppMark(size = 40.dp) },
+        title = { Text(stringResource(R.string.free_notice_title)) },
+        text = { Text(pluralStringResource(R.plurals.free_notice_body, daysLeft, daysLeft)) },
+        confirmButton = { Button(onClick = onSignIn) { Text(stringResource(R.string.connections_sign_in_action)) } },
+        dismissButton = { TextButton(onClick = onLater) { Text(stringResource(R.string.free_notice_later)) } }
+    )
 }
 
 /**

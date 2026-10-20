@@ -4,10 +4,12 @@ import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -36,7 +38,11 @@ fun NavigationGraph(
     navController: NavHostController = rememberNavController(),
     startDestination: Any = StartupRoute,
     animate: Boolean = true,
-    onFirstLaunchComplete: () -> Unit = {}
+    onFirstLaunchComplete: () -> Unit = {},
+    /** An install that agreed to an older notice: the startup notice is shown again and Agree goes to Home. */
+    reAgree: Boolean = false,
+    onPolicyAgreed: () -> Unit = {},
+    onScreen: (String) -> Unit = {}
 ) {
     val enterForward: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition =
         if (animate) { { enterTransitionForward() } } else { { EnterTransition.None } }
@@ -47,7 +53,16 @@ fun NavigationGraph(
     val exitBackward: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition =
         if (animate) { { exitTransitionBackward() } } else { { ExitTransition.None } }
     val context = androidx.compose.ui.platform.LocalContext.current
-    
+
+    // Route names only, without arguments: analytics gets "HomeRoute", never an album or wallpaper id.
+    DisposableEffect(navController) {
+        val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+            onScreen(destination.route.orEmpty().substringAfterLast('.').substringBefore('/'))
+        }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose { navController.removeOnDestinationChangedListener(listener) }
+    }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -63,8 +78,15 @@ fun NavigationGraph(
         composable<StartupRoute> {
             StartupScreen(
                 onAgree = {
-                    navController.navigate(WallpaperModeSelectionRoute) {
-                        popUpTo<StartupRoute> { inclusive = true }
+                    onPolicyAgreed()
+                    if (reAgree) {
+                        navController.navigate(HomeRoute) {
+                            popUpTo<StartupRoute> { inclusive = true }
+                        }
+                    } else {
+                        navController.navigate(WallpaperModeSelectionRoute) {
+                            popUpTo<StartupRoute> { inclusive = true }
+                        }
                     }
                 },
                 onPrivacyClick = {

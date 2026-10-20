@@ -41,7 +41,7 @@ sealed interface ConnectionsMessage {
     data class Failed(val reason: String?) : ConnectionsMessage
 }
 
-private class SignInNeededException : IOException("Sign in to download full-size wallpapers")
+private class SignInNeededException : IOException("Connections asked for a sign-in to send this wallpaper")
 
 @HiltViewModel
 class ConnectionsViewModel @Inject constructor(

@@ -141,8 +141,6 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it.clear() }
     }
 
-    override suspend fun clearScheduleSettings() = updateScheduleSettings(ScheduleSettings())
-
     override suspend fun updateAlbumId(screen: ScreenType, albumId: String?) {
         dataStore.edit { prefs -> albumIdKeys(screen).forEach { prefs.setOrRemove(it, albumId) } }
     }
