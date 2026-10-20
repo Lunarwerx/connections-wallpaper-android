@@ -253,8 +253,9 @@ fun WallpaperScreen(
         if (wallpaperMode == WallpaperMode.STATIC) {
             // The phone beside the switch swipes its home pages, so the switch shows what it does.
             // The launcher slides only a filled picture; any other scaling sets one that fits the screen exactly.
+            // Only the home screen has pages to swipe, so the switch shows while Home rotates; its value is kept.
             val slides = scheduleSettings.homeScrollingEnabled && scheduleSettings.scalingType(ScreenType.HOME) == ScalingType.FILL
-            SettingsGroup({
+            if (homeEnabled) SettingsGroup({
                 Column {
                     SwitchRow(
                         icon = Icons.Outlined.SwapHoriz,
