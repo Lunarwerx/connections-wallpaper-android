@@ -4,6 +4,7 @@ saves shots/suite/FAIL-<test>.jpg and the labels on screen, then the run goes on
   tools\emulator-suite\check.cmd                                (unit, lint, release build, device tests)
   adb -s emulator-5554 install -r app/build/outputs/apk/release/app-release.apk
   python -X utf8 tools/emulator-suite/suite.py [test ...]      (no names: every test, in order)
+  python -X utf8 tools/emulator-suite/private.py [test ...]    (the same on a private emulator, when another session has 5554)
   python -X utf8 tools/emulator-suite/unlock_speed.py          (after lock_first_folder: screen-off to new lock picture)
 
 Each run wipes the app's data first (the same as a fresh install) and takes about six minutes.
@@ -366,10 +367,17 @@ TESTS = [t_lock_first_folder, t_unlock_changes, t_timer_toggle, t_unlock_off, t_
          t_library_folder_fills_both, t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore]
 
 
+def unknown_tests(names: list[str]) -> list[str]:
+    return sorted(set(names) - {t.__name__[2:] for t in TESTS})
+
+
 def main() -> None:
+    names = sys.argv[1:]
+    unknown = unknown_tests(names)
+    if unknown:
+        sys.exit(f"no such test: {', '.join(unknown)}")
     cw.push_testwalls(FOLDER)  # before connecting: it restarts adbd as root
     cw.connect()
-    names = sys.argv[1:]
     results = []
     for test in TESTS:
         name = test.__name__[2:]
@@ -393,6 +401,7 @@ def main() -> None:
     for name, verdict, secs, why in results:
         print(f"{verdict} {name:28s} {secs:5.1f}s {why}")
     print(f"{sum(r[1] == 'PASS' for r in results)} of {len(results)} passed, total {time.time() - T0:.1f}s")
+    sys.exit(0 if results and all(r[1] == "PASS" for r in results) else 1)
 
 
 if __name__ == "__main__":
