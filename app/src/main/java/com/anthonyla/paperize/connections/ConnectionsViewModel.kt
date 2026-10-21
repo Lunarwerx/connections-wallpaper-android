@@ -9,12 +9,17 @@ import com.anthonyla.paperize.domain.usecase.CreateAlbumUseCase
 import com.anthonyla.paperize.presentation.common.stateWhileSubscribed
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -43,6 +48,7 @@ sealed interface ConnectionsMessage {
     data object AlreadyInAlbum : ConnectionsMessage
     data class WallpaperSet(val target: WallpaperTarget) : ConnectionsMessage
     data object SavedToPhone : ConnectionsMessage
+    data class AddedToCollection(val name: String) : ConnectionsMessage
     data object SignInNeeded : ConnectionsMessage
     data class Failed(val reason: String?) : ConnectionsMessage
 }
@@ -59,7 +65,8 @@ class ConnectionsViewModel @Inject constructor(
     private val originals: ConnectionsOriginals,
     private val createAlbumUseCase: CreateAlbumUseCase,
     private val preferences: ExplorePreferences,
-    albumRepository: AlbumRepository
+    albumRepository: AlbumRepository,
+    private val collectionStore: ConnectionsCollections
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ConnectionsUiState())
@@ -67,6 +74,16 @@ class ConnectionsViewModel @Inject constructor(
 
     val albums: StateFlow<List<AlbumSummary>> =
         albumRepository.getAlbumSummaries().stateWhileSubscribed(viewModelScope, emptyList())
+
+    /** The phone's collections: the member's own, and gallery tags saved offline. */
+    val collections: StateFlow<List<WallpaperCollection>> =
+        collectionStore.all.stateWhileSubscribed(viewModelScope, emptyList())
+
+    /** The cards for Explore's Collections shelf and the collections manager. */
+    val cards: StateFlow<List<CollectionCard>> =
+        combine(collectionStore.all, _state.map { it.tags }.distinctUntilChanged()) { saved, tags ->
+            collectionCards(saved, tags, originals::savedPreview)
+        }.flowOn(Dispatchers.IO).stateWhileSubscribed(viewModelScope, emptyList())
 
     private val _messages = Channel<ConnectionsMessage>(Channel.BUFFERED)
     val messages: Flow<ConnectionsMessage> = _messages.receiveAsFlow()
@@ -175,6 +192,32 @@ class ConnectionsViewModel @Inject constructor(
             )
             _state.update { it.copy(saving = it.saving - wallpaper.id) }
             _messages.send(message)
+        }
+    }
+
+    /** Puts [wallpaper] in one of the member's own collections, or takes it out when it is there. */
+    fun toggleInCollection(wallpaper: ConnectionsWallpaper, collectionId: String) {
+        viewModelScope.launch {
+            runCatchingCancellable { collectionStore.toggle(collectionId, wallpaper) }
+                .onFailure { _messages.send(ConnectionsMessage.Failed(it.message)) }
+        }
+    }
+
+    /** A new collection of the member's own, starting with [wallpaper]. */
+    fun addToNewCollection(wallpaper: ConnectionsWallpaper, name: String) {
+        viewModelScope.launch {
+            runCatchingCancellable { collectionStore.create(name, wallpaper) }
+                .onSuccess { _messages.send(ConnectionsMessage.AddedToCollection(it.name)) }
+                .onFailure { _messages.send(ConnectionsMessage.Failed(it.message)) }
+        }
+    }
+
+    /** A new, empty collection; [onCreated] gets its id to open it. */
+    fun createCollection(name: String, onCreated: (String) -> Unit) {
+        viewModelScope.launch {
+            runCatchingCancellable { collectionStore.create(name) }
+                .onSuccess { onCreated(it.id) }
+                .onFailure { _messages.send(ConnectionsMessage.Failed(it.message)) }
         }
     }
 

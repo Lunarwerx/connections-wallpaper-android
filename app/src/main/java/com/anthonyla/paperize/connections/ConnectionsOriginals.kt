@@ -39,17 +39,42 @@ class ConnectionsOriginals @Inject constructor(
     private val albumRepository: AlbumRepository
 ) {
     /** Returns false when the album already had this wallpaper. */
-    suspend fun addToAlbum(wallpaper: ConnectionsWallpaper, albumId: String): Boolean {
-        val (uri, name) = kept(wallpaper)
-        val entry = Wallpaper(
-            id = generateId(),
-            albumId = albumId,
-            uri = uri.toString(),
-            fileName = name,
-            dateModified = System.currentTimeMillis()
-        )
-        return albumRepository.addWallpapersToAlbum(albumId, listOf(entry)) > 0
+    suspend fun addToAlbum(wallpaper: ConnectionsWallpaper, albumId: String): Boolean =
+        addAllToAlbum(listOf(wallpaper), albumId) > 0
+
+    /** Adds every one of [wallpapers] to the album in one go; returns how many it did not have yet. */
+    suspend fun addAllToAlbum(wallpapers: List<ConnectionsWallpaper>, albumId: String): Int {
+        if (wallpapers.isEmpty()) return 0
+        val entries = wallpapers.map { wallpaper ->
+            val (uri, name) = kept(wallpaper)
+            Wallpaper(
+                id = generateId(),
+                albumId = albumId,
+                uri = uri.toString(),
+                fileName = name,
+                dateModified = System.currentTimeMillis()
+            )
+        }
+        return albumRepository.addWallpapersToAlbum(albumId, entries)
     }
+
+    /** Keeps the original and its preview on the phone, so the picture shows and sets with no internet. */
+    suspend fun keepOffline(wallpaper: ConnectionsWallpaper) {
+        kept(wallpaper)
+        keepPreview(wallpaper)
+    }
+
+    /** What a saved picture shows from on the phone: its preview, else its original; pictures with neither are left out. */
+    suspend fun localImages(wallpapers: List<ConnectionsWallpaper>): Map<String, File> = withContext(Dispatchers.IO) {
+        val originals = File(context.filesDir, APP_DIR).listFiles()?.filter { it.isFile && !it.name.endsWith(".part") }
+            ?.associateBy { it.nameWithoutExtension }.orEmpty()
+        wallpapers.mapNotNull { wallpaper ->
+            (previewFile(wallpaper).takeIf { it.isFile } ?: originals[wallpaper.slug])?.let { wallpaper.id to it }
+        }.toMap()
+    }
+
+    /** The saved preview of [wallpaper], when there is one. */
+    fun savedPreview(wallpaper: ConnectionsWallpaper): File? = previewFile(wallpaper).takeIf { it.isFile }
 
     suspend fun setAsWallpaper(wallpaper: ConnectionsWallpaper, target: WallpaperTarget) {
         val (uri, _) = kept(wallpaper)
@@ -71,7 +96,7 @@ class ConnectionsOriginals @Inject constructor(
     /** The app's own copy of the original, fetched once from the full door; a second use costs no second download. */
     private suspend fun appCopy(wallpaper: ConnectionsWallpaper): Pair<Uri, String> {
         val dir = File(context.filesDir, APP_DIR)
-        withContext(Dispatchers.IO) { dir.listFiles()?.firstOrNull { it.nameWithoutExtension == wallpaper.slug } }
+        withContext(Dispatchers.IO) { dir.listFiles()?.firstOrNull { it.isFile && it.nameWithoutExtension == wallpaper.slug } }
             ?.let { return contentUri(it) to it.name }
         val full = api.full(wallpaper.id)
         val name = "${wallpaper.slug}.${extensionOf(full)}"
@@ -88,6 +113,27 @@ class ConnectionsOriginals @Inject constructor(
             }
         }
         return contentUri(file) to name
+    }
+
+    private suspend fun keepPreview(wallpaper: ConnectionsWallpaper) {
+        val file = previewFile(wallpaper)
+        if (withContext(Dispatchers.IO) { file.isFile }) return
+        withContext(Dispatchers.IO) {
+            file.parentFile?.mkdirs()
+            val part = File(file.parentFile, "${file.name}.part")
+            try {
+                api.readOriginal(wallpaper.previewUrl) { input -> part.outputStream().use { input.copyTo(it) } }
+                if (!part.renameTo(file)) throw IOException("The preview could not be kept")
+            } finally {
+                part.delete()
+            }
+        }
+    }
+
+    private fun previewFile(wallpaper: ConnectionsWallpaper): File {
+        val extension = wallpaper.previewUrl.substringBefore('?').substringAfterLast('/').substringAfterLast('.', "")
+            .lowercase().takeIf { it.length in 3..4 && it.all(Char::isLetterOrDigit) } ?: "webp"
+        return File(File(File(context.filesDir, APP_DIR), PREVIEW_DIR), "${wallpaper.slug}.$extension")
     }
 
     private fun contentUri(file: File): Uri = FileProvider.getUriForFile(context, "${context.packageName}.connections", file)
@@ -146,5 +192,7 @@ class ConnectionsOriginals @Inject constructor(
         val RELATIVE_PATH = "${Environment.DIRECTORY_PICTURES}/Connections Wallpaper/"
         /** Under files/, where res/xml/connections_files.xml lets the app's FileProvider read it back. */
         const val APP_DIR = "connections"
+        /** Under APP_DIR: the previews a collection saved offline shows from. */
+        const val PREVIEW_DIR = "previews"
     }
 }

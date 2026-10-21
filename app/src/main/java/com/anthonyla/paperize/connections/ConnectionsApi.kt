@@ -39,8 +39,20 @@ data class ConnectionsWallpaperPage(
     val nextCursor: String? = null
 )
 
+/** The picture on a tag's collection card (WallpaperTagCover): no two tags share one while a tag has another to show. */
 @Serializable
-data class ConnectionsTag(val tag: String, val count: Int)
+data class ConnectionsCover(
+    val id: String,
+    val slug: String,
+    val previewUrl: String,
+    val previewWidth: Int = 0,
+    val previewHeight: Int = 0,
+    val color: String? = null
+)
+
+/** A gallery tag, which Explore also shows as a collection: its count and its card's cover. */
+@Serializable
+data class ConnectionsTag(val tag: String, val count: Int, val cover: ConnectionsCover? = null)
 
 @Serializable
 private data class ConnectionsTags(val tags: List<ConnectionsTag>)

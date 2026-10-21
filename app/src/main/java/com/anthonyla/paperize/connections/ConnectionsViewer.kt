@@ -27,13 +27,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.CollectionsBookmark
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryAdd
@@ -42,6 +46,7 @@ import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Wallpaper
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
@@ -98,14 +103,9 @@ import com.anthonyla.paperize.presentation.common.components.AddAlbumDialog
 import com.anthonyla.paperize.presentation.common.theme.ViewerTheme
 import kotlinx.coroutines.launch
 
-private enum class ViewerSheet { Target, Album }
+private enum class ViewerSheet { Target, Album, Collection }
 
-/**
- * The full-screen viewer: swipe through the gallery, tap the picture to hide everything else, set it
- * on the home or lock screen, add it to an album, or save it to the phone. Setting and adding take
- * no account and use the full-quality original; saving asks a signed-out visitor to sign in. Dark in
- * either theme.
- */
+/** The viewer over Explore's own wall of pictures. */
 @Composable
 fun ConnectionsViewer(
     viewModel: ConnectionsViewModel,
@@ -116,8 +116,41 @@ fun ConnectionsViewer(
     onClose: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    ConnectionsViewer(
+        viewModel = viewModel,
+        wallpapers = state.wallpapers,
+        startIndex = startIndex,
+        onLoadMore = viewModel::loadMore,
+        images = emptyMap(),
+        signedIn = signedIn,
+        snackbarHostState = snackbarHostState,
+        onSignInNeeded = onSignInNeeded,
+        onClose = onClose
+    )
+}
+
+/**
+ * The full-screen viewer over [wallpapers] (Explore's wall, or a collection's): swipe through, tap the picture to
+ * hide everything else, set it on the home or lock screen, keep it in a collection, add it to an album, or save it
+ * to the phone. Setting, collecting and adding take no account and use the full-quality original; saving asks a
+ * signed-out visitor to sign in. [images] shows a picture from the phone when it is saved there. Dark in either theme.
+ */
+@Composable
+fun ConnectionsViewer(
+    viewModel: ConnectionsViewModel,
+    wallpapers: List<ConnectionsWallpaper>,
+    startIndex: Int,
+    onLoadMore: () -> Unit,
+    images: Map<String, Any>,
+    signedIn: Boolean,
+    snackbarHostState: SnackbarHostState,
+    onSignInNeeded: () -> Unit,
+    onClose: () -> Unit
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle()
-    val wallpapers = state.wallpapers
+    val collections by viewModel.collections.collectAsStateWithLifecycle()
+    val own = collections.filter { it.own }.sortedByDescending { it.createdAt }
     BackHandler(onBack = onClose)
     DarkSystemBars()
     if (wallpapers.isEmpty()) {
@@ -132,7 +165,7 @@ fun ConnectionsViewer(
 
     LaunchedEffect(pagerState, wallpapers.size) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
-            if (page >= wallpapers.size - LOAD_AHEAD) viewModel.loadMore()
+            if (page >= wallpapers.size - LOAD_AHEAD) onLoadMore()
         }
     }
     // A keyboard pages too (a laptop, a tablet's keyboard case); Escape already closes, as Back.
@@ -166,7 +199,7 @@ fun ConnectionsViewer(
                 beyondViewportPageCount = 1,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
-                ViewerPage(wallpaper = wallpapers[page], onTap = { chrome = !chrome })
+                ViewerPage(wallpaper = wallpapers[page], image = images[wallpapers[page].id], onTap = { chrome = !chrome })
             }
 
             AnimatedVisibility(
@@ -199,7 +232,9 @@ fun ConnectionsViewer(
                             setting = wallpaper.id in state.setting,
                             saving = wallpaper.id in state.saving,
                             downloading = wallpaper.id in state.downloading,
+                            collected = own.any { collection -> collection.wallpapers.any { it.id == wallpaper.id } },
                             onSet = { sheet = ViewerSheet.Target },
+                            onCollect = { sheet = ViewerSheet.Collection },
                             onAdd = { sheet = ViewerSheet.Album },
                             onSave = { if (signedIn) viewModel.saveToPhone(wallpaper) else onSignInNeeded() }
                         )
@@ -228,13 +263,23 @@ fun ConnectionsViewer(
                 },
                 onDismiss = { sheet = null }
             )
+            ViewerSheet.Collection -> CollectionSheet(
+                collections = own,
+                wallpaper = current,
+                onToggle = { collection -> viewModel.toggleInCollection(current, collection.id) },
+                onNew = { name ->
+                    sheet = null
+                    viewModel.addToNewCollection(current, name)
+                },
+                onDismiss = { sheet = null }
+            )
             null -> Unit
         }
     }
 }
 
 @Composable
-private fun ViewerPage(wallpaper: ConnectionsWallpaper, onTap: () -> Unit) {
+private fun ViewerPage(wallpaper: ConnectionsWallpaper, image: Any?, onTap: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -243,7 +288,7 @@ private fun ViewerPage(wallpaper: ConnectionsWallpaper, onTap: () -> Unit) {
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(wallpaper.previewUrl)
+                .data(image ?: wallpaper.previewUrl)
                 .crossfade(true)
                 .build(),
             contentDescription = wallpaper.title,
@@ -260,7 +305,9 @@ private fun InfoCard(
     setting: Boolean,
     saving: Boolean,
     downloading: Boolean,
+    collected: Boolean,
     onSet: () -> Unit,
+    onCollect: () -> Unit,
     onAdd: () -> Unit,
     onSave: () -> Unit
 ) {
@@ -274,12 +321,25 @@ private fun InfoCard(
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
         Column(modifier = Modifier.padding(start = 20.dp, end = 16.dp, top = 20.dp, bottom = 16.dp)) {
-            Text(
-                text = wallpaper.title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = wallpaper.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                // Where the picture comes from sits beside its name, so the actions below fit a narrow phone.
+                wallpaper.sourceUrl?.let { source ->
+                    IconButton(onClick = { uriHandler.openUri(source) }, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            Icons.AutoMirrored.Outlined.OpenInNew,
+                            contentDescription = stringResource(R.string.connections_view_source),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
             Text(
                 text = listOfNotNull(wallpaper.credit, licenseLabel(wallpaper.license), "${wallpaper.width} × ${wallpaper.height}")
                     .joinToString(" · "),
@@ -312,6 +372,12 @@ private fun InfoCard(
                     Spacer(Modifier.width(8.dp))
                     Text(stringResource(if (setting) R.string.connections_setting else R.string.connections_set_wallpaper))
                 }
+                FilledTonalIconButton(onClick = onCollect, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        if (collected) Icons.Filled.Bookmark else Icons.Outlined.BookmarkAdd,
+                        contentDescription = stringResource(R.string.connections_save_to_collection)
+                    )
+                }
                 FilledTonalIconButton(
                     onClick = { if (!saving) onAdd() },
                     modifier = Modifier.size(48.dp)
@@ -330,11 +396,6 @@ private fun InfoCard(
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
                     } else {
                         Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.connections_save_to_phone))
-                    }
-                }
-                wallpaper.sourceUrl?.let { source ->
-                    IconButton(onClick = { uriHandler.openUri(source) }, modifier = Modifier.size(48.dp)) {
-                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = stringResource(R.string.connections_view_source))
                     }
                 }
             }
@@ -396,6 +457,63 @@ private fun AlbumSheet(
             },
             errorMessage = error,
             isSaving = false
+        )
+    }
+}
+
+/** The member's own collections, each ticked when it holds [wallpaper]; a tap puts it in or takes it out. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CollectionSheet(
+    collections: List<WallpaperCollection>,
+    wallpaper: ConnectionsWallpaper,
+    onToggle: (WallpaperCollection) -> Unit,
+    onNew: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var naming by rememberSaveable { mutableStateOf(false) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 16.dp)
+        ) {
+            SheetTitle(stringResource(R.string.connections_save_to_collection))
+            collections.forEach { collection ->
+                val inIt = collection.wallpapers.any { it.id == wallpaper.id }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .toggleable(value = inIt, role = Role.Checkbox, onValueChange = { onToggle(collection) })
+                        .padding(start = 24.dp, end = 12.dp, top = 4.dp, bottom = 4.dp)
+                ) {
+                    Icon(Icons.Outlined.CollectionsBookmark, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = collection.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = pluralStringResource(R.plurals.wallpaper_count, collection.wallpapers.size, collection.wallpapers.size),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Checkbox(checked = inIt, onCheckedChange = null)
+                }
+            }
+            SheetRow(Icons.Outlined.Add, stringResource(R.string.connections_new_collection)) { naming = true }
+        }
+    }
+    if (naming) {
+        CollectionNameDialog(
+            title = stringResource(R.string.connections_new_collection),
+            initial = "",
+            taken = { name -> collections.any { it.name.equals(name, ignoreCase = true) } },
+            onConfirm = { name ->
+                naming = false
+                onNew(name)
+            },
+            onDismiss = { naming = false }
         )
     }
 }

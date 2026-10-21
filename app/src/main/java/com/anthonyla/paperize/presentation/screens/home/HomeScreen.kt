@@ -29,7 +29,6 @@ import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,7 +63,7 @@ import com.anthonyla.paperize.connections.ads.AdsViewModel
 import com.anthonyla.paperize.connections.ads.ConnectionsAds
 import com.anthonyla.paperize.connections.ads.SponsoredBanner
 import com.anthonyla.paperize.connections.ads.SponsoredPopup
-import com.anthonyla.paperize.connections.ConnectionsMessage
+import com.anthonyla.paperize.connections.ConnectionsMessageEffect
 import com.anthonyla.paperize.connections.ConnectionsScreen
 import com.anthonyla.paperize.connections.ConnectionsViewModel
 import com.anthonyla.paperize.connections.ConnectionsViewer
@@ -87,6 +86,8 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToAlbum: (String) -> Unit,
     onNavigateToVisualEffects: () -> Unit,
+    onNavigateToCollections: () -> Unit,
+    onNavigateToCollection: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel(),
     connectionsViewModel: ConnectionsViewModel = hiltViewModel(),
@@ -186,39 +187,7 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(connectionsViewModel) {
-        connectionsViewModel.messages.collect { message ->
-            when (message) {
-                is ConnectionsMessage.WallpaperSet -> {
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_set_done))
-                }
-                is ConnectionsMessage.Saved -> {
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_saved, message.albumName))
-                }
-                ConnectionsMessage.SavedToPhone -> {
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_saved_to_phone))
-                }
-                ConnectionsMessage.AlreadyInAlbum ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_already_in_album))
-                ConnectionsMessage.SignInNeeded -> {
-                    val result = snackbarHostState.showSnackbar(
-                        message = resources.getString(R.string.connections_sign_in_needed),
-                        actionLabel = resources.getString(R.string.connections_sign_in_action)
-                    )
-                    if (result == SnackbarResult.ActionPerformed) showAccount = true
-                }
-                is ConnectionsMessage.Failed -> {
-                    haptics.performHapticFeedback(HapticFeedbackType.Reject)
-                    snackbarHostState.showSnackbar(
-                        resources.getString(R.string.connections_failed, message.reason ?: resources.getString(R.string.connections_unknown_error))
-                    )
-                }
-            }
-        }
-    }
+    ConnectionsMessageEffect(connectionsViewModel, snackbarHostState, onSignInNeeded = { showAccount = true })
 
     // Material's expanded window (a tablet held wide, a laptop window) gets a side rail instead of a bottom bar.
     val wide = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } >= AppLayout.expandedWidth
@@ -335,6 +304,8 @@ fun HomeScreen(
                             viewerStart = index
                             viewerOpen = true
                         },
+                        onOpenCollections = onNavigateToCollections,
+                        onOpenCollection = onNavigateToCollection,
                         searchFocus = searchFocus,
                         viewModel = connectionsViewModel
                     )

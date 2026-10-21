@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Explore's collections: the shelf, the manager, a collection's page, and saving one offline. -->
+  <string name="connections_collections">合集</string>
+  <string name="connections_see_all">查看全部</string>
+  <string name="connections_collections_yours">我的</string>
+  <string name="connections_collections_gallery">来自图库</string>
+  <string name="connections_new_collection">新建合集</string>
+  <string name="connections_collection_name">名称</string>
+  <string name="connections_collection_name_taken">已有同名合集</string>
+  <string name="connections_save_to_collection">收藏到合集</string>
+  <string name="connections_collection_empty">点按壁纸上的书签，即可添加到这里</string>
+  <string name="connections_save_offline">离线保存</string>
+  <string name="connections_update_offline">更新离线内容</string>
+  <string name="connections_saved_offline">已离线保存</string>
+  <string name="connections_saving_offline">正在保存 %1$d / %2$d</string>
+  <string name="connections_stop_saving">停止保存</string>
+  <string name="connections_offline_done">%1$s 已离线保存</string>
+  <string name="connections_offline_partly">已离线保存 %1$d / %2$d 张，再保存一次即可完成</string>
+  <string name="connections_offline_sign_in_title">离线保存 %1$s</string>
+  <string name="connections_offline_sign_in_body">没有网络也能打开，还能作为相册轮换。使用免费的 Connections 账号即可。</string>
+  <string name="connections_rename">重命名</string>
+  <string name="connections_delete">删除</string>
+  <string name="connections_more_options">更多选项</string>
+  <string name="connections_delete_collection_title">删除 %1$s？</string>
+  <string name="connections_delete_collection_body">其中的壁纸仍保留在图库和你的相册中。</string>
+</resources>

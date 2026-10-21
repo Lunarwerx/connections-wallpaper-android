@@ -50,8 +50,14 @@ def open_app() -> None:
 
 
 def open_tab(name: str) -> None:
-    """Open a tab at its top: a tab keeps its scroll between visits, and a label lower down can share a name."""
+    """Open a tab at its top: a tab keeps its scroll between visits, and a label lower down can share a name. A page
+    over the tabs (Settings, which pick_mode leaves open, or an album) is backed out of first."""
     open_app()
+    for _ in range(3):
+        if cw.d(text="Library").exists:
+            break
+        cw.d.press("back")
+        cw.d(text="Library").wait(timeout=3)
     cw.tap(name)
     time.sleep(0.5)
     page = cw.d(scrollable=True)
@@ -134,7 +140,8 @@ def scroll_to(text: str) -> None:
 def tab_bottom_has(text: str, timeout: float = 4) -> bool:
     """Scroll the tab to its end, again until the timeout, so a row that just appeared below the fold counts."""
     def at_end() -> bool:
-        cw.d(scrollable=True).scroll.toEnd(max_swipes=5)
+        # toEnd stops at the end; the Wallpaper tab with both albums takes more than five swipes on a 1080x2400 screen.
+        cw.d(scrollable=True).scroll.toEnd(max_swipes=20)
         return cw.has(text)
     return wait_until(at_end, timeout)
 
@@ -299,7 +306,11 @@ def t_unlock_notice():
     cw.d.open_notification()
     note = cw.d(text="Change on unlock is on")
     check(note.wait(timeout=5), "the notice is in the shade")
-    note.swipe("right", steps=10)
+    # A swipe on the title alone is too short to dismiss it; a person's swipe crosses the row.
+    b = note.info["bounds"]
+    w = cw.d.info["displayWidth"]
+    y = (b["top"] + b["bottom"]) // 2
+    cw.d.swipe(int(w * 0.1), y, int(w * 0.95), y, duration=0.25)
     swiped = wait_until(lambda: not notice_posted(), 5)
     cw.d.press("back")
     check(swiped, "a swipe dismisses it")
@@ -524,7 +535,7 @@ def gallery_sizes() -> dict:
     import json
     import urllib.request
     url = "https://wallpaper.connectionsapi.com/v1/wallpapers?limit=100"
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"accept": "application/json"}), timeout=20) as res:
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"accept": "application/json", "user-agent": cw.UA}), timeout=20) as res:
         return {w["title"]: (w["width"], w["height"]) for w in json.load(res)["items"]}
 
 
@@ -549,9 +560,138 @@ def t_explore_set_signed_out():
     cw.d.press("back")
 
 
+
+def gallery_tags() -> dict:
+    """Each gallery tag's live count, from the same door the app reads."""
+    import json
+    import urllib.request
+    url = "https://wallpaper.connectionsapi.com/v1/tags"
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"accept": "application/json", "user-agent": cw.UA}), timeout=20) as res:
+        return {t["tag"]: t["count"] for t in json.load(res)["tags"]}
+
+
+def ready_app() -> None:
+    """A collections test also runs on its own: an app that has not been set up yet is set up first."""
+    cw.sh("shell", "am", "start", "-n", cw.MAIN)
+    if cw.d(text="Agree").wait(timeout=4):
+        cw.onboard()
+
+
+def explore_shelf() -> None:
+    ready_app()
+    open_tab("Explore")
+    check(cw.has("Search wallpapers", timeout=6), "Explore loads")
+    check(cw.has("See all", timeout=10), "the Collections shelf shows above the pictures")
+
+
+def kept_files() -> list[str]:
+    """What the app keeps in its own storage for the gallery (files/connections, previews included); needs adb root."""
+    out = cw.sh("shell", "ls", "-R", f"/data/data/{cw.PKG}/files/connections")
+    return sorted(l.strip() for l in out.splitlines() if l.strip() and not l.endswith(":") and "No such file" not in l)
+
+
+def new_collection_from_viewer(name: str) -> str:
+    """Open a gallery picture, put it in a new collection named <name> from the bookmark, close the viewer."""
+    sizes = gallery_sizes()
+    title = next((l for l in cw.labels() if l in sizes), None)
+    check(title is not None, "a gallery wallpaper is on screen")
+    cw.tap(title)
+    check(cw.has("Set wallpaper", timeout=6), f"the viewer opens on {title}")
+    cw.tap("Save to collection")
+    check(cw.has("New collection", timeout=5), "the bookmark opens Save to collection")
+    cw.tap("New collection")
+    field = cw.d(className="android.widget.EditText")
+    check(field.wait(timeout=5), "New collection asks for a name")
+    field.set_text(name)
+    cw.tap("Save")
+    check(cw.has(f"Added to {name}", timeout=6), f"the picture is in {name}")
+    cw.d.press("back")
+    return title
+
+
+def t_collections_browse():
+    """Explore's shelf opens the manager (Yours, then the gallery's tags), and a tag's page shows its live count."""
+    tags = gallery_tags()
+    explore_shelf()
+    cw.tap("See all")
+    check(cw.has("New collection", timeout=6) and cw.has("Yours"), "See all opens the manager with Yours and New collection")
+    for tag in ("Art", "Space", "Japan"):
+        if not cw.has(tag):
+            cw.d(scrollable=True).scroll.to(text=tag)
+        check(cw.has(tag, timeout=4), f"the manager shows the gallery's {tag}")
+    cw.d(scrollable=True).scroll.toBeginning(max_swipes=10)
+    if not cw.has("Art"):
+        cw.d(scrollable=True).scroll.to(text="Art")
+    cw.tap("Art")
+    count = tags["art"]
+    check(cw.has(f"{count} wallpaper", timeout=8), f"Art's page says {count} wallpapers, as the gallery does")
+    check(cw.has("Save offline"), "and offers Save offline")
+    cw.d.press("back")
+    cw.d.press("back")
+    check(cw.has("See all", timeout=6), "back returns to Explore")
+
+
+def t_collection_own():
+    """Anyone, signed out, makes a collection from a picture's bookmark; it shows on the shelf, renames, and deletes."""
+    explore_shelf()
+    new_collection_from_viewer("Beach Days")
+    check(cw.has("Beach Days", timeout=6), "the new collection is on the shelf")
+    cw.tap("Beach Days")
+    check(cw.has("1 wallpaper", timeout=6), "its page holds the one picture")
+    cw.tap("More options")
+    cw.tap("Rename")
+    field = cw.d(className="android.widget.EditText")
+    check(field.wait(timeout=5), "Rename asks for the new name")
+    field.set_text("Beach")
+    cw.tap("Save")
+    check(wait_until(lambda: cw.d(text="Beach").exists, 6), "the page takes the new name")
+    cw.tap("More options")
+    cw.tap("Delete")
+    check(cw.has("Delete Beach?", timeout=5), "Delete asks first")
+    cw.d(text="Delete").click()
+    check(cw.has("See all", timeout=8), "deleting goes back to Explore")
+    check(wait_until(lambda: not cw.d(text="Beach").exists, 6), "and the collection is gone from the shelf")
+
+
+def t_collection_offline_signed_out():
+    """Signed out, Save offline asks for the free account in the app's own sheet and keeps nothing on the phone."""
+    explore_shelf()
+    before = kept_files()
+    if not cw.has("Art"):
+        cw.tap("See all")
+    cw.tap("Art")
+    cw.tap("Save offline")
+    check(cw.has("Save Art offline", timeout=6), "Save offline asks for the account, named for what it saves")
+    check(cw.has("Sign in with Connections"), "with the app's own Sign in with Connections button")
+    cw.d.press("back")
+    time.sleep(2)
+    after = kept_files()
+    check(after == before, f"nothing was fetched while signed out ({len(before)} files before, {len(after)} after)")
+    cw.d.press("back")
+
+
+def t_collection_offline_opens():
+    """A collection of the member's own opens with no internet: the shelf and its page come from the phone."""
+    explore_shelf()
+    title = new_collection_from_viewer("Offline Pick")
+    cw.sh("shell", "cmd", "connectivity", "airplane-mode", "enable")
+    try:
+        cw.sh("shell", "am", "force-stop", cw.PKG)
+        time.sleep(1)
+        open_tab("Explore")
+        check(cw.has("Offline Pick", timeout=10), "with no internet, the shelf still shows the collection")
+        cw.tap("Offline Pick")
+        check(cw.has("1 wallpaper", timeout=6), "its page opens")
+        check(cw.has(title, timeout=4), f"with its picture, {title}")
+    finally:
+        cw.sh("shell", "cmd", "connectivity", "airplane-mode", "disable")
+    cw.d.press("back")
+
+
 TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
          t_timer_toggle, t_unlock_off, t_pause, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
-         t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out]
+         t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out,
+         t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collection_offline_opens]
 
 
 def unknown_tests(names: list[str]) -> list[str]:

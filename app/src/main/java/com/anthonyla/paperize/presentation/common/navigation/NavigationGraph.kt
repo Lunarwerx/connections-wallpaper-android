@@ -15,6 +15,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.anthonyla.paperize.connections.CollectionScreen
+import com.anthonyla.paperize.connections.CollectionsScreen
+import com.anthonyla.paperize.connections.ConnectionsViewModel
 import com.anthonyla.paperize.core.util.PermissionUtil
 import com.anthonyla.paperize.presentation.common.navigation.util.enterTransitionBackward
 import com.anthonyla.paperize.presentation.common.navigation.util.enterTransitionForward
@@ -133,7 +136,32 @@ fun NavigationGraph(
                 },
                 onNavigateToVisualEffects = {
                     navController.navigate(VisualEffectsRoute) { launchSingleTop = true }
+                },
+                onNavigateToCollections = {
+                    navController.navigate(CollectionsRoute) { launchSingleTop = true }
+                },
+                onNavigateToCollection = { id ->
+                    navController.navigate(CollectionRoute(id))
                 }
+            )
+        }
+
+        // Both share Explore's view model with the Home screen, so the viewer, a collection and Explore agree.
+        composable<CollectionsRoute> { entry ->
+            val homeEntry = remember(entry) { navController.getBackStackEntry<HomeRoute>() }
+            CollectionsScreen(
+                onBack = { navController.popBackStack() },
+                onOpen = { id -> navController.navigate(CollectionRoute(id)) },
+                viewModel = hiltViewModel<ConnectionsViewModel>(homeEntry)
+            )
+        }
+
+        composable<CollectionRoute> { entry ->
+            val homeEntry = remember(entry) { navController.getBackStackEntry<HomeRoute>() }
+            CollectionScreen(
+                onBack = { navController.popBackStack() },
+                onOpenAlbum = { albumId -> navController.navigate(AlbumRoute(albumId)) },
+                explore = hiltViewModel<ConnectionsViewModel>(homeEntry)
             )
         }
 

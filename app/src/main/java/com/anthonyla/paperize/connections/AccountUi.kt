@@ -121,7 +121,10 @@ fun AccountAvatar(session: ConnectionsSession, size: Dp, modifier: Modifier = Mo
     }
 }
 
-/** Who is signed in (and Sign out), or what signing in does here and when it becomes required. */
+/**
+ * Who is signed in (and Sign out), or what signing in does here and when it becomes required. A sheet opened by
+ * something that takes the account (saving a collection offline) says so in its own [title] and [body].
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountSheet(
@@ -129,7 +132,9 @@ fun AccountSheet(
     status: SignInStatus,
     onSignIn: () -> Unit,
     onSignOut: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    title: String? = null,
+    body: String? = null
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberBottomSheetState(SheetValue.Hidden, setOf(SheetValue.Hidden, SheetValue.Expanded))) {
         Column(
@@ -168,9 +173,9 @@ fun AccountSheet(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     AppMark(size = 56.dp)
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.connections_free_title), style = MaterialTheme.typography.titleLarge)
+                        Text(title ?: stringResource(R.string.connections_free_title), style = MaterialTheme.typography.titleLarge)
                         Text(
-                            text = when (state) {
+                            text = body ?: when (state) {
                                 is AccountState.Trial -> pluralStringResource(R.plurals.connections_trial_days_left, state.daysLeft, state.daysLeft)
                                 else -> stringResource(R.string.connections_trial_over)
                             },

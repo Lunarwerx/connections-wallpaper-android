@@ -38,3 +38,11 @@ object VisualEffectsRoute
 
 @Serializable
 object PrivacyRoute
+
+/** Explore's collections manager. */
+@Serializable
+object CollectionsRoute
+
+/** One collection's page: a member's own collection, or a gallery tag ("tag:<tag>"). */
+@Serializable
+data class CollectionRoute(val id: String)

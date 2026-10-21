@@ -25,6 +25,7 @@ class ConnectionsViewModelTest {
     private val api = mockk<ConnectionsApi>()
     private val preferences = mockk<ExplorePreferences>(relaxUnitFun = true)
     private val albums = mockk<AlbumRepository>()
+    private val collections = mockk<ConnectionsCollections> { every { all } returns flowOf(emptyList()) }
     private val store = ViewModelStore()
     private val phone = DeviceFit.of(411f, 914f, foldable = false, computer = false)
 
@@ -43,7 +44,7 @@ class ConnectionsViewModelTest {
     }
 
     private fun viewModel(): ConnectionsViewModel =
-        ConnectionsViewModel(api, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), preferences, albums)
+        ConnectionsViewModel(api, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), preferences, albums, collections)
             .also { store.put("explore", it) }
 
     @Test fun `Explore waits for the screen, then asks for its shape with the closest picture first`() = runTest {

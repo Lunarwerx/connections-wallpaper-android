@@ -113,14 +113,19 @@ import kotlinx.coroutines.flow.filter
 @Composable
 fun ConnectionsScreen(
     onOpen: (Int) -> Unit,
+    onOpenCollections: () -> Unit,
+    onOpenCollection: (String) -> Unit,
     modifier: Modifier = Modifier,
     searchFocus: FocusRequester? = null,
     viewModel: ConnectionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val cards by viewModel.cards.collectAsStateWithLifecycle()
     val device = rememberDeviceFit()
     LaunchedEffect(device) { viewModel.setDevice(device) }
     val showAllShapes = { viewModel.selectShape(ExploreShape.ALL) }
+    // The shelf belongs to the whole gallery: a search or a tag shows just the pictures.
+    val shelf = shelfCards(cards).takeIf { it.isNotEmpty() && state.query.isEmpty() && state.tag == null }
 
     Column(modifier = modifier.fillMaxSize()) {
         SearchPill(query = state.query, onSearch = viewModel::search, focus = searchFocus)
@@ -132,25 +137,41 @@ fun ConnectionsScreen(
             onShape = viewModel::selectShape,
             onTag = viewModel::selectTag
         )
+        // With no pictures to show (offline among them), the shelf stays above the reason, so saved collections still open.
+        val above: @Composable () -> Unit = {
+            if (shelf != null) CollectionsShelf(cards = shelf, onOpen = onOpenCollection, onSeeAll = onOpenCollections)
+        }
         Box(modifier = Modifier.fillMaxSize()) {
             when {
-                state.wallpapers.isEmpty() && state.failed -> EmptyState(
-                    icon = Icons.Outlined.CloudOff,
-                    text = stringResource(R.string.connections_load_failed),
-                    action = stringResource(R.string.connections_retry),
-                    onAction = viewModel::retry
-                )
-                state.wallpapers.isEmpty() && state.loading -> SkeletonGrid()
-                state.wallpapers.isEmpty() && state.shape != ExploreShape.ALL -> EmptyState(
-                    icon = Icons.Outlined.SearchOff,
-                    text = stringResource(R.string.connections_empty_shape),
-                    action = stringResource(R.string.connections_show_all_shapes),
-                    onAction = showAllShapes
-                )
-                state.wallpapers.isEmpty() -> EmptyState(
-                    icon = Icons.Outlined.SearchOff,
-                    text = stringResource(R.string.connections_empty)
-                )
+                state.wallpapers.isEmpty() && state.failed -> Column(Modifier.fillMaxSize()) {
+                    above()
+                    EmptyState(
+                        icon = Icons.Outlined.CloudOff,
+                        text = stringResource(R.string.connections_load_failed),
+                        action = stringResource(R.string.connections_retry),
+                        onAction = viewModel::retry
+                    )
+                }
+                state.wallpapers.isEmpty() && state.loading -> Column(Modifier.fillMaxSize()) {
+                    above()
+                    SkeletonGrid()
+                }
+                state.wallpapers.isEmpty() && state.shape != ExploreShape.ALL -> Column(Modifier.fillMaxSize()) {
+                    above()
+                    EmptyState(
+                        icon = Icons.Outlined.SearchOff,
+                        text = stringResource(R.string.connections_empty_shape),
+                        action = stringResource(R.string.connections_show_all_shapes),
+                        onAction = showAllShapes
+                    )
+                }
+                state.wallpapers.isEmpty() -> Column(Modifier.fillMaxSize()) {
+                    above()
+                    EmptyState(
+                        icon = Icons.Outlined.SearchOff,
+                        text = stringResource(R.string.connections_empty)
+                    )
+                }
                 else -> WallpaperGrid(
                     wallpapers = state.wallpapers,
                     loading = state.loading,
@@ -159,7 +180,17 @@ fun ConnectionsScreen(
                     onLoadMore = viewModel::loadMore,
                     onOpen = onOpen,
                     // The end of a list cut down to one shape says so, and offers the rest.
-                    onShowAllShapes = showAllShapes.takeIf { state.shape != ExploreShape.ALL && state.nextCursor == null }
+                    onShowAllShapes = showAllShapes.takeIf { state.shape != ExploreShape.ALL && state.nextCursor == null },
+                    header = shelf?.let { cards ->
+                        @Composable {
+                            CollectionsShelf(
+                                cards = cards,
+                                onOpen = onOpenCollection,
+                                onSeeAll = onOpenCollections,
+                                bleed = GRID_SIDE_PADDING
+                            )
+                        }
+                    }
                 )
             }
         }
@@ -349,16 +380,22 @@ private fun TagChip(label: String, selected: Boolean, onClick: () -> Unit) {
     )
 }
 
+/**
+ * Pictures in a wall that asks for more near its end. [header] spans the grid's whole width above them (Explore's
+ * Collections shelf); [images] shows a picture from the phone when it is saved there (a collection saved offline).
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun WallpaperGrid(
+internal fun WallpaperGrid(
     wallpapers: List<ConnectionsWallpaper>,
     loading: Boolean,
     failed: Boolean,
     onRetry: () -> Unit,
     onLoadMore: () -> Unit,
     onOpen: (Int) -> Unit,
-    onShowAllShapes: (() -> Unit)?
+    onShowAllShapes: (() -> Unit)? = null,
+    header: (@Composable () -> Unit)? = null,
+    images: Map<String, Any> = emptyMap()
 ) {
     val gridState = rememberLazyStaggeredGridState()
     val open = stringResource(R.string.context_open)
@@ -380,9 +417,10 @@ private fun WallpaperGrid(
             .fillMaxSize()
             .mouseScrollbar(gridState.scrollIndicatorState)
     ) {
+        if (header != null) item(key = HEADER_KEY, span = StaggeredGridItemSpan.FullLine) { header() }
         itemsIndexed(wallpapers, key = { _, wallpaper -> wallpaper.id }) { index, wallpaper ->
             ContextMenuArea(actions = listOf(MenuAction(open, Icons.AutoMirrored.Outlined.OpenInNew) { onOpen(index) })) {
-                Tile(wallpaper = wallpaper, onClick = { onOpen(index) })
+                Tile(wallpaper = wallpaper, onClick = { onOpen(index) }, image = images[wallpaper.id])
             }
         }
         if (loading || failed || onShowAllShapes != null) {
@@ -420,7 +458,7 @@ private fun EndOfShape(onShowAllShapes: () -> Unit) {
  * keyboard's focus rings it (a laptop window, a tablet's keyboard case).
  */
 @Composable
-private fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
+internal fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit, image: Any? = null) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
@@ -436,7 +474,7 @@ private fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
     val ring = MaterialTheme.colorScheme.primary
     AsyncImage(
         model = ImageRequest.Builder(LocalContext.current)
-            .data(wallpaper.previewUrl)
+            .data(image ?: wallpaper.previewUrl)
             .crossfade(true)
             .build(),
         contentDescription = wallpaper.title,
@@ -457,7 +495,7 @@ private fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SkeletonGrid() {
+internal fun SkeletonGrid() {
     val pulse by rememberInfiniteTransition(label = "skeleton").animateFloat(
         initialValue = 0.45f,
         targetValue = 1f,
@@ -487,7 +525,7 @@ private fun SkeletonGrid() {
 }
 
 @Composable
-private fun EmptyState(
+internal fun EmptyState(
     icon: ImageVector,
     text: String,
     action: String? = null,
@@ -526,7 +564,8 @@ private fun ratioOf(width: Int, height: Int): Float =
 private val TILE_MIN_WIDTH = 160.dp
 private val TILE_GAP = 8.dp
 private val TILE_SHAPE = RoundedCornerShape(16.dp)
-private val GRID_PADDING = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp)
+private val GRID_SIDE_PADDING = 16.dp
+private val GRID_PADDING = PaddingValues(start = GRID_SIDE_PADDING, end = GRID_SIDE_PADDING, top = 4.dp, bottom = 24.dp)
 private val SKELETON_RATIOS = listOf(1.45f, 0.8f, 1.25f, 1.5f, 0.75f, 1.3f, 1f, 1.4f)
 private const val PRESSED_SCALE = 0.96f
 private const val HOVERED_SCALE = 1.02f
@@ -538,3 +577,4 @@ private const val ALL_TAGS_KEY = "__all__"
 private const val SHAPE_KEY = "__shape__"
 private const val DIVIDER_KEY = "__divider__"
 private const val FOOTER_KEY = "__footer__"
+private const val HEADER_KEY = "__header__"
