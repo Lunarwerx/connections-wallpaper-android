@@ -30,7 +30,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.constants.Constants
+import com.anthonyla.paperize.presentation.common.components.ContextMenuArea
 import com.anthonyla.paperize.presentation.common.components.EmptyCollection
+import com.anthonyla.paperize.presentation.common.components.MenuAction
+import com.anthonyla.paperize.presentation.common.components.mouseScrollbar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import com.anthonyla.paperize.presentation.common.theme.AppGrid
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.album_view.components.SortBottomSheet
@@ -47,6 +52,7 @@ fun FolderViewScreen(
     viewModel: FolderViewViewModel = hiltViewModel()
 ) {
     val lazyListState = rememberLazyGridState()
+    val open = stringResource(R.string.context_open)
 
     val folder by viewModel.folder.collectAsStateWithLifecycle()
     val wallpapers = folder?.wallpapers.orEmpty()
@@ -89,7 +95,9 @@ fun FolderViewScreen(
             } else {
                 LazyVerticalGrid(
                     state = lazyListState,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .mouseScrollbar(lazyListState.scrollIndicatorState),
                     columns = GridCells.Adaptive(AppGrid.itemMinSize),
                     contentPadding = PaddingValues(AppSpacing.gridPadding),
                     horizontalArrangement = Arrangement.spacedBy(AppSpacing.gridSpacing),
@@ -99,19 +107,9 @@ fun FolderViewScreen(
                         items = sortedWallpapers,
                         key = { wallpaper -> wallpaper.id }
                     ) { wallpaper ->
-                        WallpaperItem(
-                            wallpaperUri = wallpaper.uri,
-                            wallpaperName = wallpaper.displayFileName,
-                            isSelected = false,
-                            isSelectionMode = false,
-                            onClick = {
-                                onNavigateToWallpaperView(
-                                    wallpaper.id,
-                                    wallpaper.uri,
-                                    wallpaper.fileName
-                                )
-                            },
-                            onLongClick = null,
+                        val openWallpaper = { onNavigateToWallpaperView(wallpaper.id, wallpaper.uri, wallpaper.fileName) }
+                        ContextMenuArea(
+                            actions = listOf(MenuAction(open, Icons.AutoMirrored.Outlined.OpenInNew) { openWallpaper() }),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .aspectRatio(Constants.WALLPAPER_ASPECT_RATIO)
@@ -121,7 +119,17 @@ fun FolderViewScreen(
                                         easing = FastOutSlowInEasing
                                     )
                                 )
-                        )
+                        ) {
+                            WallpaperItem(
+                                wallpaperUri = wallpaper.uri,
+                                wallpaperName = wallpaper.displayFileName,
+                                isSelected = false,
+                                isSelectionMode = false,
+                                onClick = { openWallpaper() },
+                                onLongClick = null,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
             }

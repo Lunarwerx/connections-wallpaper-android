@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
@@ -38,6 +39,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.domain.model.AlbumSummary
+import com.anthonyla.paperize.presentation.common.components.ContextMenuArea
+import com.anthonyla.paperize.presentation.common.components.MenuAction
+import com.anthonyla.paperize.presentation.common.components.mouseScrollbar
 import com.anthonyla.paperize.presentation.common.theme.AppGrid
 import com.anthonyla.paperize.presentation.common.theme.AppIconSizes
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
@@ -54,6 +58,7 @@ fun LibraryScreen(
 ) {
     val gridState = rememberLazyGridState()
     var showAddMenu by remember { mutableStateOf(false) }
+    val open = stringResource(R.string.context_open)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -128,17 +133,19 @@ fun LibraryScreen(
                 state = gridState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(paddingValues),
+                    .padding(paddingValues)
+                    .mouseScrollbar(gridState.scrollIndicatorState),
                 columns = GridCells.Adaptive(AppGrid.itemMinSize),
                 contentPadding = PaddingValues(AppSpacing.gridPadding),
                 horizontalArrangement = Arrangement.Start
             ) {
                 items(albums, key = { album -> album.id }) { album ->
-                    AlbumItem(
-                        album = album,
-                        onAlbumViewClick = { onViewAlbum(album.id) },
+                    ContextMenuArea(
+                        actions = listOf(MenuAction(open, Icons.AutoMirrored.Outlined.OpenInNew) { onViewAlbum(album.id) }),
                         modifier = Modifier.padding(AppSpacing.gridPadding)
-                    )
+                    ) {
+                        AlbumItem(album = album, onAlbumViewClick = { onViewAlbum(album.id) })
+                    }
                 }
             }
         }

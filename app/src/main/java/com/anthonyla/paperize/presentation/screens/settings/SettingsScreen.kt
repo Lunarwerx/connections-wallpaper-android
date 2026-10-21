@@ -41,6 +41,7 @@ import com.anthonyla.paperize.presentation.common.components.SectionLabel
 import com.anthonyla.paperize.presentation.common.components.SettingsGroup
 import com.anthonyla.paperize.presentation.common.components.SettingsRow
 import com.anthonyla.paperize.presentation.common.components.SwitchRow
+import com.anthonyla.paperize.presentation.common.components.mouseScrollbar
 import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.wallpaper_mode_selection.WallpaperModeOptions
@@ -86,11 +87,13 @@ fun SettingsScreen(
             )
         }
     ) { paddingValues ->
+        val scroll = rememberScrollState()
         Column(
             modifier = modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
+                .mouseScrollbar(scroll.scrollIndicatorState)
+                .verticalScroll(scroll)
                 // The whole width scrolls; the rows keep a readable column in a wide window.
                 .wrapContentWidth(Alignment.CenterHorizontally)
                 .widthIn(max = AppLayout.contentMaxWidth)

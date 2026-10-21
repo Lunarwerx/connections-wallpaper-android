@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.outlined.Close
@@ -71,6 +72,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -97,6 +100,9 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.anthonyla.paperize.R
+import com.anthonyla.paperize.presentation.common.components.ContextMenuArea
+import com.anthonyla.paperize.presentation.common.components.MenuAction
+import com.anthonyla.paperize.presentation.common.components.mouseScrollbar
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -108,6 +114,7 @@ import kotlinx.coroutines.flow.filter
 fun ConnectionsScreen(
     onOpen: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    searchFocus: FocusRequester? = null,
     viewModel: ConnectionsViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -116,7 +123,7 @@ fun ConnectionsScreen(
     val showAllShapes = { viewModel.selectShape(ExploreShape.ALL) }
 
     Column(modifier = modifier.fillMaxSize()) {
-        SearchPill(query = state.query, onSearch = viewModel::search)
+        SearchPill(query = state.query, onSearch = viewModel::search, focus = searchFocus)
         FilterRow(
             shape = state.shape,
             device = state.device,
@@ -182,7 +189,7 @@ private fun rememberDeviceFit(): DeviceFit {
 }
 
 @Composable
-private fun SearchPill(query: String, onSearch: (String) -> Unit) {
+private fun SearchPill(query: String, onSearch: (String) -> Unit, focus: FocusRequester?) {
     // Follows the gallery's query, which a restored process starts empty, so field and grid agree.
     var text by remember { mutableStateOf(query) }
     val focusManager = LocalFocusManager.current
@@ -195,7 +202,8 @@ private fun SearchPill(query: String, onSearch: (String) -> Unit) {
         },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .then(if (focus != null) Modifier.focusRequester(focus) else Modifier),
         placeholder = { Text(stringResource(R.string.connections_search_hint)) },
         leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
         trailingIcon = if (text.isEmpty()) null else {
@@ -353,6 +361,7 @@ private fun WallpaperGrid(
     onShowAllShapes: (() -> Unit)?
 ) {
     val gridState = rememberLazyStaggeredGridState()
+    val open = stringResource(R.string.context_open)
     LaunchedEffect(gridState) {
         // Keyed on the item count too, so a page that still leaves the end in view asks for the next.
         snapshotFlow {
@@ -367,10 +376,14 @@ private fun WallpaperGrid(
         contentPadding = GRID_PADDING,
         verticalItemSpacing = TILE_GAP,
         horizontalArrangement = Arrangement.spacedBy(TILE_GAP),
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .mouseScrollbar(gridState.scrollIndicatorState)
     ) {
         itemsIndexed(wallpapers, key = { _, wallpaper -> wallpaper.id }) { index, wallpaper ->
-            Tile(wallpaper = wallpaper, onClick = { onOpen(index) })
+            ContextMenuArea(actions = listOf(MenuAction(open, Icons.AutoMirrored.Outlined.OpenInNew) { onOpen(index) })) {
+                Tile(wallpaper = wallpaper, onClick = { onOpen(index) })
+            }
         }
         if (loading || failed || onShowAllShapes != null) {
             item(key = FOOTER_KEY, span = StaggeredGridItemSpan.FullLine) {

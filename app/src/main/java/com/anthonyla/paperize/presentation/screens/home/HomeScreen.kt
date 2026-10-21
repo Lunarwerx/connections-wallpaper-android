@@ -42,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -52,6 +53,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anthonyla.paperize.R
+import com.anthonyla.paperize.presentation.common.components.AppShortcut
+import com.anthonyla.paperize.presentation.common.components.OnShortcut
 import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.connections.AccountSheet
 import com.anthonyla.paperize.connections.AccountState
@@ -152,6 +155,13 @@ fun HomeScreen(
     )
 
     val pagerState = rememberPagerState { tabItems.size }
+    val searchFocus = remember { FocusRequester() }
+    OnShortcut(AppShortcut.SEARCH, enabled = !viewerOpen) {
+        coroutineScope.launch {
+            pagerState.scrollToPage(EXPLORE_PAGE)
+            runCatching { searchFocus.requestFocus() }
+        }
+    }
     val viewerVisibility = remember { MutableTransitionState(false) }
     viewerVisibility.targetState = viewerOpen
 
@@ -314,6 +324,7 @@ fun HomeScreen(
                             viewerStart = index
                             viewerOpen = true
                         },
+                        searchFocus = searchFocus,
                         viewModel = connectionsViewModel
                     )
                 }
@@ -418,3 +429,6 @@ fun HomeScreen(
 }
 
 private const val VIEWER_MS = 250
+
+/** The pager page Explore sits on (Wallpaper, Library, Explore). */
+private const val EXPLORE_PAGE = 2

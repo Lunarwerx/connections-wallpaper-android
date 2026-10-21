@@ -301,5 +301,15 @@
     <item quantity="one">我们只请你登录或创建一个免费的 Connections 账号。现在不想？没关系，你还有 %d 天。</item>
     <item quantity="other">我们只请你登录或创建一个免费的 Connections 账号。现在不想？没关系，接下来 %d 天内随时再来。</item>
   </plurals>
+  <string name="context_open">打开</string>
+  <string name="context_select">选择</string>
+  <string name="context_deselect">取消选择</string>
+  <string name="shortcut_search">搜索探索</string>
+  <string name="shortcut_select_all">全选相册中的内容</string>
+  <string name="shortcut_delete">移除所选内容</string>
+  <string name="shortcut_menu">打开当前图片的菜单</string>
+  <string name="shortcut_previous">上一张图片</string>
+  <string name="shortcut_next">下一张图片</string>
+  <string name="shortcut_back">返回，或关闭打开的内容</string>
 </resources>
 

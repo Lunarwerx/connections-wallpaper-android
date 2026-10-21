@@ -65,6 +65,7 @@ import com.anthonyla.paperize.presentation.common.components.SettingsRow
 import com.anthonyla.paperize.presentation.common.components.ScrollingDemo
 import com.anthonyla.paperize.presentation.common.components.SettingsRowTextStart
 import com.anthonyla.paperize.presentation.common.components.SwitchRow
+import com.anthonyla.paperize.presentation.common.components.mouseScrollbar
 import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.AlbumSelectionBottomSheet
@@ -115,10 +116,12 @@ fun WallpaperScreen(
     // Nothing changes on its own while the changer is off, so when and how often show only while it is on.
     val changing = allRequiredAlbumsSelected && scheduleSettings.enableChanger
 
+    val scroll = rememberScrollState()
     Column(
         modifier = modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .mouseScrollbar(scroll.scrollIndicatorState)
+            .verticalScroll(scroll)
             // The whole width scrolls; the cards keep a readable column in a wide window.
             .wrapContentWidth(Alignment.CenterHorizontally)
             .widthIn(max = AppLayout.contentMaxWidth)

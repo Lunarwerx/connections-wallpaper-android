@@ -304,5 +304,15 @@
     <item quantity="one">All we ask is that you sign in or create a free Connections account. Not now? That\'s fine, you have %d day left.</item>
     <item quantity="other">All we ask is that you sign in or create a free Connections account. Not now? That\'s fine, come back any time in the next %d days.</item>
   </plurals>
+  <string name="context_open">Open</string>
+  <string name="context_select">Select</string>
+  <string name="context_deselect">Deselect</string>
+  <string name="shortcut_search">Search Explore</string>
+  <string name="shortcut_select_all">Select everything in an album</string>
+  <string name="shortcut_delete">Remove what is selected</string>
+  <string name="shortcut_menu">Open the menu of the picture in focus</string>
+  <string name="shortcut_previous">Previous picture</string>
+  <string name="shortcut_next">Next picture</string>
+  <string name="shortcut_back">Back, or close what is open</string>
 </resources>
 

@@ -37,7 +37,15 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.presentation.common.components.AddAlbumAnimatedFab
+import com.anthonyla.paperize.presentation.common.components.AppShortcut
+import com.anthonyla.paperize.presentation.common.components.ContextMenuArea
 import com.anthonyla.paperize.presentation.common.components.EmptyCollection
+import com.anthonyla.paperize.presentation.common.components.MenuAction
+import com.anthonyla.paperize.presentation.common.components.OnShortcut
+import com.anthonyla.paperize.presentation.common.components.mouseScrollbar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import androidx.compose.material.icons.outlined.CheckCircle
 import com.anthonyla.paperize.presentation.common.theme.AppGrid
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.album_view.components.AlbumViewTopBar
@@ -93,6 +101,16 @@ fun AlbumViewScreen(
     BackHandler(enabled = isSelectionMode) {
         viewModel.clearSelection()
     }
+    // The same as the selection bar's buttons.
+    OnShortcut(AppShortcut.SELECT_ALL, enabled = totalItemsCount > 0) {
+        if (allSelected) viewModel.clearSelection() else viewModel.selectAll()
+    }
+    OnShortcut(AppShortcut.DELETE, enabled = isSelectionMode) {
+        if (!isDeleting) showDeleteSelectedDialog = true
+    }
+    val open = stringResource(R.string.context_open)
+    val select = stringResource(R.string.context_select)
+    val deselect = stringResource(R.string.context_deselect)
 
     val sortedFolders = remember(folders, sortOption) {
         when (sortOption) {
@@ -172,7 +190,8 @@ fun AlbumViewScreen(
             state = lazyListState,
             modifier = modifier
                 .fillMaxSize()
-                .padding(paddingValues),
+                .padding(paddingValues)
+                .mouseScrollbar(lazyListState.scrollIndicatorState),
             columns = GridCells.Adaptive(AppGrid.itemMinSize),
             contentPadding = PaddingValues(AppSpacing.gridPadding),
             horizontalArrangement = Arrangement.spacedBy(AppSpacing.gridSpacing),
@@ -182,20 +201,14 @@ fun AlbumViewScreen(
                 items = sortedFolders,
                 key = { folder -> "folder-${folder.id}" }
             ) { folder ->
-                FolderItem(
-                    folder = folder,
-                    isSelected = folder.id in selectedFolders,
-                    isSelectionMode = isSelectionMode,
-                    onClick = {
-                        if (isSelectionMode) {
+                val selected = folder.id in selectedFolders
+                ContextMenuArea(
+                    actions = listOf(
+                        MenuAction(open, Icons.AutoMirrored.Outlined.OpenInNew) { onNavigateToFolder(folder.id) },
+                        MenuAction(if (selected) deselect else select, Icons.Outlined.CheckCircle) {
                             viewModel.toggleFolderSelection(folder.id)
-                        } else {
-                            onNavigateToFolder(folder.id)
                         }
-                    },
-                    onLongClick = {
-                        viewModel.toggleFolderSelection(folder.id)
-                    },
+                    ),
                     modifier = commonItemModifier
                         .animateItem(
                             placementSpec = tween(
@@ -203,32 +216,39 @@ fun AlbumViewScreen(
                                 easing = FastOutSlowInEasing
                             )
                         )
-                )
+                ) {
+                    FolderItem(
+                        folder = folder,
+                        isSelected = selected,
+                        isSelectionMode = isSelectionMode,
+                        onClick = {
+                            if (isSelectionMode) {
+                                viewModel.toggleFolderSelection(folder.id)
+                            } else {
+                                onNavigateToFolder(folder.id)
+                            }
+                        },
+                        onLongClick = {
+                            viewModel.toggleFolderSelection(folder.id)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
 
             items(
                 items = sortedWallpapers,
                 key = { wallpaper -> "wallpaper-${wallpaper.id}" }
             ) { wallpaper ->
-                WallpaperItem(
-                    wallpaperUri = wallpaper.uri,
-                    wallpaperName = wallpaper.displayFileName,
-                    isSelected = wallpaper.id in selectedWallpapers,
-                    isSelectionMode = isSelectionMode,
-                    onClick = {
-                        if (isSelectionMode) {
+                val selected = wallpaper.id in selectedWallpapers
+                val openWallpaper = { onNavigateToWallpaperView(wallpaper.id, wallpaper.uri, wallpaper.fileName) }
+                ContextMenuArea(
+                    actions = listOf(
+                        MenuAction(open, Icons.AutoMirrored.Outlined.OpenInNew) { openWallpaper() },
+                        MenuAction(if (selected) deselect else select, Icons.Outlined.CheckCircle) {
                             viewModel.toggleWallpaperSelection(wallpaper.id)
-                        } else {
-                            onNavigateToWallpaperView(
-                                wallpaper.id,
-                                wallpaper.uri,
-                                wallpaper.fileName
-                            )
                         }
-                    },
-                    onLongClick = {
-                        viewModel.toggleWallpaperSelection(wallpaper.id)
-                    },
+                    ),
                     modifier = commonItemModifier
                         .animateItem(
                             placementSpec = tween(
@@ -236,7 +256,25 @@ fun AlbumViewScreen(
                                 easing = FastOutSlowInEasing
                             )
                         )
-                )
+                ) {
+                    WallpaperItem(
+                        wallpaperUri = wallpaper.uri,
+                        wallpaperName = wallpaper.displayFileName,
+                        isSelected = selected,
+                        isSelectionMode = isSelectionMode,
+                        onClick = {
+                            if (isSelectionMode) {
+                                viewModel.toggleWallpaperSelection(wallpaper.id)
+                            } else {
+                                openWallpaper()
+                            }
+                        },
+                        onLongClick = {
+                            viewModel.toggleWallpaperSelection(wallpaper.id)
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }
