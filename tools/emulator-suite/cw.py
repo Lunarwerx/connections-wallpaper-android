@@ -105,21 +105,27 @@ def labels() -> list[str]:
     return out
 
 
+def unstale(action, tries: int = 3):
+    """Run action() again when the screen redrew between finding a node and using it (a stale node)."""
+    for attempt in range(tries):
+        try:
+            return action()
+        except Exception as e:  # noqa: BLE001 - uiautomator2 reports a stale node only as an RPC error message
+            if "StaleObjectException" not in str(e) or attempt == tries - 1:
+                raise
+            time.sleep(0.5)
+
+
 def tap(text: str, timeout: float = 8, contains: bool = False) -> None:
     """Click a label, finding it again if the screen redraws between the find and the click."""
-    for attempt in range(3):
+    def find_and_click() -> None:
         sel = d(textContains=text) if contains else d(text=text)
         if not sel.wait(timeout=timeout):
             sel = d(descriptionContains=text) if contains else d(description=text)
             if not sel.wait(timeout=1):
                 raise AssertionError(f"no {text!r} on screen; saw {labels()[:40]}")
-        try:
-            sel.click()
-            return
-        except Exception as e:  # noqa: BLE001 - uiautomator2 reports a stale node only as an RPC error message
-            if "StaleObjectException" not in str(e) or attempt == 2:
-                raise
-            time.sleep(0.5)
+        sel.click()
+    unstale(find_and_click)
 
 
 def has(text: str, timeout: float = 0) -> bool:

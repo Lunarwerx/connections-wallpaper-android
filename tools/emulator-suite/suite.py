@@ -123,7 +123,7 @@ def switch_state(title: str) -> bool:
     t = cw.d(text=title)
     if not t.wait(timeout=5):
         raise AssertionError(f"no row {title!r}")
-    b = t.info["bounds"]
+    b = cw.unstale(lambda: t.info["bounds"])
     cy = (b["top"] + b["bottom"]) // 2
     for el in cw.d.xpath('//*[@checkable="true"]').all():
         lx, ly, rx, ry = el.bounds
