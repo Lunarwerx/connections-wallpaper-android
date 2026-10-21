@@ -250,9 +250,11 @@ def t_static_replaces_live():
           f"{cw.PKG}/com.anthonyla.paperize.service.livewallpaper.PaperizeLiveWallpaperService")
     set_live_in_picker()
     check(wait_until(live_is_ours, 12), "our live wallpaper is back on the phone")
-    cw.sh("shell", "am", "force-stop", cw.PKG)
-    open_app()
+    # A fresh activity, never a force-stop: Android resets the wallpaper to its own default when the live wallpaper's
+    # package is force-stopped, which passed this check with the app doing nothing (2026-10-21).
+    cw.sh("shell", "am", "start", "-n", cw.MAIN, "-f", "0x10008000")
     check(wait_until(lambda: not live_anywhere(), 15), f"opening the app replaces it with a static picture ({ids()})")
+    check(cw.wall_image("wallpaper").width > 640, "home has a picture of the app's, not Android's default (which has no file)")
     lock_after = cw.wall_color("lock")
     check(lock_after == lock_before, f"the lock screen keeps its picture ({lock_before} -> {lock_after})")
 
@@ -705,6 +707,9 @@ def main() -> None:
         sys.exit(f"no such test: {', '.join(unknown)}")
     cw.push_testwalls(FOLDER)  # before connecting: it restarts adbd as root
     cw.connect()
+    # A CPU-starved emulator raises "System UI isn't responding" over every screen; Wait lets the system catch up.
+    cw.d.watcher.when("%responding%").when("Wait").click()
+    cw.d.watcher.start(1.0)
     results = []
     for test in TESTS:
         name = test.__name__[2:]
