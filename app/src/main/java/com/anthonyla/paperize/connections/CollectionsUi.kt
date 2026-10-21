@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -59,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -114,7 +116,18 @@ internal fun CollectionsShelf(
                 Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(18.dp))
             }
         }
+        val row = rememberLazyListState()
+        val lead = cards.firstOrNull()?.id
+        var shownLead by rememberSaveable { mutableStateOf(lead) }
+        // A list keeps the card it was showing in place, so a collection just made would land out of sight to its left.
+        LaunchedEffect(lead) {
+            if (lead != shownLead) {
+                shownLead = lead
+                row.scrollToItem(0)
+            }
+        }
         LazyRow(
+            state = row,
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -303,10 +316,16 @@ internal fun CollectionNameDialog(
 ) {
     var name by rememberSaveable { mutableStateOf(initial) }
     val focus = remember { FocusRequester() }
+    // The field's keyboard otherwise outlives the dialog and takes the next back press meant for the page.
+    val keyboard = LocalSoftwareKeyboardController.current
     val trimmed = name.trim()
     val clash = trimmed.isNotEmpty() && !trimmed.equals(initial.trim(), ignoreCase = true) && taken(trimmed)
+    val dismiss = {
+        keyboard?.hide()
+        onDismiss()
+    }
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismiss,
         title = { Text(title) },
         text = {
             OutlinedTextField(
@@ -324,12 +343,18 @@ internal fun CollectionNameDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(trimmed) }, enabled = trimmed.isNotEmpty() && !clash) {
+            TextButton(
+                onClick = {
+                    keyboard?.hide()
+                    onConfirm(trimmed)
+                },
+                enabled = trimmed.isNotEmpty() && !clash
+            ) {
                 Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(onClick = dismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
     LaunchedEffect(focus) { runCatching { focus.requestFocus() } }

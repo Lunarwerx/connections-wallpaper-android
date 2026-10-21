@@ -88,7 +88,7 @@ def pick_folder(folder: str = FOLDER) -> None:
     d(textMatches="(?i)^allow$").click(timeout=5)
     check(wait_until(lambda: not d(packageName="com.google.android.documentsui").exists, 10), "picker closed")
     # The first album added while signed out brings the one-time free-account note; the suite stays signed out.
-    if d(text="Not now").wait(timeout=3):
+    if d(text="Not now").wait(timeout=8):  # a loaded PC's fresh emulator took over 3 s to show it
         d(text="Not now").click()
 
 
@@ -608,6 +608,7 @@ def new_collection_from_viewer(name: str) -> str:
     cw.tap("Save")
     check(cw.has(f"Added to {name}", timeout=6), f"the picture is in {name}")
     cw.d.press("back")
+    check(wait_until(lambda: not cw.d(text="Set wallpaper").exists, 4), "one back closes the viewer (the name's keyboard is already down)")
     return title
 
 
@@ -637,7 +638,8 @@ def t_collection_own():
     """Anyone, signed out, makes a collection from a picture's bookmark; it shows on the shelf, renames, and deletes."""
     explore_shelf()
     new_collection_from_viewer("Beach Days")
-    check(cw.has("Beach Days", timeout=6), "the new collection is on the shelf")
+    # Exact text: cw.has matches by contains, and the "Added to Beach Days" note would pass for the card.
+    check(cw.d(text="Beach Days").wait(timeout=6), "the new collection leads the shelf, in sight")
     cw.tap("Beach Days")
     check(cw.has("1 wallpaper", timeout=6), "its page holds the one picture")
     cw.tap("More options")
@@ -659,8 +661,10 @@ def t_collection_offline_signed_out():
     """Signed out, Save offline asks for the free account in the app's own sheet and keeps nothing on the phone."""
     explore_shelf()
     before = kept_files()
-    if not cw.has("Art"):
-        cw.tap("See all")
+    # Explore's Art chip shares the shelf card's label; the manager has only the card.
+    cw.tap("See all")
+    if not cw.has("Art", timeout=4):
+        cw.d(scrollable=True).scroll.to(text="Art")
     cw.tap("Art")
     cw.tap("Save offline")
     check(cw.has("Save Art offline", timeout=6), "Save offline asks for the account, named for what it saves")
@@ -669,6 +673,7 @@ def t_collection_offline_signed_out():
     time.sleep(2)
     after = kept_files()
     check(after == before, f"nothing was fetched while signed out ({len(before)} files before, {len(after)} after)")
+    cw.d.press("back")
     cw.d.press("back")
 
 
@@ -680,8 +685,9 @@ def t_collection_offline_opens():
     try:
         cw.sh("shell", "am", "force-stop", cw.PKG)
         time.sleep(1)
+        cw.sh("shell", "am", "start", "-n", cw.MAIN)
         open_tab("Explore")
-        check(cw.has("Offline Pick", timeout=10), "with no internet, the shelf still shows the collection")
+        check(cw.d(text="Offline Pick").wait(timeout=10), "with no internet, the shelf still shows the collection")
         cw.tap("Offline Pick")
         check(cw.has("1 wallpaper", timeout=6), "its page opens")
         check(cw.has(title, timeout=4), f"with its picture, {title}")
