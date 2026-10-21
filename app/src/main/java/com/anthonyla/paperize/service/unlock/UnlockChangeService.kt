@@ -1,8 +1,7 @@
 package com.anthonyla.paperize.service.unlock
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -13,13 +12,16 @@ import android.content.pm.ServiceInfo
 import android.os.IBinder
 import android.os.PowerManager
 import android.os.SystemClock
+import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
+import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.presentation.MainActivity
@@ -51,6 +53,7 @@ class UnlockChangeService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var listening = false
+    private var inForeground = false
     private var lastChangeAt = 0L
     private val wakeLock by lazy {
         getSystemService(PowerManager::class.java)
@@ -68,7 +71,19 @@ class UnlockChangeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        // Every settings edit starts the watcher again; posting the notice only the first time keeps one the user swiped
+        // away gone. A service already in the foreground owes Android no second startForeground.
+        if (!inForeground) {
+            try {
+                ServiceCompat.startForeground(this, NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } catch (e: ForegroundServiceStartNotAllowedException) {
+                // A sticky restart from the background may be refused the foreground; the next app open starts it.
+                Log.w(TAG, "Unlock watcher restarted in the background without the foreground", e)
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            inForeground = true
+        }
         if (!listening) {
             val events = IntentFilter(Intent.ACTION_SCREEN_OFF).apply { addAction(Intent.ACTION_USER_PRESENT) }
             ContextCompat.registerReceiver(this, screenEvents, events, ContextCompat.RECEIVER_NOT_EXPORTED)
@@ -134,19 +149,16 @@ class UnlockChangeService : Service() {
         }
     }
 
-    private fun notification(): Notification {
-        val channel = NotificationChannel(CHANNEL_ID, getString(R.string.change_on_unlock), NotificationManager.IMPORTANCE_MIN)
-            .apply { setShowBadge(false) }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+    private fun notification(): Notification =
+        NotificationCompat.Builder(this, Constants.UNLOCK_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.unlock_watch_title))
             .setContentIntent(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE))
+            .addAction(0, getString(R.string.hide), PendingIntent.getActivity(this, 1, noticeSettings(this), PendingIntent.FLAG_IMMUTABLE))
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setSilent(true)
             .setOngoing(true)
             .build()
-    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -159,7 +171,6 @@ class UnlockChangeService : Service() {
 
     companion object {
         private const val TAG = "UnlockChangeService"
-        private const val CHANNEL_ID = "change_on_unlock"
         private const val NOTIFICATION_ID = 3
 
         /** Screen-off events closer together than this (one press read twice) change the wallpaper once. */
@@ -184,5 +195,22 @@ class UnlockChangeService : Service() {
                 Log.w(TAG, "Unlock watcher not started from the background", e)
             }
         }
+
+        /** Whether Android shows the watcher's notice: not when its channel, or the app's notifications, are off. */
+        fun noticeShown(context: Context): Boolean {
+            val manager = NotificationManagerCompat.from(context)
+            val channel = manager.getNotificationChannelCompat(Constants.UNLOCK_CHANNEL_ID)
+            return manager.areNotificationsEnabled() && channel?.importance != NotificationManagerCompat.IMPORTANCE_NONE
+        }
+
+        /**
+         * Android's page for the notice. Android raises a running service's notice to Low whatever the app asks, so
+         * only this page's switch hides it (owner ask, 2026-10-21); the watcher keeps running hidden.
+         */
+        fun noticeSettings(context: Context): Intent =
+            Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .putExtra(Settings.EXTRA_CHANNEL_ID, Constants.UNLOCK_CHANNEL_ID)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 }

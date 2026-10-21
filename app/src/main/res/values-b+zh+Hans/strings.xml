@@ -271,6 +271,11 @@
   <string name="change_on_unlock">解锁时更换</string>
   <string name="change_on_timer">定时更换</string>
   <string name="unlock_watch_title">解锁时更换已开启</string>
+  <string name="unlock_notice">解锁时更换通知</string>
+  <string name="notice_shown">显示</string>
+  <string name="notice_hidden">已隐藏</string>
+  <string name="hide">隐藏</string>
+  <string name="open_album">打开相册</string>
   <string name="no_albums_yet">还没有相册</string>
   <string name="add_photos">添加照片</string>
   <string name="photos_album_name">照片</string>

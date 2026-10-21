@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.anthonyla.paperize.core.EmptyAlbumException
 import com.anthonyla.paperize.core.ScreenType
+import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.runCatchingCancellable
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.core.util.setImageChecked
@@ -109,6 +110,23 @@ class WallpaperController @Inject constructor(
                     prepare.completeSpecific(albumId, it, wallpaperId, settings.shuffleEnabled)
                 }
             }
+        }
+    }
+
+    /**
+     * Static mode never moves Paperize's live wallpaper, so a [screen] left on it would freeze there. It takes its own
+     * album's current picture when it rotates, else the current picture of the screen that does; a screen switched off
+     * lends nothing. A rotating screen with no current picture yet takes its album's next one, as [reapply] does.
+     */
+    suspend fun replaceLive(screen: ScreenType, settings: ScheduleSettings) {
+        val rotating = settings.activeScreens(WallpaperMode.STATIC).flatMap { it.staticScreens() }
+        val source = if (screen in rotating) screen else rotating.firstOrNull() ?: return
+        val albumId = (if (source == ScreenType.HOME) settings.homeAlbumId else settings.lockAlbumId) ?: return
+        val bitmap = runCatchingCancellable { render(albumId, source) }.getOrNull()
+        when {
+            bitmap != null -> applyImage(WallpaperImage.Drawn(bitmap), screen)
+            screen == source -> changeSelected(albumId, screen, settings)
+            else -> error("$source has no current picture to lend $screen")
         }
     }
 

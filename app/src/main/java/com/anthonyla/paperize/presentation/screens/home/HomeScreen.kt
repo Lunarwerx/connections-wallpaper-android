@@ -302,6 +302,13 @@ fun HomeScreen(
                                 onChangeWallpaperNow = viewModel::changeWallpaperNow,
                                 onAddFolder = { addFolder(it) },
                                 onOpenVisualEffects = onNavigateToVisualEffects,
+                                // A current picture opens its album from Library, so back lands in Library.
+                                onOpenAlbum = { albumId ->
+                                    coroutineScope.launch {
+                                        pagerState.scrollToPage(LIBRARY_PAGE)
+                                        onNavigateToAlbum(albumId)
+                                    }
+                                },
                                 homeWallpaperUri = currentHomeWallpaperUri,
                                 lockWallpaperUri = currentLockWallpaperUri,
                                 liveWallpaperUri = currentLiveWallpaperUri,
@@ -433,6 +440,9 @@ fun HomeScreen(
 }
 
 private const val VIEWER_MS = 250
+
+/** The pager page Library sits on (Wallpaper, Library, Explore). */
+private const val LIBRARY_PAGE = 1
 
 /** The pager page Explore sits on (Wallpaper, Library, Explore). */
 private const val EXPLORE_PAGE = 2

@@ -1,5 +1,6 @@
 package com.anthonyla.paperize.presentation.screens.wallpaper.components
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -53,7 +55,10 @@ fun CurrentWallpaperPreview(
     homeWallpaperUri: String?,
     lockWallpaperUri: String?,
     modifier: Modifier = Modifier,
-    animate: Boolean = true
+    animate: Boolean = true,
+    /** Opens the album the lock screen's picture comes from; null when no album is picked. */
+    onOpenLock: (() -> Unit)? = null,
+    onOpenHome: (() -> Unit)? = null
 ) {
     val configuration = LocalConfiguration.current
 
@@ -98,6 +103,7 @@ fun CurrentWallpaperPreview(
                     aspectRatio = screenAspectRatio,
                     contentDescription = stringResource(R.string.content_desc_current_lock_wallpaper),
                     animate = animate,
+                    onClick = onOpenLock,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -108,6 +114,7 @@ fun CurrentWallpaperPreview(
                     aspectRatio = screenAspectRatio,
                     contentDescription = stringResource(R.string.content_desc_current_home_wallpaper),
                     animate = animate,
+                    onClick = onOpenHome,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -123,9 +130,11 @@ private fun WallpaperPreviewBox(
     aspectRatio: Float,
     contentDescription: String,
     animate: Boolean,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val openLabel = stringResource(R.string.open_album)
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
@@ -135,6 +144,7 @@ private fun WallpaperPreviewBox(
                 .aspectRatio(aspectRatio)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .then(if (onClick == null) Modifier else Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick))
         ) {
             // A screen this app has not set yet shows its own glyph, not a blank tile.
             if (wallpaperUri == null) {

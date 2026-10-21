@@ -91,6 +91,8 @@ fun WallpaperScreen(
     onChangeWallpaperNow: () -> Unit,
     onAddFolder: (ScreenType) -> Unit,
     onOpenVisualEffects: () -> Unit,
+    /** Opens an album in Library: a current picture opens the album it comes from. */
+    onOpenAlbum: (String) -> Unit,
     homeWallpaperUri: String?,
     lockWallpaperUri: String?,
     liveWallpaperUri: String?,
@@ -289,10 +291,16 @@ fun WallpaperScreen(
                     )
                 }
             })
+            // Owner ask (2026-10-21): a picture whose screen rotates an album opens that album.
+            val opener = { albumId: String? ->
+                albumId?.takeIf { id -> albums.any { it.id == id } }?.let { id -> { onOpenAlbum(id) } }
+            }
             CurrentWallpaperPreview(
                 homeWallpaperUri = homeWallpaperUri,
                 lockWallpaperUri = lockWallpaperUri,
-                animate = appSettings.animate
+                animate = appSettings.animate,
+                onOpenLock = opener(scheduleSettings.lockAlbumId.takeIf { lockEnabled }),
+                onOpenHome = opener(scheduleSettings.homeAlbumId.takeIf { homeEnabled })
             )
         }
 

@@ -80,9 +80,16 @@ class PaperizeApplication : Application(), Configuration.Provider, DefaultLifecy
             description = getString(R.string.notification_channel_description)
             setShowBadge(false)
         }
+        // Change on unlock's notice has a channel of its own from the first launch, so Settings can open Android's page
+        // for it before the watcher has ever run, and turning it off hides nothing else.
+        val unlock = NotificationChannel(
+            Constants.UNLOCK_CHANNEL_ID,
+            getString(R.string.change_on_unlock),
+            NotificationManager.IMPORTANCE_MIN
+        ).apply { setShowBadge(false) }
 
         val notificationManager = getSystemService(NotificationManager::class.java)
-        notificationManager.createNotificationChannel(channel)
+        notificationManager.createNotificationChannels(listOf(channel, unlock))
     }
 
     override fun onStart(owner: LifecycleOwner) {

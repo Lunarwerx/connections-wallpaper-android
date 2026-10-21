@@ -17,10 +17,12 @@ import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.connections.analytics.ConnectionsAnalytics
 import com.anthonyla.paperize.core.constants.Constants
+import com.anthonyla.paperize.core.runCatchingCancellable
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
 import com.anthonyla.paperize.presentation.MainActivity
 import com.anthonyla.paperize.service.WallpaperChangeLock
+import com.anthonyla.paperize.service.livewallpaper.PaperizeLiveWallpaperService
 import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -57,6 +59,7 @@ class WallpaperChangeService : Service() {
                 try {
                     when (action) {
                         ACTION_CHANGE_WALLPAPER -> changeWallpaper(screen)
+                        ACTION_REPLACE_LIVE -> replaceFrozenLive()
                         ACTION_APPLY_SPECIFIC_WALLPAPER -> applySpecificWallpaper(wallpaperId, screen ?: ScreenType.BOTH)
                         ACTION_REAPPLY_EFFECTS -> reapplyEffects()
                         else -> Log.w(TAG, "Unknown action: $action")
@@ -74,7 +77,10 @@ class WallpaperChangeService : Service() {
         return START_NOT_STICKY
     }
 
-    /** Without a [screen], changes every screen the current settings rotate. */
+    /**
+     * Changes [screen], or without one every screen the current settings rotate, then replaces a frozen live wallpaper:
+     * the first album picked for one screen can leave the other on it.
+     */
     private suspend fun changeWallpaper(screen: ScreenType?) {
         analytics.hintTrigger("manual")
         val mode = settingsRepository.getWallpaperMode()
@@ -84,6 +90,27 @@ class WallpaperChangeService : Service() {
             val outcome = wallpaperController.change(target, settings)
             if (outcome.emptyAlbum) showEmptyAlbumNotification()
             if (outcome.changed) wallpaperScheduler.resetAfterManualChange(target, settings, mode)
+        }
+        replaceFrozenLive()
+    }
+
+    /**
+     * Static mode never moves Paperize's live wallpaper, so a screen still showing it would freeze: it takes a static
+     * picture and the rotating screens keep theirs. Everything is read when this runs, under the change lock, so a switch
+     * to live mode queued meanwhile keeps its wallpaper. Twice at most, since setting one screen can hand the live
+     * wallpaper to the other. A failure here is logged, not shown: the next app open tries again.
+     */
+    private suspend fun replaceFrozenLive() {
+        repeat(2) {
+            if (settingsRepository.getWallpaperMode() != WallpaperMode.STATIC) return
+            val settings = settingsRepository.getScheduleSettings()
+            if (!settings.enableChanger || !settings.hasRequiredAlbums(WallpaperMode.STATIC)) return
+            val frozen = PaperizeLiveWallpaperService.showingOn(this)
+            if (frozen.isEmpty()) return
+            for (target in frozen) {
+                runCatchingCancellable { wallpaperController.replaceLive(target, settings) }
+                    .onFailure { Log.w(TAG, "Could not replace the live wallpaper on $target", it) }
+            }
         }
     }
 
@@ -154,6 +181,7 @@ class WallpaperChangeService : Service() {
     companion object {
         private const val TAG = "WallpaperChangeService"
         private const val ACTION_CHANGE_WALLPAPER = "com.anthonyla.paperize.ACTION_CHANGE_WALLPAPER"
+        private const val ACTION_REPLACE_LIVE = "com.anthonyla.paperize.ACTION_REPLACE_LIVE"
         private const val ACTION_APPLY_SPECIFIC_WALLPAPER = "com.anthonyla.paperize.ACTION_APPLY_SPECIFIC_WALLPAPER"
         private const val ACTION_REAPPLY_EFFECTS = "com.anthonyla.paperize.ACTION_REAPPLY_EFFECTS"
         private const val EXTRA_SCREEN_TYPE = Constants.EXTRA_SCREEN_TYPE
@@ -163,6 +191,9 @@ class WallpaperChangeService : Service() {
         /** Without a [screen], changes every screen the current settings rotate (or the live wallpaper). */
         fun changeWallpaper(context: Context, screen: ScreenType? = null) =
             start(context, ACTION_CHANGE_WALLPAPER) { screen?.let { putExtra(EXTRA_SCREEN_TYPE, it.name) } }
+
+        /** In static mode, put a static picture where Paperize's live wallpaper still shows, moving no rotation on. */
+        fun replaceLiveWallpaper(context: Context) = start(context, ACTION_REPLACE_LIVE)
 
         fun applyWallpaper(context: Context, wallpaperId: String, screen: ScreenType) =
             start(context, ACTION_APPLY_SPECIFIC_WALLPAPER) {

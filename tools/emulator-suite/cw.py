@@ -128,16 +128,20 @@ def has(text: str, timeout: float = 0) -> bool:
 
 
 def wallpaper_ids() -> dict:
-    """System and lock wallpaper ids from dumpsys; a change of id is a new wallpaper set."""
+    """System and lock wallpaper ids and components from dumpsys; a change of id is a new wallpaper set. A lock screen
+    sharing the home wallpaper has an empty section, so its id and component are None (reading past it used to pick
+    up the fallback wallpaper's id=1)."""
     out = sh("shell", "dumpsys", "wallpaper")
+    parts = re.split(r"^(\w[\w ]* wallpaper state):", out, flags=re.M)
+    bodies = dict(zip(parts[1::2], parts[2::2]))
     ids = {}
     for section, key in (("System wallpaper state", "system"), ("Lock wallpaper state", "lock")):
-        i = out.find(section)
-        if i >= 0:
-            m = re.search(r"\bid=(\d+)", out[i:i + 3000])
-            ids[key] = int(m.group(1)) if m else None
-    comp = re.search(r"mWallpaperComponent=(\S+)", out)
-    ids["component"] = comp.group(1) if comp else None
+        body = bodies.get(section, "")
+        m = re.search(r"\bid=(\d+)", body)
+        ids[key] = int(m.group(1)) if m else None
+        comp = re.search(r"mWallpaperComponent=(\S+)", body)
+        ids[f"{key}_component"] = comp.group(1) if comp else None
+    ids["component"] = ids["system_component"]
     return ids
 
 

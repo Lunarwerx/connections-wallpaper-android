@@ -11,6 +11,7 @@ object Constants {
     // Notifications
     const val NOTIFICATION_CHANNEL_ID = "paperize_channel"
     const val NOTIFICATION_ID = 1
+    const val UNLOCK_CHANNEL_ID = "change_on_unlock"
 
     // Services
     const val ACTION_RELOAD_WALLPAPER = "com.anthonyla.paperize.ACTION_RELOAD_WALLPAPER"

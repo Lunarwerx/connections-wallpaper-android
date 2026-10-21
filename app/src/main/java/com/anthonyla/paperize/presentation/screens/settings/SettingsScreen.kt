@@ -15,6 +15,8 @@ import androidx.compose.material.icons.outlined.BatteryFull
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsOff
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Wallpaper
@@ -45,6 +47,7 @@ import com.anthonyla.paperize.presentation.common.components.mouseScrollbar
 import com.anthonyla.paperize.presentation.common.theme.AppLayout
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.wallpaper_mode_selection.WallpaperModeOptions
+import com.anthonyla.paperize.service.unlock.UnlockChangeService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,8 +71,11 @@ fun SettingsScreen(
         mutableStateOf(isIgnoringBatteryOptimizations(context))
     }
 
+    var unlockNoticeShown by remember { mutableStateOf(UnlockChangeService.noticeShown(context)) }
+
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations(context)
+        unlockNoticeShown = UnlockChangeService.noticeShown(context)
     }
 
     Scaffold(
@@ -107,7 +113,7 @@ fun SettingsScreen(
             // scheduled it delays nothing, so it is a plain row that still opens the setting.
             val batteryWarning = rotating && !isIgnoringBatteryOptimizations
             SectionLabel(stringResource(R.string.settings_section_wallpaper))
-            SettingsGroup(
+            val wallpaperRows = mutableListOf<@Composable () -> Unit>(
                 {
                     SettingsRow(
                         icon = if (isIgnoringBatteryOptimizations) Icons.Outlined.BatteryFull else Icons.Outlined.BatteryAlert,
@@ -137,6 +143,23 @@ fun SettingsScreen(
                     )
                 }
             )
+            // Change on unlock is static mode's. Android shows its running notice, and only Android's page hides it.
+            if (wallpaperMode == WallpaperMode.STATIC) wallpaperRows.add {
+                SettingsRow(
+                    icon = if (unlockNoticeShown) Icons.Outlined.Notifications else Icons.Outlined.NotificationsOff,
+                    title = stringResource(R.string.unlock_notice),
+                    supporting = stringResource(if (unlockNoticeShown) R.string.notice_shown else R.string.notice_hidden),
+                    onClick = { context.startActivity(UnlockChangeService.noticeSettings(context)) },
+                    trailing = {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+            }
+            SettingsGroup(*wallpaperRows.toTypedArray())
 
             SectionLabel(stringResource(R.string.appearance))
             SettingsGroup(
@@ -283,10 +306,10 @@ fun SettingsScreen(
                         enabled = !isBusy,
                         onSelect = { mode ->
                             showModeSheet = false
-                            if (mode != wallpaperMode) {
-                                viewModel.switchWallpaperMode(mode) { needsLivePicker ->
-                                    if (needsLivePicker) openLiveWallpaperPicker(context)
-                                }
+                            // Picking the current mode applies it again: Static replaces a live wallpaper left
+                            // showing, Live asks for the live wallpaper when it is not set.
+                            viewModel.switchWallpaperMode(mode) { needsLivePicker ->
+                                if (needsLivePicker) openLiveWallpaperPicker(context)
                             }
                         }
                     )

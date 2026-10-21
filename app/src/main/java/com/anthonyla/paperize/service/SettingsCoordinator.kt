@@ -142,16 +142,25 @@ class SettingsCoordinator @Inject constructor(
     fun changeWallpaperNow() = WallpaperChangeService.changeWallpaper(context)
 
     /**
-     * Pause rotation if the user replaced Paperize's live wallpaper outside the app. The album stays
-     * selected, so resuming only asks for the live wallpaper again.
+     * Square the settings with what the phone shows. In live mode, Paperize's live wallpaper replaced outside the app
+     * pauses rotation (the album stays, so resuming only asks for the live wallpaper again). In static mode, Paperize's
+     * live wallpaper still showing is frozen, since static mode never moves it, so a static picture replaces it now and
+     * the rotating screens keep theirs.
      */
-    suspend fun disableIfLiveWallpaperReplaced() = mutex.withLock {
+    suspend fun matchPhoneWallpaper(): Unit = mutex.withLock {
         val settings = settingsRepository.getScheduleSettings()
-        if (settingsRepository.getWallpaperMode() == WallpaperMode.LIVE && settings.liveAlbumId != null &&
-            settings.enableChanger && !PaperizeLiveWallpaperService.isActive(context)
-        ) {
-            settingsRepository.updateEnableChanger(false)
-            scheduler.cancelAllWallpaperChanges()
+        when (val mode = settingsRepository.getWallpaperMode()) {
+            WallpaperMode.LIVE ->
+                if (settings.liveAlbumId != null && settings.enableChanger && !PaperizeLiveWallpaperService.isActive(context)) {
+                    settingsRepository.updateEnableChanger(false)
+                    scheduler.cancelAllWallpaperChanges()
+                }
+            WallpaperMode.STATIC ->
+                if (settings.enableChanger && settings.hasRequiredAlbums(mode) &&
+                    PaperizeLiveWallpaperService.showingOn(context).isNotEmpty()
+                ) {
+                    WallpaperChangeService.replaceLiveWallpaper(context)
+                }
         }
     }
 
@@ -167,11 +176,18 @@ class SettingsCoordinator @Inject constructor(
             scheduler.cancelAllWallpaperChanges()
             settingsRepository.updateWallpaperMode(mode)
         }
-        scheduler.updateSchedules(settings, mode)
+        // Picking the mode already on keeps any countdown still running.
+        scheduler.updateSchedules(settings, mode, onlyIfNotScheduled = previous == mode)
         if (!settings.enableChanger || !settings.hasRequiredAlbums(mode)) return@withLock false
         when (mode) {
             WallpaperMode.STATIC -> {
-                if (previous != mode) WallpaperChangeService.changeWallpaper(context)
+                // A switch changes the wallpaper now, which also replaces our live one; picking Static again only
+                // replaces a live wallpaper still showing (owner report, 2026-10-21).
+                if (previous != mode) {
+                    WallpaperChangeService.changeWallpaper(context)
+                } else if (PaperizeLiveWallpaperService.showingOn(context).isNotEmpty()) {
+                    WallpaperChangeService.replaceLiveWallpaper(context)
+                }
                 false
             }
             WallpaperMode.LIVE -> !PaperizeLiveWallpaperService.isActive(context)

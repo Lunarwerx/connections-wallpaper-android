@@ -4,6 +4,7 @@ import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.Bitmap
 import com.anthonyla.paperize.core.EmptyAlbumException
+import com.anthonyla.paperize.core.NoValidWallpaperException
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.domain.model.PreparedWallpaper
 import com.anthonyla.paperize.domain.model.ScheduleSettings
@@ -122,6 +123,16 @@ class WallpaperControllerTest {
         coVerify(exactly = 0) { prepare(any(), any()) }
         coVerify(exactly = 0) { prepare.complete(any(), any()) }
         verify { bitmap.recycle() }
+    }
+
+    @Test fun `a screen frozen on the live wallpaper before its album has a current picture takes the next one`() = runTest {
+        val active = settings.copy(enableChanger = true, homeEnabled = true, lockEnabled = true)
+        coEvery { render("album", ScreenType.HOME, null) } throws NoValidWallpaperException()
+        coEvery { prepare("album", ScreenType.HOME) } returns prepared
+        every { manager.setBitmap(bitmap, null, true, 1) } returns 1
+        controller.replaceLive(ScreenType.HOME, active)
+        verify { manager.setBitmap(bitmap, null, true, 1) }
+        coVerify { prepare.complete(prepared, ScreenType.HOME) }
     }
 
 }

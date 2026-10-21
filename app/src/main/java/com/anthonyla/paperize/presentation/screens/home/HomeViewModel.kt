@@ -86,7 +86,7 @@ class HomeViewModel @Inject constructor(
 
     init {
         // Launched in order so later edits queue behind this check in the coordinator.
-        viewModelScope.launch { coordinator.disableIfLiveWallpaperReplaced() }
+        viewModelScope.launch { coordinator.matchPhoneWallpaper() }
     }
 
     fun dismissLiveWallpaperPrompt() {

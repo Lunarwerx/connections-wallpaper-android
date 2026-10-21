@@ -14,6 +14,7 @@ import com.anthonyla.paperize.domain.repository.WallpaperRepository
 import com.anthonyla.paperize.domain.usecase.ImportWallpapersUseCase
 import com.anthonyla.paperize.presentation.screens.album_view.ImportProgress
 import com.anthonyla.paperize.service.SettingsCoordinator
+import com.anthonyla.paperize.service.livewallpaper.PaperizeLiveWallpaperService
 import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -55,6 +56,9 @@ class HomeViewModelTest {
             stored.value
         }
         every { wallpapers.getCurrentWallpaperFlow(any(), any()) } returns flowOf(null)
+        // Opening the app asks Android where Paperize's live wallpaper shows; here it shows nowhere.
+        mockkObject(PaperizeLiveWallpaperService.Companion)
+        every { PaperizeLiveWallpaperService.showingOn(any()) } returns emptySet()
         val coordinator = SettingsCoordinator(mockk(relaxed = true), settings, wallpapers, albums, scheduler)
         viewModel = HomeViewModel(albums, settings, wallpapers, importer, coordinator)
         store.put("home", viewModel)

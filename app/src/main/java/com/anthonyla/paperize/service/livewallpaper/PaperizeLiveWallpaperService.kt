@@ -75,6 +75,23 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                 false
             }
         }
+
+        /** The screens showing Paperize's live wallpaper: home, and since Android 14, a lock screen that holds it itself. */
+        fun showingOn(context: Context): Set<ScreenType> {
+            val ours = ComponentName(context, PaperizeLiveWallpaperService::class.java)
+            return try {
+                val manager = WallpaperManager.getInstance(context)
+                buildSet {
+                    if (manager.wallpaperInfo?.component == ours) add(ScreenType.HOME)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                        manager.getWallpaperInfo(WallpaperManager.FLAG_LOCK)?.component == ours
+                    ) add(ScreenType.LOCK)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error checking where the live wallpaper shows", e)
+                emptySet()
+            }
+        }
     }
 
     override fun onCreateEngine(): Engine {

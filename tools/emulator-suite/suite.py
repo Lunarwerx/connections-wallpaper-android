@@ -175,6 +175,162 @@ def t_unlock_changes():
     check(len(set(seen)) >= 2, "different pictures across unlocks")
 
 
+def pick_mode(label: str) -> None:
+    open_tab("Settings")
+    cw.tap("Wallpaper mode")
+    cw.tap(label)
+
+
+def set_live_in_picker() -> None:
+    """Accept the system live wallpaper preview the Live switch opens, on both screens where it asks."""
+    d = cw.d
+    d(textMatches="(?i)set wallpaper").click(timeout=10)
+    both = d(textMatches="(?i)home (screen )?and lock screens?")
+    if both.wait(timeout=3):
+        both.click()
+
+
+def live_is_ours(where: str = "system") -> bool:
+    """Whether our live wallpaper shows on <where> (system or lock). Home always reports a component, so none there is
+    a dumpsys the parse no longer reads, never an answer."""
+    now = ids()
+    component = now[f"{where}_component"]
+    if where == "system" and component is None:
+        raise AssertionError(f"no home wallpaper component in dumpsys ({now})")
+    return cw.PKG in (component or "")
+
+
+def live_anywhere() -> bool:
+    return live_is_ours("system") or live_is_ours("lock")
+
+
+def live_round_trip(home_rotates: bool) -> None:
+    """Owner report (2026-10-21): live back to static kept every setting but rotated only after Change wallpaper
+    now. The switch itself replaces our live wallpaper with a static picture (static mode cannot move it, so a screen
+    left on it freezes), starts the unlock watcher, and the next unlock changes the picture."""
+    pick_mode("Live wallpaper")
+    set_live_in_picker()
+    check(wait_until(live_is_ours, 12), f"our live wallpaper is the phone's ({ids()['component']})")
+    # A lock screen sharing home's wallpaper has no section of its own (lock None).
+    check(live_is_ours("lock") or ids()["lock"] is None, f"and the lock screen's ({ids()})")
+    check(wait_until(lambda: not watcher_running(), 6), "live mode: no unlock watcher")
+    before = ids()
+    pick_mode("Static")
+    check(wait_until(lambda: not live_anywhere(), 12), f"the switch leaves our live wallpaper on no screen ({before} -> {ids()})")
+    check(wait_until(watcher_running, 8), "the switch starts the unlock watcher")
+    unlock()
+    start = ids()
+    time.sleep(1.2)
+    screen_off_on()
+    # One picture on both screens is set as the system wallpaper alone (the lock id stays 1).
+    changed = wait_until(lambda: ids()["lock"] != start["lock"] or ids()["system"] != start["system"], 8)
+    unlock()
+    check(changed, f"the first unlock after the switch changes the wallpaper ({start} -> {ids()})")
+    if home_rotates:
+        check(ids()["system"] != start["system"], f"home included ({start} -> {ids()})")
+
+
+def t_live_to_static():
+    live_round_trip(home_rotates=False)
+
+
+def t_static_replaces_live():
+    """Static mode with our live wallpaper put back on the phone (from its own picker): opening the app replaces it,
+    and the lock screen, which rotates, keeps its picture (a full change there would skip one)."""
+    lock_before = cw.wall_color("lock")
+    cw.sh("shell", "am", "start", "-a", "android.service.wallpaper.CHANGE_LIVE_WALLPAPER", "--ecn",
+          "android.service.wallpaper.extra.LIVE_WALLPAPER_COMPONENT",
+          f"{cw.PKG}/com.anthonyla.paperize.service.livewallpaper.PaperizeLiveWallpaperService")
+    set_live_in_picker()
+    check(wait_until(live_is_ours, 12), "our live wallpaper is back on the phone")
+    cw.sh("shell", "am", "force-stop", cw.PKG)
+    open_app()
+    check(wait_until(lambda: not live_anywhere(), 15), f"opening the app replaces it with a static picture ({ids()})")
+    lock_after = cw.wall_color("lock")
+    check(lock_after == lock_before, f"the lock screen keeps its picture ({lock_before} -> {lock_after})")
+
+
+def t_live_to_static_both():
+    live_round_trip(home_rotates=True)
+
+
+def t_live_to_static_home_only():
+    """Only home rotating: the switch also clears our live wallpaper off the lock screen, which Android 14+ lets keep a
+    live wallpaper of its own when home alone is set."""
+    open_tab("Wallpaper")
+    cw.tap("Lock")
+    check(wait_until(lambda: not cw.has("Lock album"), 4), "Lock is off, so home alone rotates")
+    live_round_trip(home_rotates=True)
+    open_tab("Wallpaper")
+    cw.tap("Lock")
+    check(cw.has("Lock album", timeout=4), "Lock is on again for the tests after")
+
+
+def t_preview_opens_album():
+    """Owner ask (2026-10-21): the lock screen's current picture opens its album inside Library, and back lands in
+    Library."""
+    open_tab("Wallpaper")
+    scroll_to("Current wallpapers")
+    cw.d(description="Current lock screen wallpaper").click(timeout=5)
+    check(cw.d(description="Back").wait(timeout=5) and cw.has(FOLDER), "the lock picture opens its album")
+    cw.d.screenshot("shots/suite/preview-opens-album.jpg")
+    cw.d(description="Back").click()
+    check(cw.has("Add album", timeout=5), "back lands in Library")
+
+
+def notice_posted() -> bool:
+    """Whether change on unlock's notice (notification 3) is posted."""
+    out = cw.sh("shell", "dumpsys", "notification", "--noredact")
+    return re.search(rf"NotificationRecord\(\S+ pkg={re.escape(cw.PKG)} user=\S+ id=3 ", out) is not None
+
+
+def notice_importance() -> int:
+    out = cw.sh("shell", "dumpsys", "notification", "--noredact")
+    m = re.search(r"mId='change_on_unlock'.*?mImportance=(\d+)", out)
+    if not m:
+        raise AssertionError("no change_on_unlock channel in dumpsys notification")
+    return int(m.group(1))
+
+
+def t_unlock_notice():
+    """Owner ask (2026-10-21): the change-on-unlock notice can go. Swiped away, it stays away when a setting changes;
+    Settings opens Android's page for it, and hidden there the watcher still changes the wallpaper on unlock."""
+    check(wait_until(notice_posted, 6), "the watcher's notice is posted")
+    cw.d.open_notification()
+    note = cw.d(text="Change on unlock is on")
+    check(note.wait(timeout=5), "the notice is in the shade")
+    note.swipe("right", steps=10)
+    swiped = wait_until(lambda: not notice_posted(), 5)
+    cw.d.press("back")
+    check(swiped, "a swipe dismisses it")
+    open_tab("Wallpaper")
+    pid = cw.sh("shell", "pidof", cw.PKG).strip()
+    cw.tap("Change on a timer")
+    cw.tap("Change on a timer")
+    # Each edit starts the running watcher again without a second startForeground: past Android's 10 s deadline for
+    # one, the same process still runs it (a missed one kills the app).
+    time.sleep(12)
+    check(cw.sh("shell", "pidof", cw.PKG).strip() == pid and watcher_running(), f"the app ({pid}) and its watcher outlive the edits")
+    check(not notice_posted(), "a settings change posts no notice again")
+    open_tab("Settings")
+    check(cw.has("Change on unlock notification", timeout=5) and cw.has("Shown"), "Settings shows the notice as Shown")
+    cw.d.screenshot("shots/suite/settings-unlock-notice.jpg")
+    cw.tap("Change on unlock notification")
+    switch = cw.d(className="android.widget.Switch", checked=True)
+    check(switch.wait(timeout=8), f"Android's page for the notice opens ({cw.labels()[:12]})")
+    switch.click()
+    check(wait_until(lambda: notice_importance() == 0, 5), "its switch turns the notice's channel off")
+    cw.d.press("back")
+    check(cw.has("Hidden", timeout=5), "back in Settings, the row says Hidden")
+    unlock()
+    before = ids()["lock"]
+    time.sleep(1.2)
+    screen_off_on()
+    changed = wait_until(lambda: ids()["lock"] != before, 8)
+    unlock()
+    check(changed and watcher_running(), "hidden, the watcher still changes the lock screen on unlock")
+
+
 def t_timer_toggle():
     open_tab("Wallpaper")
     jobs = job_count()
@@ -393,9 +549,9 @@ def t_explore_set_signed_out():
     cw.d.press("back")
 
 
-TESTS = [t_lock_first_folder, t_unlock_changes, t_timer_toggle, t_unlock_off, t_pause, t_effects,
-         t_library_folder_fills_both, t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore,
-         t_explore_set_signed_out]
+TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
+         t_timer_toggle, t_unlock_off, t_pause, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
+         t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out]
 
 
 def unknown_tests(names: list[str]) -> list[str]:
