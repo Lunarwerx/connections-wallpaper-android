@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import traceback
+from xml.etree import ElementTree
 
 import cw
 
@@ -119,18 +120,27 @@ def job_count() -> int:
     return len(re.findall(rf"^\s*JOB \S+: \S+ \S*{re.escape(cw.PKG)}/", out, re.M))
 
 
-def switch_state(title: str) -> bool:
-    """The checked state of the switch on the row titled <title> (same height as the title)."""
-    t = cw.d(text=title)
-    if not t.wait(timeout=5):
-        raise AssertionError(f"no row {title!r}")
-    b = cw.unstale(lambda: t.info["bounds"])
-    cy = (b["top"] + b["bottom"]) // 2
-    for el in cw.d.xpath('//*[@checkable="true"]').all():
-        lx, ly, rx, ry = el.bounds
-        if ly <= cy <= ry:
-            return el.attrib.get("checked") == "true"
-    raise AssertionError(f"no switch beside {title!r}")
+def switch_state(title: str, timeout: float = 5) -> bool:
+    """The checked state of the switch on the row titled <title> (same height as the title). The title and the
+    switches come from one screen dump: a row that has just appeared slides in, and two separate reads saw its title
+    and its switch in different places. The dump is taken again until the row has its switch."""
+    def top_bottom(node: ElementTree.Element) -> tuple[int, int]:
+        _, top, _, bottom = map(int, re.findall(r"-?\d+", node.get("bounds", "")))
+        return top, bottom
+
+    end = time.time() + timeout
+    while True:
+        root = ElementTree.fromstring(cw.d.dump_hierarchy())
+        rows = [n for n in root.iter() if n.get("text") == title]
+        if rows:
+            top, bottom = top_bottom(rows[0])
+            cy = (top + bottom) // 2
+            for n in root.iter():
+                if n.get("checkable") == "true" and top_bottom(n)[0] <= cy <= top_bottom(n)[1]:
+                    return n.get("checked") == "true"
+        if time.time() > end:
+            raise AssertionError(f"no switch beside {title!r}" if rows else f"no row {title!r}")
+        time.sleep(0.3)
 
 
 def scroll_to(text: str) -> None:
