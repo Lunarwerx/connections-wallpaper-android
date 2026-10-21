@@ -13,6 +13,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * Puts the schedules and the unlock watcher back after a reboot or an app update. An update stops the app's process,
+ * the watcher with it, and nothing else starts it again until the app is opened; both broadcasts may start it.
+ */
 @AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
 
@@ -28,9 +32,10 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == "android.intent.action.QUICKBOOT_POWERON"
+            intent.action == "android.intent.action.QUICKBOOT_POWERON" ||
+            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
         ) {
-            Log.d(TAG, "Boot completed, rescheduling wallpaper changes")
+            Log.d(TAG, "${intent.action}: rescheduling wallpaper changes")
 
             val pendingResult = goAsync()
 

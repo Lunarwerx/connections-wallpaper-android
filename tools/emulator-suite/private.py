@@ -134,12 +134,13 @@ def main() -> None:
     p.add_argument("--boot-timeout", type=float, default=300, help="seconds a boot may take (default 300)")
     p.add_argument("--suite-timeout", type=float, default=1800, help="seconds the suite may take (default 1800)")
     p.add_argument("--keep", action="store_true", help="leave the emulator running after the suite")
+    p.add_argument("--apk", default=APK, help="the APK to install (default: this tree's release build)")
     a = p.parse_args()
     unknown = suite.unknown_tests(a.tests)
     if unknown:
         sys.exit(f"no such test: {', '.join(unknown)}")
-    if not os.path.isfile(APK):
-        sys.exit(f"no release APK at {APK}: run gradlew assembleRelease (or tools\\emulator-suite\\check.cmd) first")
+    if not os.path.isfile(a.apk):
+        sys.exit(f"no release APK at {a.apk}: run gradlew assembleRelease (or tools\\emulator-suite\\check.cmd) first")
 
     ensure_avd(a.avd, a.from_avd)
     held = hold(a.avd)  # noqa: F841 - the lock lasts as long as this handle
@@ -158,7 +159,7 @@ def main() -> None:
             wait_booted(serial, a.avd, a.boot_timeout, proc, log)
         ready = True
         try:
-            installed = subprocess.run([cw.ADB, "-s", serial, "install", "-r", APK], capture_output=True, timeout=300,
+            installed = subprocess.run([cw.ADB, "-s", serial, "install", "-r", a.apk], capture_output=True, timeout=300,
                                        creationflags=cw.NO_WINDOW)
         except subprocess.TimeoutExpired:
             sys.exit("install took over 300s")

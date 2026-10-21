@@ -12,6 +12,7 @@ Each run wipes the app's data first (the same as a fresh install) and takes abou
 import os
 import re
 import sys
+import tempfile
 import time
 import traceback
 
@@ -383,6 +384,19 @@ def t_pause():
     check(switch_state("Change on unlock"), "resumed, Change on unlock is back and still on")
 
 
+def t_update_keeps_watcher():
+    """An app update brings the unlock watcher back by itself. An update stops the app's process, and on 2026-10-21 the
+    owner's phone went without change on unlock after one until the app was opened."""
+    check(wait_until(watcher_running, 6), "unlock watcher running before the update")
+    path = cw.sh("shell", "pm", "path", cw.PKG).split()[0].removeprefix("package:")
+    with tempfile.TemporaryDirectory() as tmp:
+        apk = os.path.join(tmp, "base.apk")
+        cw.sh("pull", path, apk, check=True)
+        out = cw.sh("install", "-r", apk)
+    check("Success" in out, f"the same APK installed over itself ({out[-200:]})")
+    check(wait_until(watcher_running, 30), "the watcher is back after the update, with the app never opened")
+
+
 def t_library_folder_fills_both():
     """From Library, with nothing set up: the album is named after the folder and both screens use it."""
     cw.fresh_app()
@@ -697,7 +711,7 @@ def t_collection_offline_opens():
 
 
 TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
-         t_timer_toggle, t_unlock_off, t_pause, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
+         t_timer_toggle, t_unlock_off, t_pause, t_update_keeps_watcher, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
          t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out,
          t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collection_offline_opens]
 
