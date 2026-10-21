@@ -5,11 +5,14 @@ plugins {
     alias(libs.plugins.kotlinCompose)
     alias(libs.plugins.hiltAndroid)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.room)
     alias(libs.plugins.kotlinSerialization)
 }
 
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
+// Room's plugin gives each variant the schema folder as a declared input and output. As a bare KSP argument, a
+// fresh build of debug and release at once wrote and read schemas/4.json together (release read it empty).
+room {
+    schemaDirectory("$projectDir/schemas")
 }
 
 android {
