@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LibraryAdd
 import androidx.compose.material.icons.outlined.Lock
@@ -101,7 +102,9 @@ private enum class ViewerSheet { Target, Album }
 
 /**
  * The full-screen viewer: swipe through the gallery, tap the picture to hide everything else, set it
- * on the home or lock screen, or add it to an album. Dark in either theme.
+ * on the home or lock screen, add it to an album, or save it to the phone. Setting and adding take
+ * no account and use the full-quality original; saving asks a signed-out visitor to sign in. Dark in
+ * either theme.
  */
 @Composable
 fun ConnectionsViewer(
@@ -195,8 +198,10 @@ fun ConnectionsViewer(
                             wallpaper = wallpaper,
                             setting = wallpaper.id in state.setting,
                             saving = wallpaper.id in state.saving,
-                            onSet = { if (signedIn) sheet = ViewerSheet.Target else onSignInNeeded() },
-                            onAdd = { if (signedIn) sheet = ViewerSheet.Album else onSignInNeeded() }
+                            downloading = wallpaper.id in state.downloading,
+                            onSet = { sheet = ViewerSheet.Target },
+                            onAdd = { sheet = ViewerSheet.Album },
+                            onSave = { if (signedIn) viewModel.saveToPhone(wallpaper) else onSignInNeeded() }
                         )
                     }
                 }
@@ -254,8 +259,10 @@ private fun InfoCard(
     wallpaper: ConnectionsWallpaper,
     setting: Boolean,
     saving: Boolean,
+    downloading: Boolean,
     onSet: () -> Unit,
-    onAdd: () -> Unit
+    onAdd: () -> Unit,
+    onSave: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     Surface(
@@ -313,6 +320,16 @@ private fun InfoCard(
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
                     } else {
                         Icon(Icons.Outlined.LibraryAdd, contentDescription = stringResource(R.string.connections_add_to_album))
+                    }
+                }
+                FilledTonalIconButton(
+                    onClick = { if (!downloading) onSave() },
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    if (downloading) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
+                    } else {
+                        Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.connections_save_to_phone))
                     }
                 }
                 wallpaper.sourceUrl?.let { source ->

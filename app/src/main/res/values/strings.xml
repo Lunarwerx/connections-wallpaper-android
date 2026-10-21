@@ -230,6 +230,8 @@
   <string name="connections_show_all_shapes">Show all shapes</string>
   <string name="connections_view_source">View source</string>
   <string name="connections_add_to_album">Add to album</string>
+  <string name="connections_save_to_phone">Save to phone</string>
+  <string name="connections_saved_to_phone">Saved to Pictures</string>
   <string name="connections_new_album">New album</string>
   <string name="connections_saved">Added to %1$s</string>
   <string name="connections_already_in_album">Already in that album</string>
@@ -247,7 +249,7 @@
   <string name="connections_sign_in_action">Sign in</string>
   <string name="connections_signing_in">Signing in…</string>
   <string name="connections_sign_in_failed">Sign-in didn\'t finish: %1$s</string>
-  <string name="connections_sign_in_needed">Sign in with your free account to get this wallpaper</string>
+  <string name="connections_sign_in_needed">Sign in with your free account to save wallpapers to your phone</string>
   <string name="connections_no_browser">No browser on this phone can open Connections sign-in</string>
   <string name="connections_signed_in">Signed in as %1$s</string>
   <string name="connections_sign_out">Sign out</string>

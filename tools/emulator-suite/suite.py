@@ -363,8 +363,39 @@ def t_explore():
     check(len(tiles) > 8, f"gallery has pictures ({len(tiles)} labels)")
 
 
+def gallery_sizes() -> dict:
+    """Each published wallpaper's title and original size, from the live gallery the app browses."""
+    import json
+    import urllib.request
+    url = "https://wallpaper.connectionsapi.com/v1/wallpapers?limit=100"
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"accept": "application/json"}), timeout=20) as res:
+        return {w["title"]: (w["width"], w["height"]) for w in json.load(res)["items"]}
+
+
+def t_explore_set_signed_out():
+    """Signed out, a gallery wallpaper sets at its full size (never the 640px preview); only Save to phone asks for a sign-in."""
+    sizes = gallery_sizes()
+    open_tab("Explore")
+    check(cw.has("Search wallpapers", timeout=6), "Explore loads")
+    title = next((l for l in cw.labels() if l in sizes), None)
+    check(title is not None, "a gallery wallpaper is on screen")
+    cw.tap(title)
+    check(cw.has("Set wallpaper", timeout=6), f"the viewer opens on {title}")
+    before = ids()
+    cw.tap("Set wallpaper")
+    cw.tap("Home and lock screens")
+    check(wait_until(lambda: ids().get("system") != before.get("system"), 90), "the wallpaper is set, signed out")
+    width, height = sizes[title]
+    got = cw.wall_file_size("wallpaper_orig")
+    check(max(got) >= min(1920, max(width, height)) and max(got) > 640, f"set at {got[0]}x{got[1]}, the original is {width}x{height}")
+    cw.tap("Save to phone")
+    check(cw.has("Sign in with Connections", timeout=6), "Save to phone asks a signed-out visitor to sign in")
+    cw.d.press("back")
+
+
 TESTS = [t_lock_first_folder, t_unlock_changes, t_timer_toggle, t_unlock_off, t_pause, t_effects,
-         t_library_folder_fills_both, t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore]
+         t_library_folder_fills_both, t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore,
+         t_explore_set_signed_out]
 
 
 def unknown_tests(names: list[str]) -> list[str]:

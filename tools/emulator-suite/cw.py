@@ -154,6 +154,14 @@ def wall_rgb(which: str = "lock") -> tuple:
     return im.getpixel((im.width // 2, im.height // 2))
 
 
+def wall_file_size(name: str) -> tuple:
+    """Width and height of one of the system's wallpaper files (needs adb root): wallpaper_orig keeps the picture as set."""
+    import io
+    from PIL import Image
+    r = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"], capture_output=True, creationflags=NO_WINDOW)
+    return Image.open(io.BytesIO(r.stdout)).size
+
+
 def wall_color(which: str = "lock") -> str:
     """The test colour of the wallpaper file itself."""
     return nearest(wall_rgb(which))

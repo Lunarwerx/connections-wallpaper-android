@@ -29,9 +29,10 @@ data class ConnectionsUiState(
     /** True from the start: the first page is asked for as soon as the saved shape and the screen are known. */
     val loading: Boolean = true,
     val failed: Boolean = false,
-    /** Wallpapers being added to an album, and being set on the screen, by id. */
+    /** Wallpapers being added to an album, being set on the screen, and being saved to the phone, by id. */
     val saving: Set<String> = emptySet(),
     val setting: Set<String> = emptySet(),
+    val downloading: Set<String> = emptySet(),
     /** The shape chip's choice, and the screen it fits ([device] is null until the screen is measured). */
     val shape: ExploreShape = ExploreShape.FIT,
     val device: DeviceFit? = null
@@ -41,6 +42,7 @@ sealed interface ConnectionsMessage {
     data class Saved(val albumName: String) : ConnectionsMessage
     data object AlreadyInAlbum : ConnectionsMessage
     data class WallpaperSet(val target: WallpaperTarget) : ConnectionsMessage
+    data object SavedToPhone : ConnectionsMessage
     data object SignInNeeded : ConnectionsMessage
     data class Failed(val reason: String?) : ConnectionsMessage
 }
@@ -48,7 +50,7 @@ sealed interface ConnectionsMessage {
 /** What one list of pages asks the gallery for; [order] puts each page closest to that screen's shape first. */
 private data class PageRequest(val query: String, val tag: String?, val orientation: WallpaperShape?, val order: DeviceFit?)
 
-private class SignInNeededException : IOException("Connections asked for a sign-in to send this wallpaper")
+private class SignInNeededException : IOException("Connections asked for a sign-in to save this wallpaper")
 
 @HiltViewModel
 class ConnectionsViewModel @Inject constructor(
@@ -144,9 +146,21 @@ class ConnectionsViewModel @Inject constructor(
         if (wallpaper.id in _state.value.setting) return
         viewModelScope.launch {
             _state.update { it.copy(setting = it.setting + wallpaper.id) }
-            val message = runCatchingCancellable { withToken { originals.setAsWallpaper(wallpaper, target, it) } }
+            val message = runCatchingCancellable { originals.setAsWallpaper(wallpaper, target) }
                 .fold(onSuccess = { ConnectionsMessage.WallpaperSet(target) }, onFailure = ::failure)
             _state.update { it.copy(setting = it.setting - wallpaper.id) }
+            _messages.send(message)
+        }
+    }
+
+    /** Saving the original to the phone is the one thing that takes an account (Michael, 2026-10-20: encouragement, not a lock). */
+    fun saveToPhone(wallpaper: ConnectionsWallpaper) {
+        if (wallpaper.id in _state.value.downloading) return
+        viewModelScope.launch {
+            _state.update { it.copy(downloading = it.downloading + wallpaper.id) }
+            val message = runCatchingCancellable { withToken { originals.saveToPhone(wallpaper, it) } }
+                .fold(onSuccess = { ConnectionsMessage.SavedToPhone }, onFailure = ::failure)
+            _state.update { it.copy(downloading = it.downloading - wallpaper.id) }
             _messages.send(message)
         }
     }
@@ -155,7 +169,7 @@ class ConnectionsViewModel @Inject constructor(
         if (wallpaper.id in _state.value.saving) return
         viewModelScope.launch {
             _state.update { it.copy(saving = it.saving + wallpaper.id) }
-            val message = runCatchingCancellable { withToken { originals.addToAlbum(wallpaper, albumId, it) } }.fold(
+            val message = runCatchingCancellable { originals.addToAlbum(wallpaper, albumId) }.fold(
                 onSuccess = { added -> if (added) ConnectionsMessage.Saved(albumName) else ConnectionsMessage.AlreadyInAlbum },
                 onFailure = ::failure
             )

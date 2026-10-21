@@ -60,7 +60,7 @@ private data class ConnectionsRefusal(val error: String? = null, val message: St
 class ConnectionsApiException(val status: Int, override val message: String) : IOException(message) {
 }
 
-/** The Connections Wallpaper plane's public API: browse for everyone, originals for a signed-in member. */
+/** The Connections Wallpaper plane's public API: browse and set the full picture for everyone, save originals for a signed-in member. */
 @Singleton
 class ConnectionsApi @Inject constructor() {
     private val json = Json { ignoreUnknownKeys = true }
@@ -81,13 +81,17 @@ class ConnectionsApi @Inject constructor() {
     suspend fun tags(): List<ConnectionsTag> =
         json.decodeFromString<ConnectionsTags>(request("GET", "/v1/tags")).tags
 
-    /** [token] is the member's AEGIS access token (ConnectionsAccount.accessToken). */
+    /** A short-lived URL to the full-quality original, to set it as a wallpaper: no sign-in, not counted as a download. */
+    suspend fun full(id: String): ConnectionsDownload =
+        json.decodeFromString(request("GET", "/v1/wallpapers/full?id=${URLEncoder.encode(id, "UTF-8")}"))
+
+    /** The original to save to the phone, counted as a download; [token] is the member's AEGIS access token (ConnectionsAccount.accessToken). */
     suspend fun download(id: String, token: String): ConnectionsDownload =
         json.decodeFromString(
             request("POST", "/v1/wallpapers/download", body = json.encodeToString(mapOf("id" to id)), token = token)
         )
 
-    /** Streams the original behind a [download] URL into [write]. */
+    /** Streams the original behind a [full] or [download] URL into [write]. */
     suspend fun <T> readOriginal(url: String, write: (InputStream) -> T): T = withContext(Dispatchers.IO) {
         val connection = open(url)
         try {

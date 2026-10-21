@@ -197,6 +197,10 @@ fun HomeScreen(
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     snackbarHostState.showSnackbar(resources.getString(R.string.connections_saved, message.albumName))
                 }
+                ConnectionsMessage.SavedToPhone -> {
+                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_saved_to_phone))
+                }
                 ConnectionsMessage.AlreadyInAlbum ->
                     snackbarHostState.showSnackbar(resources.getString(R.string.connections_already_in_album))
                 ConnectionsMessage.SignInNeeded -> {

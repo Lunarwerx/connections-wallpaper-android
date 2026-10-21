@@ -228,6 +228,8 @@
   <string name="connections_show_all_shapes">显示全部形状</string>
   <string name="connections_view_source">查看来源</string>
   <string name="connections_add_to_album">添加到相册</string>
+  <string name="connections_save_to_phone">保存到手机</string>
+  <string name="connections_saved_to_phone">已保存到手机图片</string>
   <string name="connections_new_album">新建相册</string>
   <string name="connections_saved">已添加到 %1$s</string>
   <string name="connections_already_in_album">已在该相册中</string>
@@ -245,7 +247,7 @@
   <string name="connections_sign_in_action">登录</string>
   <string name="connections_signing_in">正在登录…</string>
   <string name="connections_sign_in_failed">登录未完成：%1$s</string>
-  <string name="connections_sign_in_needed">使用免费账号登录即可获取这张壁纸</string>
+  <string name="connections_sign_in_needed">使用免费账号登录即可将壁纸保存到手机</string>
   <string name="connections_no_browser">此手机上没有可以打开 Connections 登录页面的浏览器</string>
   <string name="connections_signed_in">已登录为 %1$s</string>
   <string name="connections_sign_out">退出登录</string>

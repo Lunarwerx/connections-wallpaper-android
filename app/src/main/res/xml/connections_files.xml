@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Where ConnectionsOriginals keeps the full-quality originals it sets and adds to albums; the app's own FileProvider serves them. -->
+<paths>
+    <files-path name="connections" path="connections/" />
+</paths>

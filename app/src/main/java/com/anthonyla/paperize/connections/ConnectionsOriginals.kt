@@ -7,12 +7,14 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import com.anthonyla.paperize.core.util.generateId
 import com.anthonyla.paperize.domain.model.Wallpaper
 import com.anthonyla.paperize.domain.repository.AlbumRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 
@@ -24,10 +26,12 @@ enum class WallpaperTarget(val flags: Int) {
 }
 
 /**
- * Full-quality Connections originals on the phone. Each is saved once into
- * Pictures/Connections Wallpaper; adding it to an album or setting it as the wallpaper reuses that
- * copy. The app owns the MediaStore row it inserts, so it reads it back without a storage
- * permission, and the photo also shows up in the gallery app.
+ * Full-quality Connections originals on the phone. Setting one as the wallpaper or adding it to an
+ * album needs no account: the original comes from the gallery's public full door and is kept in the
+ * app's own storage (files/connections), which no other app sees. Saving one to the phone is for a
+ * signed-in member (the download door, counted): it goes into Pictures/Connections Wallpaper and
+ * shows up in the gallery app, and the wallpaper or an album then reuses that copy. The app owns the
+ * MediaStore row it inserts, so it reads it back without a storage permission.
  */
 class ConnectionsOriginals @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -35,8 +39,8 @@ class ConnectionsOriginals @Inject constructor(
     private val albumRepository: AlbumRepository
 ) {
     /** Returns false when the album already had this wallpaper. */
-    suspend fun addToAlbum(wallpaper: ConnectionsWallpaper, albumId: String, token: String): Boolean {
-        val (uri, name) = saved(wallpaper, token)
+    suspend fun addToAlbum(wallpaper: ConnectionsWallpaper, albumId: String): Boolean {
+        val (uri, name) = kept(wallpaper)
         val entry = Wallpaper(
             id = generateId(),
             albumId = albumId,
@@ -47,16 +51,46 @@ class ConnectionsOriginals @Inject constructor(
         return albumRepository.addWallpapersToAlbum(albumId, listOf(entry)) > 0
     }
 
-    suspend fun setAsWallpaper(wallpaper: ConnectionsWallpaper, target: WallpaperTarget, token: String) {
-        val (uri, _) = saved(wallpaper, token)
+    suspend fun setAsWallpaper(wallpaper: ConnectionsWallpaper, target: WallpaperTarget) {
+        val (uri, _) = kept(wallpaper)
         withContext(Dispatchers.IO) {
             val input = context.contentResolver.openInputStream(uri) ?: throw IOException("The saved picture could not be opened")
             input.use { WallpaperManager.getInstance(context).setStream(it, null, true, target.flags) }
         }
     }
 
-    private suspend fun saved(wallpaper: ConnectionsWallpaper, token: String): Pair<Uri, String> =
+    /** Saves the original into the phone's pictures with a member's [token]; a copy saved before is kept as it is. */
+    suspend fun saveToPhone(wallpaper: ConnectionsWallpaper, token: String) {
         savedOriginal(wallpaper.slug) ?: downloadOriginal(wallpaper, token)
+    }
+
+    /** The copy saved to the phone when there is one, else the app's own. */
+    private suspend fun kept(wallpaper: ConnectionsWallpaper): Pair<Uri, String> =
+        savedOriginal(wallpaper.slug) ?: appCopy(wallpaper)
+
+    /** The app's own copy of the original, fetched once from the full door; a second use costs no second download. */
+    private suspend fun appCopy(wallpaper: ConnectionsWallpaper): Pair<Uri, String> {
+        val dir = File(context.filesDir, APP_DIR)
+        withContext(Dispatchers.IO) { dir.listFiles()?.firstOrNull { it.nameWithoutExtension == wallpaper.slug } }
+            ?.let { return contentUri(it) to it.name }
+        val full = api.full(wallpaper.id)
+        val name = "${wallpaper.slug}.${extensionOf(full)}"
+        val file = File(dir, name)
+        withContext(Dispatchers.IO) {
+            dir.mkdirs()
+            // Written beside it and renamed, so a copy cut short is never taken for a whole one.
+            val part = File(dir, "$name.part")
+            try {
+                api.readOriginal(full.url) { input -> part.outputStream().use { input.copyTo(it) } }
+                if (!part.renameTo(file)) throw IOException("The picture could not be kept")
+            } finally {
+                part.delete()
+            }
+        }
+        return contentUri(file) to name
+    }
+
+    private fun contentUri(file: File): Uri = FileProvider.getUriForFile(context, "${context.packageName}.connections", file)
 
     /** A copy this app saved before (same slug), so a second use costs no second download. */
     private suspend fun savedOriginal(slug: String): Pair<Uri, String>? = withContext(Dispatchers.IO) {
@@ -110,5 +144,7 @@ class ConnectionsOriginals @Inject constructor(
 
     private companion object {
         val RELATIVE_PATH = "${Environment.DIRECTORY_PICTURES}/Connections Wallpaper/"
+        /** Under files/, where res/xml/connections_files.xml lets the app's FileProvider read it back. */
+        const val APP_DIR = "connections"
     }
 }
