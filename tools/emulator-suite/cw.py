@@ -28,6 +28,8 @@ def _adb() -> str:
 
 ADB = _adb()
 PKG = "icu.connections.wallpaper"
+# The gallery API's firewall refuses Python's default user agent (403), so the suite names itself.
+UA = "connections-wallpaper-emulator-suite"
 MAIN = f"{PKG}/com.anthonyla.paperize.presentation.MainActivity"
 SHORTCUT = f"{PKG}/com.anthonyla.paperize.service.shortcut.WallpaperShortcutActivity"
 SERIAL = os.environ.get("ANDROID_SERIAL", "emulator-5554")
@@ -145,25 +147,37 @@ def wallpaper_ids() -> dict:
     return ids
 
 
-def wall_rgb(which: str = "lock") -> tuple:
-    """The centre pixel of the wallpaper file itself (needs adb root): the lock one when set, else the shared one."""
+def wall_image(name: str):
+    """One of the system's wallpaper files as a picture (needs adb root). Android rewrites the file just after a set,
+    so a read that is not yet a whole picture is tried again for a few seconds."""
     import io
     from PIL import Image
+    data = b""
+    for _ in range(10):
+        data = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"],
+                              capture_output=True, creationflags=NO_WINDOW).stdout
+        try:
+            im = Image.open(io.BytesIO(data))
+            im.load()
+            return im
+        except OSError:
+            time.sleep(0.5)
+    raise AssertionError(f"{name} never read as a picture ({len(data)} bytes)")
+
+
+def wall_rgb(which: str = "lock") -> tuple:
+    """The centre pixel of the wallpaper file itself (needs adb root): the lock one when set, else the shared one."""
     name = "wallpaper_lock" if which == "lock" else "wallpaper"
     listing = sh("shell", "ls", "/data/system/users/0/")
     if name not in listing.split():
         name = "wallpaper"
-    r = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"], capture_output=True, creationflags=NO_WINDOW)
-    im = Image.open(io.BytesIO(r.stdout)).convert("RGB")
+    im = wall_image(name).convert("RGB")
     return im.getpixel((im.width // 2, im.height // 2))
 
 
 def wall_file_size(name: str) -> tuple:
     """Width and height of one of the system's wallpaper files (needs adb root): wallpaper_orig keeps the picture as set."""
-    import io
-    from PIL import Image
-    r = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"], capture_output=True, creationflags=NO_WINDOW)
-    return Image.open(io.BytesIO(r.stdout)).size
+    return wall_image(name).size
 
 
 def wall_color(which: str = "lock") -> str:
