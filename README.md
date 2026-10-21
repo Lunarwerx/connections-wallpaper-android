@@ -20,7 +20,7 @@ gallery, a home-screen button, and a new name.
 - **When it changes.** When you unlock (on by default), on a timer (off by default), when you
   double-tap the wallpaper (live mode), from the home-screen widget, the Quick Settings tile, or the
   app shortcut. In static mode, Change on unlock runs a silent background helper, so Android shows
-  its notification.
+  its notification; Hide on the notice, or Settings → Change on unlock notification, turns it off.
 - **Where it shows.** Home and lock screen together, lock screen only, home screen only, or a
   different album for each.
 - **How it looks.** Fill, fit or stretch; darken (brightness), blur, vignette and grayscale.
@@ -91,7 +91,8 @@ The Paperize architecture is unchanged; see its notes below. The Connections tab
   pending one is ignored, and a matching one redeems once.
 - `UnlockChangeService` is static mode's Change on unlock: a quiet `specialUse` foreground service
   that sets the next wallpaper as the screen turns off. `WallpaperScheduler` starts and stops it
-  with the other schedules; live mode does the same inside its engine.
+  with the other schedules; live mode does the same inside its engine. A reboot or an app update
+  stops it, so `BootReceiver` runs the schedules again on both (`BOOT_COMPLETED`, `MY_PACKAGE_REPLACED`).
 - `ConnectionsOriginals` downloads an original into the photo library once, then adds it to an
   album through `AlbumRepository` or sets it through `WallpaperManager`.
 - The widget opens the same invisible activity as the launcher shortcut, which starts

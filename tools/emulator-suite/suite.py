@@ -4,8 +4,11 @@ saves shots/suite/FAIL-<test>.jpg and the labels on screen, then the run goes on
   tools\emulator-suite\check.cmd                                (unit, lint, release build, device tests)
   adb -s emulator-5554 install -r app/build/outputs/apk/release/app-release.apk
   python -X utf8 tools/emulator-suite/suite.py [test ...]      (no names: every test, in order)
-  python -X utf8 tools/emulator-suite/private.py [test ...]    (the same on a private emulator, when another session has 5554)
+  python -X utf8 tools/emulator-suite/private.py [test ...]    (the same on a private emulator, when another session has 5554;
+                                                               --apk <apk> runs another build, such as one from before a fix)
   python -X utf8 tools/emulator-suite/unlock_speed.py          (after lock_first_folder: screen-off to new lock picture)
+  python -X utf8 tools/emulator-suite/phone_install.py --serial <phone> [--build-log <log>]
+                                                               (install -r on a real phone whenever it is plugged in)
 
 Each run wipes the app's data first (the same as a fresh install) and takes about six minutes.
 """
