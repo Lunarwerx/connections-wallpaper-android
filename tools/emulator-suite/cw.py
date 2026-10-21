@@ -149,11 +149,12 @@ def wallpaper_ids() -> dict:
 
 def wall_image(name: str):
     """One of the system's wallpaper files as a picture (needs adb root). Android rewrites the file just after a set,
-    so a read that is not yet a whole picture is tried again for a few seconds."""
+    and on a loaded box the new file can take seconds to appear, so a read that is not yet a whole picture is tried
+    again for up to 20 s."""
     import io
     from PIL import Image
     data = b""
-    for _ in range(10):
+    for _ in range(40):
         data = subprocess.run([ADB, "-s", SERIAL, "exec-out", "cat", f"/data/system/users/0/{name}"],
                               capture_output=True, creationflags=NO_WINDOW).stdout
         try:
@@ -162,7 +163,8 @@ def wall_image(name: str):
             return im
         except OSError:
             time.sleep(0.5)
-    raise AssertionError(f"{name} never read as a picture ({len(data)} bytes)")
+    files = [f for f in sh("shell", "ls", "/data/system/users/0/").split() if f.startswith("wallpaper")]
+    raise AssertionError(f"{name} never read as a picture ({len(data)} bytes; wallpaper files: {files})")
 
 
 def wall_rgb(which: str = "lock") -> tuple:
