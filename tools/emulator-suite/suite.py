@@ -615,6 +615,36 @@ def kept_files() -> list[str]:
     return sorted(l.strip() for l in out.splitlines() if l.strip() and not l.endswith(":") and "No such file" not in l)
 
 
+def enter_name(opener: str, name: str, what: str, saved=None) -> None:
+    """Tap opener (a sheet row or menu item), type into the name dialog it opens and press Save, until the dialog's own
+    result shows: the field, then the dialog gone and, for a sheet's row, the sheet gone with it. Under load the keyboard
+    opens late and moves the dialog, so a click placed from the field's earlier bounds lands on the scrim and dismisses
+    the dialog; the sequence then starts again from the opener."""
+    field = cw.d(className="android.widget.EditText")
+    row = cw.d(text=opener)
+    saved = saved or (lambda: not row.exists)  # a page may show the same words as the row (Explore has a New collection tile)
+    end = time.time() + 120
+    seen = False
+    while time.time() < end:
+        try:
+            if not field.exists:
+                cw.tap(opener)  # one tap, then wait: a second tap while the dialog opens would close it
+                field.wait(timeout=20)
+            if not field.exists:
+                continue
+            seen = True
+            time.sleep(1.5)  # let the keyboard settle before typing into the field
+            field.set_text(name)
+            cw.tap("Save")
+            # done once the dialog and the sheet row that opened it are gone; never tap the opener again after that
+            if wait_until(lambda: not field.exists and saved(), 8):
+                return
+        except Exception:  # noqa: BLE001 - uiautomator2 reports a redrawn node as an RPC error
+            time.sleep(1)
+    check(seen, what)
+    check(False, "the name dialog took the name and Save closed it")
+
+
 def new_collection_from_viewer(name: str) -> str:
     """Open a gallery picture, put it in a new collection named <name> from the bookmark, close the viewer."""
     sizes = gallery_sizes()
@@ -624,11 +654,7 @@ def new_collection_from_viewer(name: str) -> str:
     check(cw.has("Set wallpaper", timeout=6), f"the viewer opens on {title}")
     cw.tap("Save to collection")
     check(cw.has("New collection", timeout=5), "the bookmark opens Save to collection")
-    cw.tap("New collection")
-    field = cw.d(className="android.widget.EditText")
-    check(field.wait(timeout=5), "New collection asks for a name")
-    field.set_text(name)
-    cw.tap("Save")
+    enter_name("New collection", name, "New collection asks for a name")
     check(cw.has(f"Added to {name}", timeout=6), f"the picture is in {name}")
     cw.d.press("back")
     check(wait_until(lambda: not cw.d(text="Set wallpaper").exists, 4), "one back closes the viewer (the name's keyboard is already down)")
@@ -647,13 +673,14 @@ def t_collections_browse():
         while not cw.has(tag) and time.time() < end:
             cw.d(scrollable=True).scroll.forward(steps=30)
         check(cw.has(tag, timeout=2), f"the manager shows the gallery's {tag}")
-    cw.d(scrollable=True).scroll.toBeginning(max_swipes=10)
-    if not cw.has("Art"):
-        cw.d(scrollable=True).scroll.to(text="Art")
+    # Japan sits far down a 60-tag list: swipe back up to a deadline until Art is in sight.
+    end = time.time() + 45
+    while not cw.d(text="Art").exists and time.time() < end:
+        cw.d(scrollable=True).scroll.backward(steps=30)
     cw.tap("Art")
     count = tags["art"]
     check(cw.has(f"{count} wallpaper", timeout=8), f"Art's page says {count} wallpapers, as the gallery does")
-    check(cw.has("Save offline"), "and offers Save offline")
+    check(cw.has("Save offline", timeout=10), "and offers Save offline")
     cw.d.press("back")
     cw.d.press("back")
     check(cw.has("See all", timeout=6), "back returns to Explore")
@@ -668,11 +695,7 @@ def t_collection_own():
     cw.tap("Beach Days")
     check(cw.has("1 wallpaper", timeout=6), "its page holds the one picture")
     cw.tap("More options")
-    cw.tap("Rename")
-    field = cw.d(className="android.widget.EditText")
-    check(field.wait(timeout=5), "Rename asks for the new name")
-    field.set_text("Beach")
-    cw.tap("Save")
+    enter_name("Rename", "Beach", "Rename asks for the new name")
     check(wait_until(lambda: cw.d(text="Beach").exists, 6), "the page takes the new name")
     cw.tap("More options")
     cw.tap("Delete")
@@ -732,12 +755,8 @@ def t_add_to_library_signed_out():
     check(cw.has("Set wallpaper", timeout=6), f"the viewer opens on {title}")
     cw.tap("Add to library")
     check(cw.has("New album", timeout=5), "Add to library opens the album list with New album")
-    cw.tap("New album")
-    field = cw.d(className="android.widget.EditText")
-    check(field.wait(timeout=5), "New album asks for a name")
-    field.set_text("Phone Picks")
-    cw.tap("Save")
-    check(cw.has("Sign in to add to your library", timeout=15), "signed out, the account sheet opens titled for this action")
+    enter_name("New album", "Phone Picks", "New album asks for a name")
+    check(cw.has("Sign in to add to your library", timeout=40), "signed out, the account sheet opens titled for this action")
     check(cw.has("Sign in with Connections"), "with the app's own Sign in with Connections button")
     cw.d.press("back")
     time.sleep(2)
@@ -763,11 +782,8 @@ def t_multi_select():
     cw.tap(first)
     check(cw.has("2 selected", timeout=5), "and a tap picks it again")
     cw.tap("Add to collection")
-    cw.tap("New collection")
-    field = cw.d(className="android.widget.EditText")
-    check(field.wait(timeout=5), "New collection asks for a name")
-    field.set_text("Picked Set")
-    cw.tap("Save")
+    enter_name("New collection", "Picked Set", "New collection asks for a name",
+               saved=lambda: not cw.d(textContains="selected").exists)
     check(cw.has("Added to Picked Set", timeout=6), "the picked pictures go into Picked Set")
     check(wait_until(lambda: not cw.d(textContains="selected").exists, 4), "and the selection ends with the add")
     cw.tap("Picked Set")
