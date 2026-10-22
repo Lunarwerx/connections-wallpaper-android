@@ -555,8 +555,9 @@ def t_shortcut():
 def t_explore():
     open_tab("Explore")
     check(cw.has("Search wallpapers", timeout=6), "Explore loads")
-    tiles = [l for l in cw.labels() if l not in ("All", "Art", "Space", "Earth", "Explore", "Library", "Wallpaper", "Settings", "Account")]
-    check(len(tiles) > 8, f"gallery has pictures ({len(tiles)} labels)")
+    # The wall fills after its first page arrives; read it with a deadline, not once.
+    tiles = lambda: [l for l in cw.labels() if l not in ("All", "Art", "Space", "Earth", "Explore", "Library", "Wallpaper", "Settings", "Account")]
+    check(wait_until(lambda: len(tiles()) > 8, 15), f"gallery has pictures ({len(tiles())} labels)")
 
 
 def gallery_sizes() -> dict:
@@ -599,15 +600,10 @@ def gallery_tags() -> dict:
         return {t["tag"]: t["count"] for t in json.load(res)["tags"]}
 
 
-def ready_app() -> None:
-    """A collections test also runs on its own: an app that has not been set up yet is set up first."""
-    cw.sh("shell", "am", "start", "-n", cw.MAIN)
-    if cw.d(text="Agree").wait(timeout=4):
-        cw.onboard()
-
-
 def explore_shelf() -> None:
-    ready_app()
+    """Explore from a fresh install: the collection flows leave their collections behind, and a name one took is refused."""
+    cw.fresh_app()
+    cw.onboard()
     open_tab("Explore")
     check(cw.has("Search wallpapers", timeout=6), "Explore loads")
     check(cw.has("See all", timeout=10), "the Collections shelf shows above the pictures")
@@ -646,9 +642,11 @@ def t_collections_browse():
     cw.tap("See all")
     check(cw.has("New collection", timeout=6) and cw.has("Yours"), "See all opens the manager with Yours and New collection")
     for tag in ("Art", "Space", "Japan"):
-        if not cw.has(tag):
-            cw.d(scrollable=True).scroll.to(text=tag)
-        check(cw.has(tag, timeout=4), f"the manager shows the gallery's {tag}")
+        # The gallery's tag list grows, so a tag can sit far down: scroll a step at a time, to a deadline.
+        end = time.time() + 45
+        while not cw.has(tag) and time.time() < end:
+            cw.d(scrollable=True).scroll.forward(steps=30)
+        check(cw.has(tag, timeout=2), f"the manager shows the gallery's {tag}")
     cw.d(scrollable=True).scroll.toBeginning(max_swipes=10)
     if not cw.has("Art"):
         cw.d(scrollable=True).scroll.to(text="Art")
@@ -723,10 +721,65 @@ def t_collection_offline_opens():
     cw.d.press("back")
 
 
+def t_add_to_library_signed_out():
+    """Signed out, Add to library takes a new album's name, then asks for the free account in the app's own sheet; nothing is fetched."""
+    explore_shelf()
+    before = kept_files()
+    sizes = gallery_sizes()
+    title = next((l for l in cw.labels() if l in sizes), None)
+    check(title is not None, "a gallery wallpaper is on screen")
+    cw.tap(title)
+    check(cw.has("Set wallpaper", timeout=6), f"the viewer opens on {title}")
+    cw.tap("Add to library")
+    check(cw.has("New album", timeout=5), "Add to library opens the album list with New album")
+    cw.tap("New album")
+    field = cw.d(className="android.widget.EditText")
+    check(field.wait(timeout=5), "New album asks for a name")
+    field.set_text("Phone Picks")
+    cw.tap("Save")
+    check(cw.has("Sign in to add to your library", timeout=15), "signed out, the account sheet opens titled for this action")
+    check(cw.has("Sign in with Connections"), "with the app's own Sign in with Connections button")
+    cw.d.press("back")
+    time.sleep(2)
+    check(kept_files() == before, "nothing was fetched while signed out")
+    cw.d.press("back")
+    check(wait_until(lambda: not cw.d(text="Set wallpaper").exists, 4), "one back closes the viewer")
+
+
+def t_multi_select():
+    """A long press on the Explore wall picks that picture; taps toggle; Add to collection puts the picked ones in a new collection."""
+    explore_shelf()
+    sizes = gallery_sizes()
+    titles = [l for l in cw.labels() if l in sizes]
+    check(len(titles) >= 2, "the wall shows at least two pictures")
+    first, second = titles[0], titles[1]
+    check(cw.d(description=first).wait(timeout=6), f"{first} is on the wall")
+    cw.d(description=first).long_click()
+    check(cw.has("1 selected", timeout=5), "a long press picks the picture and the bar counts it")
+    cw.tap(second)
+    check(cw.has("2 selected", timeout=5), "a tap on another picture picks it too")
+    cw.tap(first)
+    check(cw.has("1 selected", timeout=5) and not cw.has("2 selected"), "a tap on a picked picture takes it back out")
+    cw.tap(first)
+    check(cw.has("2 selected", timeout=5), "and a tap picks it again")
+    cw.tap("Add to collection")
+    cw.tap("New collection")
+    field = cw.d(className="android.widget.EditText")
+    check(field.wait(timeout=5), "New collection asks for a name")
+    field.set_text("Picked Set")
+    cw.tap("Save")
+    check(cw.has("Added to Picked Set", timeout=6), "the picked pictures go into Picked Set")
+    check(wait_until(lambda: not cw.d(textContains="selected").exists, 4), "and the selection ends with the add")
+    cw.tap("Picked Set")
+    check(cw.has("2 wallpapers", timeout=6), "its page holds both picked pictures")
+    cw.d.press("back")
+    check(cw.has("See all", timeout=6), "back returns to Explore")
+
+
 TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
          t_timer_toggle, t_unlock_off, t_pause, t_update_keeps_watcher, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
          t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out,
-         t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collection_offline_opens]
+         t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collection_offline_opens, t_multi_select, t_add_to_library_signed_out]
 
 
 def unknown_tests(names: list[str]) -> list[str]:

@@ -131,12 +131,12 @@ class ConnectionsCollections internal constructor(private val store: DataStore<P
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { decode(it) }
 
-    /** A new collection of the member's own, holding [first] when it is made from a picture. */
-    suspend fun create(name: String, first: ConnectionsWallpaper? = null): WallpaperCollection {
+    /** A new collection of the member's own, holding [picks] when it is made from pictures. */
+    suspend fun create(name: String, picks: List<ConnectionsWallpaper> = emptyList()): WallpaperCollection {
         val collection = WallpaperCollection(
             id = generateId(),
             name = name.trim(),
-            wallpapers = listOfNotNull(first),
+            wallpapers = picks.distinctBy { it.id },
             createdAt = System.currentTimeMillis()
         )
         update { it + collection }
@@ -148,6 +148,15 @@ class ConnectionsCollections internal constructor(private val store: DataStore<P
     }
 
     suspend fun delete(id: String) = update { list -> list.filterNot { it.id == id } }
+
+    /** Adds every one of [wallpapers] the collection does not hold yet, newest first; the ones it holds stay as they are. */
+    suspend fun addAll(id: String, wallpapers: List<ConnectionsWallpaper>) = update { list ->
+        list.map { collection ->
+            if (collection.id != id) return@map collection
+            val fresh = wallpapers.distinctBy { it.id }.filterNot { w -> collection.wallpapers.any { it.id == w.id } }
+            collection.copy(wallpapers = fresh + collection.wallpapers)
+        }
+    }
 
     /** Adds [wallpaper] to the collection, newest first, or takes it out when it is there; true when it was added. */
     suspend fun toggle(id: String, wallpaper: ConnectionsWallpaper): Boolean {

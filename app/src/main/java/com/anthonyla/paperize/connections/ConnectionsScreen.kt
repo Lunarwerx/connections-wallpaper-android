@@ -10,7 +10,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -39,7 +40,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Computer
@@ -126,9 +129,16 @@ fun ConnectionsScreen(
     val showAllShapes = { viewModel.selectShape(ExploreShape.ALL) }
     // The shelf belongs to the whole gallery: a search or a tag shows just the pictures.
     val shelf = shelfCards(cards).takeIf { it.isNotEmpty() && state.query.isEmpty() && state.tag == null }
+    // A new search, tag or shape is a new wall: what was picked on the old one is let go.
+    val selection = remember { WallSelection() }
+    LaunchedEffect(state.query, state.tag, state.shape) { selection.clear() }
 
     Column(modifier = modifier.fillMaxSize()) {
-        SearchPill(query = state.query, onSearch = viewModel::search, focus = searchFocus)
+        if (selection.active) {
+            SelectionBar(selection = selection, wallpapers = state.wallpapers, viewModel = viewModel)
+        } else {
+            SearchPill(query = state.query, onSearch = viewModel::search, focus = searchFocus)
+        }
         FilterRow(
             shape = state.shape,
             device = state.device,
@@ -181,6 +191,7 @@ fun ConnectionsScreen(
                     onOpen = onOpen,
                     // The end of a list cut down to one shape says so, and offers the rest.
                     onShowAllShapes = showAllShapes.takeIf { state.shape != ExploreShape.ALL && state.nextCursor == null },
+                    selection = selection,
                     header = shelf?.let { cards ->
                         @Composable {
                             CollectionsShelf(
@@ -395,7 +406,8 @@ internal fun WallpaperGrid(
     onOpen: (Int) -> Unit,
     onShowAllShapes: (() -> Unit)? = null,
     header: (@Composable () -> Unit)? = null,
-    images: Map<String, Any> = emptyMap()
+    images: Map<String, Any> = emptyMap(),
+    selection: WallSelection = remember { WallSelection() }
 ) {
     val gridState = rememberLazyStaggeredGridState()
     val open = stringResource(R.string.context_open)
@@ -420,7 +432,15 @@ internal fun WallpaperGrid(
         if (header != null) item(key = HEADER_KEY, span = StaggeredGridItemSpan.FullLine) { header() }
         itemsIndexed(wallpapers, key = { _, wallpaper -> wallpaper.id }) { index, wallpaper ->
             ContextMenuArea(actions = listOf(MenuAction(open, Icons.AutoMirrored.Outlined.OpenInNew) { onOpen(index) })) {
-                Tile(wallpaper = wallpaper, onClick = { onOpen(index) }, image = images[wallpaper.id])
+                Tile(
+                    wallpaper = wallpaper,
+                    // In selection mode a tap picks the picture instead of opening it.
+                    onClick = { if (selection.active) selection.toggle(wallpaper.id) else onOpen(index) },
+                    image = images[wallpaper.id],
+                    selected = wallpaper.id in selection.ids,
+                    picking = selection.active,
+                    onLongClick = { selection.enter(wallpaper.id) }
+                )
             }
         }
         if (loading || failed || onShowAllShapes != null) {
@@ -457,8 +477,17 @@ private fun EndOfShape(onShowAllShapes: () -> Unit) {
  * The picture and nothing else; it gives a little under the finger and lifts a little under a mouse, and a
  * keyboard's focus rings it (a laptop window, a tablet's keyboard case).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit, image: Any? = null) {
+internal fun Tile(
+    wallpaper: ConnectionsWallpaper,
+    onClick: () -> Unit,
+    image: Any? = null,
+    selected: Boolean = false,
+    picking: Boolean = false,
+    onLongClick: () -> Unit = {}
+) {
+    val haptics = LocalHapticFeedback.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val hovered by interaction.collectIsHoveredAsState()
@@ -472,26 +501,51 @@ internal fun Tile(wallpaper: ConnectionsWallpaper, onClick: () -> Unit, image: A
         label = "tile-press"
     )
     val ring = MaterialTheme.colorScheme.primary
-    AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current)
-            .data(image ?: wallpaper.previewUrl)
-            .crossfade(true)
-            .build(),
-        contentDescription = wallpaper.title,
-        placeholder = ColorPainter(wallpaper.swatch()),
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(wallpaper.previewRatio())
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .clip(TILE_SHAPE)
-            .then(if (focused) Modifier.border(FOCUS_RING, ring, TILE_SHAPE) else Modifier)
-            .clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand)
-    )
+    Box(modifier = Modifier.fillMaxWidth()) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(image ?: wallpaper.previewUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = wallpaper.title,
+            placeholder = ColorPainter(wallpaper.swatch()),
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(wallpaper.previewRatio())
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .clip(TILE_SHAPE)
+                .then(if (focused || selected) Modifier.border(FOCUS_RING, ring, TILE_SHAPE) else Modifier)
+                .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    role = Role.Button,
+                    onClick = onClick,
+                    // A long press starts selection mode with this picture picked; the phone ticks once to say so.
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongClick()
+                    }
+                )
+                .pointerHoverIcon(PointerIcon.Hand)
+        )
+        // In selection mode every picture shows its circle: filled when picked, as the album view does.
+        if (picking) {
+            Icon(
+                imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                contentDescription = null,
+                tint = if (selected) ring else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(24.dp)
+                    .background(MaterialTheme.colorScheme.surface, CircleShape)
+            )
+        }
+    }
 }
 
 @Composable
