@@ -620,25 +620,34 @@ def enter_name(opener: str, name: str, what: str, saved=None) -> None:
     result shows: the field, then the dialog gone and, for a sheet's row, the sheet gone with it. Under load the keyboard
     opens late and moves the dialog, so a click placed from the field's earlier bounds lands on the scrim and dismisses
     the dialog; the sequence then starts again from the opener."""
-    field = cw.d(className="android.widget.EditText")
+    edits = cw.d(className="android.widget.EditText")
+    save = cw.d(text="Save")
     row = cw.d(text=opener)
     saved = saved or (lambda: not row.exists)  # a page may show the same words as the row (Explore has a New collection tile)
+    # The dialog is the window with a Save button; its field is the last EditText in the dump (Explore's search field is
+    # an EditText too and comes first), so a retry can never type into the page behind the dialog.
+    dialog = lambda: save.exists and edits.exists
     end = time.time() + 120
-    seen = False
+    seen = pressed = False
     while time.time() < end:
         try:
-            if not field.exists:
+            if dialog():
+                seen = True
+                time.sleep(1.5)  # let the keyboard settle before typing into the field
+                cw.d(className="android.widget.EditText", instance=edits.count - 1).set_text(name)
+                cw.tap("Save")
+                pressed = True
+                if wait_until(lambda: not dialog() and saved(), 8):
+                    return
+            elif pressed:
+                # Save closed the dialog: wait for its result and never type again unless the dialog is back
+                if wait_until(lambda: dialog() or saved(), 8) and not dialog():
+                    return
+                if not dialog():
+                    pressed = False  # the dialog went without saving (a scrim tap): start again from the opener
+            else:
                 cw.tap(opener)  # one tap, then wait: a second tap while the dialog opens would close it
-                field.wait(timeout=20)
-            if not field.exists:
-                continue
-            seen = True
-            time.sleep(1.5)  # let the keyboard settle before typing into the field
-            field.set_text(name)
-            cw.tap("Save")
-            # done once the dialog and the sheet row that opened it are gone; never tap the opener again after that
-            if wait_until(lambda: not field.exists and saved(), 8):
-                return
+                wait_until(dialog, 20)
         except Exception:  # noqa: BLE001 - uiautomator2 reports a redrawn node as an RPC error
             time.sleep(1)
     check(seen, what)
@@ -661,25 +670,24 @@ def new_collection_from_viewer(name: str) -> str:
     return title
 
 
+def first_gallery_tag() -> str:
+    """The first tag the manager lists under From the gallery; the live gallery's tags change, so no test names one."""
+    check(cw.has("From the gallery", timeout=8), "the manager has a From the gallery list")
+    labels = cw.labels()
+    return labels[labels.index("From the gallery") + 1]
+
+
 def t_collections_browse():
     """Explore's shelf opens the manager (Yours, then the gallery's tags), and a tag's page shows its live count."""
     tags = gallery_tags()
     explore_shelf()
     cw.tap("See all")
     check(cw.has("New collection", timeout=6) and cw.has("Yours"), "See all opens the manager with Yours and New collection")
-    for tag in ("Art", "Space", "Japan"):
-        # The gallery's tag list grows, so a tag can sit far down: scroll a step at a time, to a deadline.
-        end = time.time() + 45
-        while not cw.has(tag) and time.time() < end:
-            cw.d(scrollable=True).scroll.forward(steps=30)
-        check(cw.has(tag, timeout=2), f"the manager shows the gallery's {tag}")
-    # Japan sits far down a 60-tag list: swipe back up to a deadline until Art is in sight.
-    end = time.time() + 45
-    while not cw.d(text="Art").exists and time.time() < end:
-        cw.d(scrollable=True).scroll.backward(steps=30)
-    cw.tap("Art")
-    count = tags["art"]
-    check(cw.has(f"{count} wallpaper", timeout=8), f"Art's page says {count} wallpapers, as the gallery does")
+    tag = first_gallery_tag()
+    check(tag.lower() in tags, f"the manager lists the gallery's {tag} first")
+    cw.tap(tag)
+    count = tags[tag.lower()]
+    check(cw.has(f"{count} wallpaper", timeout=8), f"{tag}'s page says {count} wallpapers, as the gallery does")
     check(cw.has("Save offline", timeout=10), "and offers Save offline")
     cw.d.press("back")
     cw.d.press("back")
@@ -709,13 +717,12 @@ def t_collection_offline_signed_out():
     """Signed out, Save offline asks for the free account in the app's own sheet and keeps nothing on the phone."""
     explore_shelf()
     before = kept_files()
-    # Explore's Art chip shares the shelf card's label; the manager has only the card.
+    # Explore's tag chips share the shelf card's label; the manager has only the card.
     cw.tap("See all")
-    if not cw.has("Art", timeout=4):
-        cw.d(scrollable=True).scroll.to(text="Art")
-    cw.tap("Art")
+    tag = first_gallery_tag()
+    cw.tap(tag)
     cw.tap("Save offline")
-    check(cw.has("Save Art offline", timeout=6), "Save offline asks for the account, named for what it saves")
+    check(cw.has(f"Save {tag} offline", timeout=6), "Save offline asks for the account, named for what it saves")
     check(cw.has("Sign in with Connections"), "with the app's own Sign in with Connections button")
     cw.d.press("back")
     time.sleep(2)
@@ -755,7 +762,8 @@ def t_add_to_library_signed_out():
     check(cw.has("Set wallpaper", timeout=6), f"the viewer opens on {title}")
     cw.tap("Add to library")
     check(cw.has("New album", timeout=5), "Add to library opens the album list with New album")
-    enter_name("New album", "Phone Picks", "New album asks for a name")
+    enter_name("New album", "Phone Picks", "New album asks for a name",
+               saved=lambda: cw.d(textContains="Sign in to add to your library").exists)
     check(cw.has("Sign in to add to your library", timeout=40), "signed out, the account sheet opens titled for this action")
     check(cw.has("Sign in with Connections"), "with the app's own Sign in with Connections button")
     cw.d.press("back")
