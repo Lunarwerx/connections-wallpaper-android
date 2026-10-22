@@ -33,7 +33,7 @@ class OfflineCollectionsTest {
 
     @After fun tearDown() = runTest { collections.close() }
 
-    private fun offline() = OfflineCollections(api, account, originals, albums, collections.store)
+    private fun offline() = OfflineCollections(api, ConnectionsLibrary(account, originals), albums, collections.store)
 
     @Test fun `signed out, Save offline asks for the account and fetches nothing`() = runTest {
         coEvery { account.accessToken(any()) } returns null

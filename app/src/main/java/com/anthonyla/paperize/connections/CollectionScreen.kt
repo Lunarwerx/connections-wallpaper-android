@@ -109,7 +109,10 @@ fun CollectionScreen(
         }
     }
 
-    ConnectionsMessageEffect(explore, snackbarHostState, onSignInNeeded = { showAccount = true })
+    ConnectionsMessageEffect(explore, snackbarHostState, onSignInNeeded = { showAccount = true }, onOpenAlbum = onOpenAlbum)
+    ResumeLibraryAdd(explore, signedIn = signedIn, onNeedAccount = { showAccount = true })
+    val libraryWaiting by explore.libraryWaiting.collectAsStateWithLifecycle()
+    val selection = remember { WallSelection() }
 
     LaunchedEffect(accountState, pendingSave) {
         if (pendingSave && accountState is AccountState.SignedIn) {
@@ -157,7 +160,7 @@ fun CollectionScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
+            if (selection.active) SelectionBar(selection = selection, wallpapers = state.wallpapers, viewModel = explore) else TopAppBar(
                 title = { Text(text = state.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -240,6 +243,7 @@ fun CollectionScreen(
                         failed = state.failed,
                         onRetry = viewModel::retry,
                         onLoadMore = viewModel::loadMore,
+                        selection = selection,
                         onOpen = { index ->
                             viewerStart = index
                             viewerOpen = true
@@ -281,9 +285,14 @@ fun CollectionScreen(
             onDismiss = {
                 showAccount = false
                 pendingSave = false
+                explore.cancelLibraryAdd()
                 accountViewModel.dismissSignInError()
             },
-            title = if (pendingSave) stringResource(R.string.connections_offline_sign_in_title, state.name) else null,
+            title = when {
+                libraryWaiting != null -> stringResource(R.string.connections_library_sign_in)
+                pendingSave -> stringResource(R.string.connections_offline_sign_in_title, state.name)
+                else -> null
+            },
             body = if (pendingSave) stringResource(R.string.connections_offline_sign_in_body) else null
         )
     }

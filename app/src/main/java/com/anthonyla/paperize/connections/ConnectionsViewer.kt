@@ -255,21 +255,21 @@ fun ConnectionsViewer(
                 albums = albums,
                 onPick = { album ->
                     sheet = null
-                    viewModel.addToAlbum(current, album)
+                    viewModel.addToLibrary(listOf(current), LibraryTarget.Existing(album))
                 },
                 onNewAlbum = { name ->
                     sheet = null
-                    viewModel.addToNewAlbum(current, name)
+                    viewModel.addToLibrary(listOf(current), LibraryTarget.New(name))
                 },
                 onDismiss = { sheet = null }
             )
             ViewerSheet.Collection -> CollectionSheet(
                 collections = own,
-                wallpaper = current,
+                wallpapers = listOf(current),
                 onToggle = { collection -> viewModel.toggleInCollection(current, collection.id) },
                 onNew = { name ->
                     sheet = null
-                    viewModel.addToNewCollection(current, name)
+                    viewModel.addToNewCollection(listOf(current), name)
                 },
                 onDismiss = { sheet = null }
             )
@@ -385,7 +385,7 @@ private fun InfoCard(
                     if (saving) {
                         CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = LocalContentColor.current)
                     } else {
-                        Icon(Icons.Outlined.LibraryAdd, contentDescription = stringResource(R.string.connections_add_to_album))
+                        Icon(Icons.Outlined.LibraryAdd, contentDescription = stringResource(R.string.connections_add_to_library))
                     }
                 }
                 FilledTonalIconButton(
@@ -418,7 +418,7 @@ private fun TargetSheet(onPick: (WallpaperTarget) -> Unit, onDismiss: () -> Unit
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AlbumSheet(
+internal fun AlbumSheet(
     albums: List<AlbumSummary>,
     onPick: (AlbumSummary) -> Unit,
     onNewAlbum: (String) -> Unit,
@@ -431,7 +431,7 @@ private fun AlbumSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 16.dp)
         ) {
-            SheetTitle(stringResource(R.string.connections_add_to_album))
+            SheetTitle(stringResource(R.string.connections_add_to_library))
             albums.forEach { album ->
                 SheetRow(
                     icon = Icons.Outlined.PhotoAlbum,
@@ -464,9 +464,9 @@ private fun AlbumSheet(
 /** The member's own collections, each ticked when it holds [wallpaper]; a tap puts it in or takes it out. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CollectionSheet(
+internal fun CollectionSheet(
     collections: List<WallpaperCollection>,
-    wallpaper: ConnectionsWallpaper,
+    wallpapers: List<ConnectionsWallpaper>,
     onToggle: (WallpaperCollection) -> Unit,
     onNew: (String) -> Unit,
     onDismiss: () -> Unit
@@ -480,7 +480,7 @@ private fun CollectionSheet(
         ) {
             SheetTitle(stringResource(R.string.connections_save_to_collection))
             collections.forEach { collection ->
-                val inIt = collection.wallpapers.any { it.id == wallpaper.id }
+                val inIt = wallpapers.all { w -> collection.wallpapers.any { it.id == w.id } }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),

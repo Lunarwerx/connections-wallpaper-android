@@ -14,7 +14,8 @@ import com.anthonyla.paperize.R
 fun ConnectionsMessageEffect(
     viewModel: ConnectionsViewModel,
     snackbarHostState: SnackbarHostState,
-    onSignInNeeded: () -> Unit
+    onSignInNeeded: () -> Unit,
+    onOpenAlbum: (String) -> Unit
 ) {
     val resources = LocalResources.current
     val haptics = LocalHapticFeedback.current
@@ -28,6 +29,14 @@ fun ConnectionsMessageEffect(
                 is ConnectionsMessage.Saved -> {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     snackbarHostState.showSnackbar(resources.getString(R.string.connections_saved, message.albumName))
+                }
+                is ConnectionsMessage.AddedToLibrary -> {
+                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                    val answer = snackbarHostState.showSnackbar(
+                        message = resources.getQuantityString(R.plurals.connections_library_added, message.count, message.count, message.albumName),
+                        actionLabel = resources.getString(R.string.open_album)
+                    )
+                    if (answer == SnackbarResult.ActionPerformed) onOpenAlbum(message.albumId)
                 }
                 ConnectionsMessage.SavedToPhone -> {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)

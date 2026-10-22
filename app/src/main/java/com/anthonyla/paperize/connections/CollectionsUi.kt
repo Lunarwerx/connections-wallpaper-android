@@ -213,7 +213,8 @@ fun CollectionsScreen(
     val cards by viewModel.cards.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var naming by rememberSaveable { mutableStateOf(false) }
-    ConnectionsMessageEffect(viewModel, snackbarHostState, onSignInNeeded = {})
+    // The manager adds no pictures to the Library, so its snackbars never offer an album.
+    ConnectionsMessageEffect(viewModel, snackbarHostState, onSignInNeeded = {}, onOpenAlbum = {})
     val own = cards.filter { it.own }
     val gallery = cards.filterNot { it.own }
 

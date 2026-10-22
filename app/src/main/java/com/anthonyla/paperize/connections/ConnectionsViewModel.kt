@@ -43,8 +43,19 @@ data class ConnectionsUiState(
     val device: DeviceFit? = null
 )
 
+/** Where a Library add goes: an album that exists, or a new album with this name. */
+sealed interface LibraryTarget {
+    data class Existing(val album: AlbumSummary) : LibraryTarget
+    data class New(val name: String) : LibraryTarget
+}
+
+/** A Library add and its pictures; a plain class, so each waiting request is its own, even when two are alike. */
+class LibraryRequest(val wallpapers: List<ConnectionsWallpaper>, val target: LibraryTarget)
+
 sealed interface ConnectionsMessage {
     data class Saved(val albumName: String) : ConnectionsMessage
+    /** [count] pictures were kept and added to the album [albumId], which is called [albumName]. */
+    data class AddedToLibrary(val albumId: String, val albumName: String, val count: Int) : ConnectionsMessage
     data object AlreadyInAlbum : ConnectionsMessage
     data class WallpaperSet(val target: WallpaperTarget) : ConnectionsMessage
     data object SavedToPhone : ConnectionsMessage
@@ -63,6 +74,7 @@ class ConnectionsViewModel @Inject constructor(
     private val api: ConnectionsApi,
     private val account: ConnectionsAccount,
     private val originals: ConnectionsOriginals,
+    private val library: ConnectionsLibrary,
     private val createAlbumUseCase: CreateAlbumUseCase,
     private val preferences: ExplorePreferences,
     albumRepository: AlbumRepository,
@@ -87,6 +99,13 @@ class ConnectionsViewModel @Inject constructor(
 
     private val _messages = Channel<ConnectionsMessage>(Channel.BUFFERED)
     val messages: Flow<ConnectionsMessage> = _messages.receiveAsFlow()
+
+    private val _libraryWaiting = MutableStateFlow<LibraryRequest?>(null)
+    /**
+     * A Library add that asked for the account. The screen opens the account sheet for it (titled for this action)
+     * and calls [resumeLibrary] once the member is signed in, so the add finishes by itself.
+     */
+    val libraryWaiting: StateFlow<LibraryRequest?> = _libraryWaiting.asStateFlow()
 
     private var pageJob: Job? = null
     private var request: PageRequest? = null
@@ -149,14 +168,61 @@ class ConnectionsViewModel @Inject constructor(
         load(request, current.nextCursor)
     }
 
-    fun addToAlbum(wallpaper: ConnectionsWallpaper, album: AlbumSummary) = addToAlbum(wallpaper, album.id, album.name)
+    /** Adds [wallpapers] to the Library: to an album that exists, or to one made now, named [target]. */
+    fun addToLibrary(wallpapers: List<ConnectionsWallpaper>, target: LibraryTarget) {
+        if (wallpapers.isEmpty()) return
+        viewModelScope.launch { runLibrary(LibraryRequest(wallpapers, target)) }
+    }
 
-    fun addToNewAlbum(wallpaper: ConnectionsWallpaper, name: String) {
-        viewModelScope.launch {
-            runCatchingCancellable { createAlbumUseCase(name) }
-                .onSuccess { album -> addToAlbum(wallpaper, album.id, album.name) }
-                .onFailure { _messages.send(ConnectionsMessage.Failed(it.message)) }
+    /** The account sheet was closed without signing in: the waiting Library add is dropped, as Save offline's is. */
+    fun cancelLibraryAdd() {
+        _libraryWaiting.value = null
+    }
+
+    /** Runs the Library add that waited for the account, if one waits; the screen calls this once the member is signed in. */
+    fun resumeLibrary() {
+        val request = _libraryWaiting.value ?: return
+        viewModelScope.launch { runLibrary(request) }
+    }
+
+    private suspend fun runLibrary(request: LibraryRequest) {
+        val ids = request.wallpapers.map { it.id }.toSet()
+        _state.update { it.copy(saving = it.saving + ids) }
+        try {
+            var albumName = ""
+            val result = runCatchingCancellable {
+                library.addToAlbum(
+                    pick = { request.wallpapers },
+                    albumFor = { albumOf(request.target).let { (id, name) -> albumName = name; id } }
+                )
+            }.getOrElse {
+                _libraryWaiting.value = null
+                _messages.send(ConnectionsMessage.Failed(it.message))
+                return
+            }
+            when (result) {
+                LibraryAdd.SignInNeeded -> _libraryWaiting.value = request
+                is LibraryAdd.Failed -> {
+                    _libraryWaiting.value = null
+                    _messages.send(ConnectionsMessage.Failed(result.reason))
+                }
+                is LibraryAdd.Added -> {
+                    _libraryWaiting.value = null
+                    _messages.send(
+                        if (result.kept.isNotEmpty() && result.added == 0) ConnectionsMessage.AlreadyInAlbum
+                        else ConnectionsMessage.AddedToLibrary(result.albumId, albumName, result.kept.size)
+                    )
+                }
+            }
+        } finally {
+            _state.update { it.copy(saving = it.saving - ids) }
         }
+    }
+
+    /** The album a Library add goes to: one that exists, or a new one (whose name the gallery may still change). */
+    private suspend fun albumOf(target: LibraryTarget): Pair<String, String> = when (target) {
+        is LibraryTarget.Existing -> target.album.id to target.album.name
+        is LibraryTarget.New -> createAlbumUseCase(target.name).let { it.id to it.name }
     }
 
     fun setWallpaper(wallpaper: ConnectionsWallpaper, target: WallpaperTarget) {
@@ -182,19 +248,6 @@ class ConnectionsViewModel @Inject constructor(
         }
     }
 
-    private fun addToAlbum(wallpaper: ConnectionsWallpaper, albumId: String, albumName: String) {
-        if (wallpaper.id in _state.value.saving) return
-        viewModelScope.launch {
-            _state.update { it.copy(saving = it.saving + wallpaper.id) }
-            val message = runCatchingCancellable { originals.addToAlbum(wallpaper, albumId) }.fold(
-                onSuccess = { added -> if (added) ConnectionsMessage.Saved(albumName) else ConnectionsMessage.AlreadyInAlbum },
-                onFailure = ::failure
-            )
-            _state.update { it.copy(saving = it.saving - wallpaper.id) }
-            _messages.send(message)
-        }
-    }
-
     /** Puts [wallpaper] in one of the member's own collections, or takes it out when it is there. */
     fun toggleInCollection(wallpaper: ConnectionsWallpaper, collectionId: String) {
         viewModelScope.launch {
@@ -203,10 +256,20 @@ class ConnectionsViewModel @Inject constructor(
         }
     }
 
-    /** A new collection of the member's own, starting with [wallpaper]. */
-    fun addToNewCollection(wallpaper: ConnectionsWallpaper, name: String) {
+    /** Adds [wallpapers] to one of the member's own collections; the ones it holds already stay as they are. */
+    fun addAllToCollection(wallpapers: List<ConnectionsWallpaper>, collectionId: String) {
         viewModelScope.launch {
-            runCatchingCancellable { collectionStore.create(name, wallpaper) }
+            val name = collections.value.firstOrNull { it.id == collectionId }?.name.orEmpty()
+            runCatchingCancellable { collectionStore.addAll(collectionId, wallpapers) }
+                .onSuccess { _messages.send(ConnectionsMessage.AddedToCollection(name)) }
+                .onFailure { _messages.send(ConnectionsMessage.Failed(it.message)) }
+        }
+    }
+
+    /** A new collection of the member's own, starting with [wallpapers]. */
+    fun addToNewCollection(wallpapers: List<ConnectionsWallpaper>, name: String) {
+        viewModelScope.launch {
+            runCatchingCancellable { collectionStore.create(name, wallpapers) }
                 .onSuccess { _messages.send(ConnectionsMessage.AddedToCollection(it.name)) }
                 .onFailure { _messages.send(ConnectionsMessage.Failed(it.message)) }
         }

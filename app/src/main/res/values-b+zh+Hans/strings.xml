@@ -227,7 +227,14 @@
   <string name="connections_end_of_shape">这种形状的壁纸就这些</string>
   <string name="connections_show_all_shapes">显示全部形状</string>
   <string name="connections_view_source">查看来源</string>
-  <string name="connections_add_to_album">添加到相册</string>
+  <string name="connections_add_to_library">添加到资料库</string>
+  <string name="connections_library_sign_in">登录后即可添加到你的资料库</string>
+  <plurals name="connections_library_added">
+    <item quantity="other">已将 %1$d 张添加到%2$s</item>
+  </plurals>
+  <string name="connections_add_to_collection">添加到收藏集</string>
+  <string name="connections_select_all">全选</string>
+  <string name="connections_selected">已选择 %1$d 项</string>
   <string name="connections_save_to_phone">保存到手机</string>
   <string name="connections_saved_to_phone">已保存到手机图片</string>
   <string name="connections_new_album">新建相册</string>

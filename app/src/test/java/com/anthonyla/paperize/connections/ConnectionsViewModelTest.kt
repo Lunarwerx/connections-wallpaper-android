@@ -44,7 +44,7 @@ class ConnectionsViewModelTest {
     }
 
     private fun viewModel(): ConnectionsViewModel =
-        ConnectionsViewModel(api, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), preferences, albums, collections)
+        ConnectionsViewModel(api, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), preferences, albums, collections)
             .also { store.put("explore", it) }
 
     @Test fun `Explore waits for the screen, then asks for its shape with the closest picture first`() = runTest {

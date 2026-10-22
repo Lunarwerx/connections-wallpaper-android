@@ -229,7 +229,15 @@
   <string name="connections_end_of_shape">That\'s every wallpaper in this shape</string>
   <string name="connections_show_all_shapes">Show all shapes</string>
   <string name="connections_view_source">View source</string>
-  <string name="connections_add_to_album">Add to album</string>
+  <string name="connections_add_to_library">Add to library</string>
+  <string name="connections_library_sign_in">Sign in to add to your library</string>
+  <plurals name="connections_library_added">
+    <item quantity="one">Added %1$d picture to %2$s</item>
+    <item quantity="other">Added %1$d pictures to %2$s</item>
+  </plurals>
+  <string name="connections_add_to_collection">Add to collection</string>
+  <string name="connections_select_all">Select all</string>
+  <string name="connections_selected">%1$d selected</string>
   <string name="connections_save_to_phone">Save to phone</string>
   <string name="connections_saved_to_phone">Saved to Pictures</string>
   <string name="connections_new_album">New album</string>

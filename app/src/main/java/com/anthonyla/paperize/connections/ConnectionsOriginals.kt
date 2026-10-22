@@ -26,8 +26,8 @@ enum class WallpaperTarget(val flags: Int) {
 }
 
 /**
- * Full-quality Connections originals on the phone. Setting one as the wallpaper or adding it to an
- * album needs no account: the original comes from the gallery's public full door and is kept in the
+ * Full-quality Connections originals on the phone. Setting one as the wallpaper needs no account; adding one to
+ * an album goes through [ConnectionsLibrary], which asks for the account first. The original comes from the gallery's public full door and is kept in the
  * app's own storage (files/connections), which no other app sees. Saving one to the phone is for a
  * signed-in member (the download door, counted): it goes into Pictures/Connections Wallpaper and
  * shows up in the gallery app, and the wallpaper or an album then reuses that copy. The app owns the
@@ -38,10 +38,6 @@ class ConnectionsOriginals @Inject constructor(
     private val api: ConnectionsApi,
     private val albumRepository: AlbumRepository
 ) {
-    /** Returns false when the album already had this wallpaper. */
-    suspend fun addToAlbum(wallpaper: ConnectionsWallpaper, albumId: String): Boolean =
-        addAllToAlbum(listOf(wallpaper), albumId) > 0
-
     /** Adds every one of [wallpapers] to the album in one go; returns how many it did not have yet. */
     suspend fun addAllToAlbum(wallpapers: List<ConnectionsWallpaper>, albumId: String): Int {
         if (wallpapers.isEmpty()) return 0

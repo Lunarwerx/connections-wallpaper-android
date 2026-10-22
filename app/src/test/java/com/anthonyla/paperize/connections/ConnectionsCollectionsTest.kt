@@ -14,7 +14,7 @@ class ConnectionsCollectionsTest {
     @Test fun `a member's own collections, with what they hold and their names, are still there after the app restarts`() = runTest {
         val file = folder.root.resolve("collections.preferences_pb")
         val first = CollectionsTestStore(file)
-        val beach = first.store.create("Beach", galleryWallpaper("a"))
+        val beach = first.store.create("Beach", listOf(galleryWallpaper("a")))
         val night = first.store.create("Night")
         assertTrue(first.store.toggle(beach.id, galleryWallpaper("b")))
         // A second tap takes a picture back out.

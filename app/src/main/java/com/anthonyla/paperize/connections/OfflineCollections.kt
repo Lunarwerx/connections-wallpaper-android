@@ -39,8 +39,7 @@ sealed interface OfflineResult {
 @Singleton
 class OfflineCollections @Inject constructor(
     private val api: ConnectionsApi,
-    private val account: ConnectionsAccount,
-    private val originals: ConnectionsOriginals,
+    private val library: ConnectionsLibrary,
     private val albums: AlbumRepository,
     private val collections: ConnectionsCollections
 ) {
@@ -79,24 +78,23 @@ class OfflineCollections @Inject constructor(
 
     /** Saves [collection] and says how it went; the account is asked for before anything is fetched. */
     suspend fun save(collection: WallpaperCollection): OfflineResult {
-        account.accessToken() ?: return OfflineResult.SignInNeeded(collection.id)
-        val wallpapers = collection.tag?.let { allOf(it) } ?: collection.wallpapers
-        _progress.update { it + (collection.id to OfflineProgress(0, wallpapers.size)) }
-        val kept = mutableListOf<ConnectionsWallpaper>()
-        var lastFailure: Throwable? = null
-        wallpapers.forEachIndexed { index, wallpaper ->
-            runCatchingCancellable { originals.keepOffline(wallpaper) }
-                .onSuccess { kept += wallpaper }
-                .onFailure { lastFailure = it }
-            _progress.update { it + (collection.id to OfflineProgress(index + 1, wallpapers.size)) }
+        val result = library.addToAlbum(
+            pick = { collection.tag?.let { allOf(it) } ?: collection.wallpapers },
+            albumFor = { albumFor(collection) },
+            onProgress = { done, total -> _progress.update { it + (collection.id to OfflineProgress(done, total)) } }
+        )
+        return when (result) {
+            LibraryAdd.SignInNeeded -> OfflineResult.SignInNeeded(collection.id)
+            is LibraryAdd.Failed -> OfflineResult.Failed(collection.id, result.reason)
+            is LibraryAdd.Added -> {
+                val complete = result.kept.size == result.wanted.size
+                collections.recordSave(
+                    collection, result.wanted, result.albumId, result.kept.map { it.id }, complete, System.currentTimeMillis()
+                )
+                if (complete) OfflineResult.Saved(collection.id, collection.name, result.kept.size, result.albumId)
+                else OfflineResult.Partly(collection.id, collection.name, result.kept.size, result.wanted.size)
+            }
         }
-        if (kept.isEmpty() && wallpapers.isNotEmpty()) return OfflineResult.Failed(collection.id, lastFailure?.message)
-        val albumId = albumFor(collection)
-        originals.addAllToAlbum(kept, albumId)
-        val complete = kept.size == wallpapers.size
-        collections.recordSave(collection, wallpapers, albumId, kept.map { it.id }, complete, System.currentTimeMillis())
-        return if (complete) OfflineResult.Saved(collection.id, collection.name, kept.size, albumId)
-        else OfflineResult.Partly(collection.id, collection.name, kept.size, wallpapers.size)
     }
 
     /** Every picture a gallery tag holds now, page by page. */
