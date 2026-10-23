@@ -163,6 +163,12 @@ def main() -> None:
         try:
             installed = subprocess.run([cw.ADB, "-s", serial, "install", "-r", a.apk], capture_output=True, timeout=300,
                                        creationflags=cw.NO_WINDOW)
+            if b"INSTALL_FAILED_VERSION_DOWNGRADE" in installed.stdout + installed.stderr:
+                # An older build (--apk old.apk, to see a flow fail on the bug it guards) goes on in place of the newer one.
+                subprocess.run([cw.ADB, "-s", serial, "uninstall", cw.PKG], capture_output=True, timeout=120,
+                               creationflags=cw.NO_WINDOW)
+                installed = subprocess.run([cw.ADB, "-s", serial, "install", a.apk], capture_output=True, timeout=300,
+                                           creationflags=cw.NO_WINDOW)
         except subprocess.TimeoutExpired:
             sys.exit("install took over 300s")
         if installed.returncode:
