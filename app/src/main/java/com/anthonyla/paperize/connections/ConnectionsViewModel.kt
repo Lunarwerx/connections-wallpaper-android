@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
@@ -78,7 +79,8 @@ class ConnectionsViewModel @Inject constructor(
     private val createAlbumUseCase: CreateAlbumUseCase,
     private val preferences: ExplorePreferences,
     albumRepository: AlbumRepository,
-    private val collectionStore: ConnectionsCollections
+    private val collectionStore: ConnectionsCollections,
+    private val offline: OfflineCollections
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ConnectionsUiState())
@@ -91,11 +93,20 @@ class ConnectionsViewModel @Inject constructor(
     val collections: StateFlow<List<WallpaperCollection>> =
         collectionStore.all.stateWhileSubscribed(viewModelScope, emptyList())
 
-    /** The cards for Explore's Collections shelf and the collections manager. */
+    /** The cards for Explore's Collections shelf and the collections manager, each with how far its Library add has got. */
     val cards: StateFlow<List<CollectionCard>> =
-        combine(collectionStore.all, _state.map { it.tags }.distinctUntilChanged()) { saved, tags ->
-            collectionCards(saved, tags, originals::savedPreview)
-        }.flowOn(Dispatchers.IO).stateWhileSubscribed(viewModelScope, emptyList())
+        combine(
+            // Covers are looked up on the phone once per change of the collections, not on every picture an add keeps.
+            combine(collectionStore.all, _state.map { it.tags }.distinctUntilChanged()) { saved, tags ->
+                collectionCards(saved, tags, originals::savedPreview)
+            }.flowOn(Dispatchers.IO),
+            offline.progress
+        ) { cards, progress ->
+            if (progress.isEmpty()) cards else cards.map { card -> progress[card.id]?.let { card.copy(adding = it) } ?: card }
+        }.stateWhileSubscribed(viewModelScope, emptyList())
+
+    /** How each collection's Library add went, wherever it was started. */
+    val offlineResults: Flow<OfflineResult> = offline.results
 
     private val _messages = Channel<ConnectionsMessage>(Channel.BUFFERED)
     val messages: Flow<ConnectionsMessage> = _messages.receiveAsFlow()
@@ -106,6 +117,10 @@ class ConnectionsViewModel @Inject constructor(
      * and calls [resumeLibrary] once the member is signed in, so the add finishes by itself.
      */
     val libraryWaiting: StateFlow<LibraryRequest?> = _libraryWaiting.asStateFlow()
+
+    private val _collectionsWaiting = MutableStateFlow<List<String>?>(null)
+    /** Whole collections whose Library add asked for the account; [resumeLibrary] starts them once the member is in. */
+    val collectionsWaiting: StateFlow<List<String>?> = _collectionsWaiting.asStateFlow()
 
     private var pageJob: Job? = null
     private var request: PageRequest? = null
@@ -174,13 +189,35 @@ class ConnectionsViewModel @Inject constructor(
         viewModelScope.launch { runLibrary(LibraryRequest(wallpapers, target)) }
     }
 
-    /** The account sheet was closed without signing in: the waiting Library add is dropped, as Save offline's is. */
-    fun cancelLibraryAdd() {
-        _libraryWaiting.value = null
+    /**
+     * Adds whole collections to the Library, each as its own album, as Add to library on a collection's page does.
+     * Signed out, they wait for the account (the screen opens the account sheet) and start once the member is in.
+     */
+    fun addCollectionsToLibrary(ids: List<String>, signedIn: Boolean) {
+        if (ids.isEmpty()) return
+        if (signedIn) ids.forEach { offline.start(it) } else _collectionsWaiting.update { (it.orEmpty() + ids).distinct() }
     }
 
-    /** Runs the Library add that waited for the account, if one waits; the screen calls this once the member is signed in. */
+    /** Deletes the member's own collections among [ids], stopping any add of theirs; a gallery collection is never deleted. */
+    fun deleteCollections(ids: List<String>) {
+        val own = ids.filterNot { it.startsWith(TAG_COLLECTION) }
+        if (own.isEmpty()) return
+        own.forEach { offline.stop(it) }
+        viewModelScope.launch {
+            runCatchingCancellable { collectionStore.delete(*own.toTypedArray()) }
+                .onFailure { _messages.send(ConnectionsMessage.Failed(it.message)) }
+        }
+    }
+
+    /** The account sheet was closed without signing in: the waiting Library adds are dropped, as a collection page's is. */
+    fun cancelLibraryAdd() {
+        _libraryWaiting.value = null
+        _collectionsWaiting.value = null
+    }
+
+    /** Runs the Library adds that waited for the account, if any wait; the screen calls this once the member is signed in. */
     fun resumeLibrary() {
+        _collectionsWaiting.getAndUpdate { null }?.forEach { offline.start(it) }
         val request = _libraryWaiting.value ?: return
         viewModelScope.launch { runLibrary(request) }
     }

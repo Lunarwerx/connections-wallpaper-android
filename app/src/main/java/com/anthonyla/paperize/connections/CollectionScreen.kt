@@ -23,10 +23,10 @@ import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.DownloadForOffline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.LibraryAdd
+import androidx.compose.material.icons.outlined.LibraryAddCheck
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.OfflinePin
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,7 +40,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,9 +54,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,9 +63,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.anthonyla.paperize.R
 
 /**
- * One collection's page: its pictures as a wall that opens the viewer, how many it holds, and Save offline. A
- * signed-out visitor who taps Save offline is asked for the free account right then, and the save starts once
- * they are signed in. The member's own collections rename and delete from the menu.
+ * One collection's page: its pictures as a wall that opens the viewer, how many it holds, and Add to library, which
+ * keeps every picture on the phone as one album. A signed-out visitor who taps it is asked for the free account
+ * right then, and the add starts once they are signed in. The member's own collections rename and delete from the menu.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,13 +82,11 @@ fun CollectionScreen(
     val signInStatus by accountViewModel.signIn.collectAsStateWithLifecycle()
     val signIn = rememberSignIn(accountViewModel)
     val signedIn = accountState is AccountState.SignedIn
-    val resources = LocalResources.current
-    val haptics = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
     var viewerOpen by rememberSaveable { mutableStateOf(false) }
     var viewerStart by rememberSaveable { mutableIntStateOf(0) }
     var showAccount by rememberSaveable { mutableStateOf(false) }
-    // Save offline asked for the account: once it is there, the save starts by itself.
+    // Add to library asked for the account: once it is there, the add starts by itself.
     var pendingSave by rememberSaveable { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     var renaming by rememberSaveable { mutableStateOf(false) }
@@ -122,32 +116,15 @@ fun CollectionScreen(
         }
     }
 
-    LaunchedEffect(viewModel) {
-        viewModel.results.collect { result ->
-            when (result) {
-                is OfflineResult.Saved -> {
-                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
-                    val answer = snackbarHostState.showSnackbar(
-                        message = resources.getString(R.string.connections_offline_done, result.name),
-                        actionLabel = resources.getString(R.string.open_album)
-                    )
-                    if (answer == SnackbarResult.ActionPerformed) onOpenAlbum(result.albumId)
-                }
-                is OfflineResult.Partly ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_offline_partly, result.saved, result.total))
-                is OfflineResult.SignInNeeded -> {
-                    pendingSave = true
-                    showAccount = true
-                }
-                is OfflineResult.Failed -> {
-                    haptics.performHapticFeedback(HapticFeedbackType.Reject)
-                    snackbarHostState.showSnackbar(
-                        resources.getString(R.string.connections_failed, result.reason ?: resources.getString(R.string.connections_unknown_error))
-                    )
-                }
-            }
-        }
-    }
+    OfflineResultsEffect(
+        results = viewModel.results,
+        snackbarHostState = snackbarHostState,
+        onSignInNeeded = {
+            pendingSave = true
+            showAccount = true
+        },
+        onOpenAlbum = onOpenAlbum
+    )
 
     val saveOffline = {
         if (signedIn) {
@@ -290,7 +267,7 @@ fun CollectionScreen(
             },
             title = when {
                 libraryWaiting != null -> stringResource(R.string.connections_library_sign_in)
-                pendingSave -> stringResource(R.string.connections_offline_sign_in_title, state.name)
+                pendingSave -> stringResource(R.string.connections_collection_library_sign_in, state.name)
                 else -> null
             },
             body = if (pendingSave) stringResource(R.string.connections_offline_sign_in_body) else null
@@ -331,19 +308,19 @@ fun CollectionScreen(
     }
 }
 
-/** Save offline, how far a save has got (and Stop), Saved offline, or Update offline when it has grown since. */
+/** Add to library, how far an add has got (and Stop), In your library, or Update library when it has grown since. */
 @Composable
 private fun OfflineControl(offline: OfflineState, enabled: Boolean, onSave: () -> Unit, onStop: () -> Unit) {
     when (offline) {
         OfflineState.NotSaved -> FilledTonalButton(onClick = onSave, enabled = enabled) {
-            Icon(Icons.Outlined.DownloadForOffline, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.LibraryAdd, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.connections_save_offline))
+            Text(stringResource(R.string.connections_add_to_library))
         }
         OfflineState.Stale -> FilledTonalButton(onClick = onSave, enabled = enabled) {
             Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.connections_update_offline))
+            Text(stringResource(R.string.connections_update_library))
         }
         is OfflineState.Saving -> Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -355,11 +332,11 @@ private fun OfflineControl(offline: OfflineState, enabled: Boolean, onSave: () -
                 strokeWidth = 2.dp
             )
             Text(
-                text = stringResource(R.string.connections_saving_offline, offline.done, offline.total),
+                text = stringResource(R.string.connections_adding_to_library, offline.done, offline.total),
                 style = MaterialTheme.typography.labelLarge
             )
             IconButton(onClick = onStop) {
-                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.connections_stop_saving))
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.connections_stop_adding))
             }
         }
         OfflineState.Saved -> Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
@@ -369,12 +346,12 @@ private fun OfflineControl(offline: OfflineState, enabled: Boolean, onSave: () -
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
             ) {
                 Icon(
-                    Icons.Outlined.OfflinePin,
+                    Icons.Outlined.LibraryAddCheck,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
-                Text(stringResource(R.string.connections_saved_offline), style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.connections_in_library), style = MaterialTheme.typography.labelLarge)
             }
         }
     }

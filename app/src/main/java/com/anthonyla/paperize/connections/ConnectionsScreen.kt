@@ -111,13 +111,14 @@ import kotlinx.coroutines.flow.filter
 
 /**
  * Explore: the Connections gallery as a wall of pictures, with search, a shape filter that opens on what fits
- * this screen, and tag filters. Tap one to open the viewer.
+ * this screen, and tag filters. Tap one to open the viewer; a long press on a picture or a shelf collection picks it.
  */
 @Composable
 fun ConnectionsScreen(
     onOpen: (Int) -> Unit,
     onOpenCollections: () -> Unit,
     onOpenCollection: (String) -> Unit,
+    signedIn: Boolean,
     modifier: Modifier = Modifier,
     searchFocus: FocusRequester? = null,
     viewModel: ConnectionsViewModel = hiltViewModel()
@@ -131,13 +132,25 @@ fun ConnectionsScreen(
     val shelf = shelfCards(cards).takeIf { it.isNotEmpty() && state.query.isEmpty() && state.tag == null }
     // A new search, tag or shape is a new wall: what was picked on the old one is let go.
     val selection = remember { WallSelection() }
-    LaunchedEffect(state.query, state.tag, state.shape) { selection.clear() }
+    // Collections picked on the shelf. Picking pictures and picking collections never run at once.
+    val shelfSelection = remember { WallSelection() }
+    LaunchedEffect(state.query, state.tag, state.shape) {
+        selection.clear()
+        shelfSelection.clear()
+    }
+    LaunchedEffect(selection.active) { if (selection.active) shelfSelection.clear() }
+    LaunchedEffect(shelfSelection.active) { if (shelfSelection.active) selection.clear() }
 
     Column(modifier = modifier.fillMaxSize()) {
-        if (selection.active) {
-            SelectionBar(selection = selection, wallpapers = state.wallpapers, viewModel = viewModel)
-        } else {
-            SearchPill(query = state.query, onSearch = viewModel::search, focus = searchFocus)
+        when {
+            shelfSelection.active -> CollectionSelectionBar(
+                selection = shelfSelection,
+                cards = shelf.orEmpty(),
+                onAddToLibrary = { ids -> viewModel.addCollectionsToLibrary(ids, signedIn) },
+                onDelete = viewModel::deleteCollections
+            )
+            selection.active -> SelectionBar(selection = selection, wallpapers = state.wallpapers, viewModel = viewModel)
+            else -> SearchPill(query = state.query, onSearch = viewModel::search, focus = searchFocus)
         }
         FilterRow(
             shape = state.shape,
@@ -149,7 +162,7 @@ fun ConnectionsScreen(
         )
         // With no pictures to show (offline among them), the shelf stays above the reason, so saved collections still open.
         val above: @Composable () -> Unit = {
-            if (shelf != null) CollectionsShelf(cards = shelf, onOpen = onOpenCollection, onSeeAll = onOpenCollections)
+            if (shelf != null) CollectionsShelf(cards = shelf, selection = shelfSelection, onOpen = onOpenCollection, onSeeAll = onOpenCollections)
         }
         Box(modifier = Modifier.fillMaxSize()) {
             when {
@@ -196,6 +209,7 @@ fun ConnectionsScreen(
                         @Composable {
                             CollectionsShelf(
                                 cards = cards,
+                                selection = shelfSelection,
                                 onOpen = onOpenCollection,
                                 onSeeAll = onOpenCollections,
                                 bleed = GRID_SIDE_PADDING

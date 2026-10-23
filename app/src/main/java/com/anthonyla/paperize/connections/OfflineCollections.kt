@@ -58,6 +58,26 @@ class OfflineCollections @Inject constructor(
         synchronized(jobs) { startLocked(collection) }
     }
 
+    /**
+     * Starts saving the collection [id]: one of the member's own as the phone keeps it, or a gallery tag's (its record
+     * once saved, else the tag itself). An own collection no longer on the phone starts nothing.
+     */
+    fun start(id: String) {
+        scope.launch {
+            val collection = runCatchingCancellable { find(id) }.getOrElse {
+                _results.emit(OfflineResult.Failed(id, it.message))
+                return@launch
+            } ?: return@launch
+            start(collection)
+        }
+    }
+
+    private suspend fun find(id: String): WallpaperCollection? {
+        val record = collections.all.first().firstOrNull { it.id == id }
+        val tag = id.takeIf { it.startsWith(TAG_COLLECTION) }?.removePrefix(TAG_COLLECTION)
+        return record ?: tag?.let { WallpaperCollection(id = id, name = tagTitle(it), tag = it) }
+    }
+
     fun stop(id: String) {
         synchronized(jobs) { jobs[id]?.cancel() }
     }

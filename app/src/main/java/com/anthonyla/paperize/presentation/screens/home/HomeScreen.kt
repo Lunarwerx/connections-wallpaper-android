@@ -64,7 +64,10 @@ import com.anthonyla.paperize.connections.ads.ConnectionsAds
 import com.anthonyla.paperize.connections.ads.SponsoredBanner
 import com.anthonyla.paperize.connections.ads.SponsoredPopup
 import com.anthonyla.paperize.connections.ConnectionsMessageEffect
+import com.anthonyla.paperize.connections.OfflineResultsEffect
 import com.anthonyla.paperize.connections.ResumeLibraryAdd
+import com.anthonyla.paperize.connections.libraryWaitingBody
+import com.anthonyla.paperize.connections.libraryWaitingTitle
 import com.anthonyla.paperize.connections.ConnectionsScreen
 import com.anthonyla.paperize.connections.ConnectionsViewModel
 import com.anthonyla.paperize.connections.ConnectionsViewer
@@ -201,7 +204,19 @@ fun HomeScreen(
     }
     ConnectionsMessageEffect(connectionsViewModel, snackbarHostState, onSignInNeeded = { showAccount = true }, onOpenAlbum = openAlbum)
     ResumeLibraryAdd(connectionsViewModel, signedIn = accountState is AccountState.SignedIn, onNeedAccount = { showAccount = true })
-    val libraryWaiting by connectionsViewModel.libraryWaiting.collectAsStateWithLifecycle()
+    // A collection added from the shelf (or one whose page was left mid-add) says how it went here.
+    OfflineResultsEffect(
+        results = connectionsViewModel.offlineResults,
+        snackbarHostState = snackbarHostState,
+        // Queued for the account, and the sheet opens now: the account state may still read signed in.
+        onSignInNeeded = { id ->
+            connectionsViewModel.addCollectionsToLibrary(listOf(id), signedIn = false)
+            showAccount = true
+        },
+        onOpenAlbum = openAlbum
+    )
+    val waitingTitle = libraryWaitingTitle(connectionsViewModel)
+    val waitingBody = libraryWaitingBody(connectionsViewModel)
 
     // Material's expanded window (a tablet held wide, a laptop window) gets a side rail instead of a bottom bar.
     val wide = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() } >= AppLayout.expandedWidth
@@ -319,6 +334,7 @@ fun HomeScreen(
                         },
                         onOpenCollections = onNavigateToCollections,
                         onOpenCollection = onNavigateToCollection,
+                        signedIn = accountState is AccountState.SignedIn,
                         searchFocus = searchFocus,
                         viewModel = connectionsViewModel
                     )
@@ -358,7 +374,8 @@ fun HomeScreen(
                 connectionsViewModel.cancelLibraryAdd()
                 accountViewModel.dismissSignInError()
             },
-            title = if (libraryWaiting != null) stringResource(R.string.connections_library_sign_in) else null
+            title = waitingTitle,
+            body = waitingBody
         )
     }
 

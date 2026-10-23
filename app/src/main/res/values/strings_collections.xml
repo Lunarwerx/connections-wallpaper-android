@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <!-- Explore's collections: the shelf, the manager, a collection's page, and saving one offline. -->
+  <!-- Explore's collections: the shelf, the manager, a collection's page, and adding one to the Library. -->
   <string name="connections_collections">Collections</string>
   <string name="connections_see_all">See all</string>
   <string name="connections_collections_yours">Yours</string>
@@ -10,18 +10,27 @@
   <string name="connections_collection_name_taken">You already have a collection with this name</string>
   <string name="connections_save_to_collection">Save to collection</string>
   <string name="connections_collection_empty">Tap the bookmark on a wallpaper to add it here</string>
-  <string name="connections_save_offline">Save offline</string>
-  <string name="connections_update_offline">Update offline</string>
-  <string name="connections_saved_offline">Saved offline</string>
-  <string name="connections_saving_offline">Saving %1$d of %2$d</string>
-  <string name="connections_stop_saving">Stop saving</string>
-  <string name="connections_offline_done">%1$s is saved offline</string>
-  <string name="connections_offline_partly">Saved %1$d of %2$d offline. Save again to finish</string>
-  <string name="connections_offline_sign_in_title">Save %1$s offline</string>
+  <!-- A whole collection added to the Library: every original is kept on the phone, in one album, so it works offline. -->
+  <string name="connections_update_library">Update library</string>
+  <string name="connections_in_library">In your library</string>
+  <string name="connections_adding_to_library">Adding %1$d of %2$d</string>
+  <string name="connections_stop_adding">Stop adding</string>
+  <string name="connections_collection_in_library">%1$s is in your library</string>
+  <string name="connections_collection_library_partly">Added %1$d of %2$d to your library. Add again to finish</string>
+  <string name="connections_collection_library_sign_in">Add %1$s to your library</string>
+  <plurals name="connections_collections_library_sign_in">
+    <item quantity="one">Add %1$d collection to your library</item>
+    <item quantity="other">Add %1$d collections to your library</item>
+  </plurals>
   <string name="connections_offline_sign_in_body">It opens with no internet, and rotates as an album. Free with a Connections account.</string>
   <string name="connections_rename">Rename</string>
   <string name="connections_delete">Delete</string>
   <string name="connections_more_options">More options</string>
   <string name="connections_delete_collection_title">Delete %1$s?</string>
+  <plurals name="connections_delete_collections_title">
+    <item quantity="one">Delete %1$d collection?</item>
+    <item quantity="other">Delete %1$d collections?</item>
+  </plurals>
   <string name="connections_delete_collection_body">Its wallpapers stay in the gallery and in your albums.</string>
+  <string name="connections_delete_collections_body">Their wallpapers stay in the gallery and in your albums.</string>
 </resources>

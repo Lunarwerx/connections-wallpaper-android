@@ -15,7 +15,6 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -122,17 +121,8 @@ class CollectionViewModel @Inject constructor(
         if (pages.value.loaded) loadMore() else load(cursor = null)
     }
 
-    /** Saves it offline; the account is asked for first (OfflineCollections). */
-    fun saveOffline() {
-        viewModelScope.launch {
-            val saved = runCatchingCancellable { record.first() }.getOrNull()
-            val collection = when (tag) {
-                null -> saved ?: return@launch
-                else -> saved ?: WallpaperCollection(id = id, name = tagTitle(tag), tag = tag)
-            }
-            offline.start(collection)
-        }
-    }
+    /** Adds it to the Library, kept on the phone as an album; the account is asked for first (OfflineCollections). */
+    fun saveOffline() = offline.start(id)
 
     fun stopSaving() = offline.stop(id)
 
@@ -141,6 +131,7 @@ class CollectionViewModel @Inject constructor(
     }
 
     fun delete() {
+        offline.stop(id)
         viewModelScope.launch { runCatchingCancellable { collections.delete(id) } }
     }
 

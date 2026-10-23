@@ -59,7 +59,10 @@ data class CollectionCard(
     val cover: Any?,
     val color: String?,
     val own: Boolean,
-    val offline: Boolean
+    /** In the Library: added whole, so its originals are on the phone. */
+    val offline: Boolean,
+    /** How far an add to the Library has got while one runs; null when none does. */
+    val adding: OfflineProgress? = null
 )
 
 /**
@@ -147,7 +150,7 @@ class ConnectionsCollections internal constructor(private val store: DataStore<P
         list.map { if (it.id == id) it.copy(name = name.trim()) else it }
     }
 
-    suspend fun delete(id: String) = update { list -> list.filterNot { it.id == id } }
+    suspend fun delete(vararg ids: String) = update { list -> list.filterNot { it.id in ids } }
 
     /** Adds every one of [wallpapers] the collection does not hold yet, newest first; the ones it holds stay as they are. */
     suspend fun addAll(id: String, wallpapers: List<ConnectionsWallpaper>) = update { list ->
@@ -177,7 +180,8 @@ class ConnectionsCollections internal constructor(private val store: DataStore<P
 
     /**
      * Records a save offline: the album that holds the originals and which pictures it held, and when every one
-     * of them was saved ([complete]). A gallery tag's collection is kept from here on with the pictures it saved.
+     * of them was saved ([complete]). A gallery tag's collection is kept from here on with the pictures it saved;
+     * one of the member's own that was deleted while it saved stays deleted.
      */
     suspend fun recordSave(
         collection: WallpaperCollection,
@@ -187,7 +191,8 @@ class ConnectionsCollections internal constructor(private val store: DataStore<P
         complete: Boolean,
         now: Long
     ) = update { list ->
-        val current = list.firstOrNull { it.id == collection.id } ?: collection.copy(createdAt = now)
+        val current = list.firstOrNull { it.id == collection.id }
+            ?: if (collection.own) return@update list else collection.copy(createdAt = now)
         val recorded = current.copy(
             // An own collection keeps its own list, which may have changed while it saved.
             wallpapers = if (current.own) current.wallpapers else wallpapers,

@@ -152,6 +152,7 @@ fun NavigationGraph(
             CollectionsScreen(
                 onBack = { navController.popBackStack() },
                 onOpen = { id -> navController.navigate(CollectionRoute(id)) },
+                onOpenAlbum = { albumId -> navController.navigate(AlbumRoute(albumId)) },
                 viewModel = hiltViewModel<ConnectionsViewModel>(homeEntry)
             )
         }

@@ -8,6 +8,45 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import com.anthonyla.paperize.R
+import kotlinx.coroutines.flow.Flow
+
+/**
+ * Says how a whole collection's Library add went, in [snackbarHostState]: in the Library (with Open album), partly,
+ * or failed. [onSignInNeeded] hears the id of a collection whose add found the member signed out.
+ */
+@Composable
+fun OfflineResultsEffect(
+    results: Flow<OfflineResult>,
+    snackbarHostState: SnackbarHostState,
+    onSignInNeeded: (String) -> Unit,
+    onOpenAlbum: (String) -> Unit
+) {
+    val resources = LocalResources.current
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(results) {
+        results.collect { result ->
+            when (result) {
+                is OfflineResult.Saved -> {
+                    haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+                    val answer = snackbarHostState.showSnackbar(
+                        message = resources.getString(R.string.connections_collection_in_library, result.name),
+                        actionLabel = resources.getString(R.string.open_album)
+                    )
+                    if (answer == SnackbarResult.ActionPerformed) onOpenAlbum(result.albumId)
+                }
+                is OfflineResult.Partly ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_collection_library_partly, result.saved, result.total))
+                is OfflineResult.SignInNeeded -> onSignInNeeded(result.id)
+                is OfflineResult.Failed -> {
+                    haptics.performHapticFeedback(HapticFeedbackType.Reject)
+                    snackbarHostState.showSnackbar(
+                        resources.getString(R.string.connections_failed, result.reason ?: resources.getString(R.string.connections_unknown_error))
+                    )
+                }
+            }
+        }
+    }
+}
 
 /** Says what the gallery's actions did, in [snackbarHostState], wherever the gallery or a collection is open. */
 @Composable

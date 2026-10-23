@@ -765,7 +765,7 @@ def t_collections_browse():
     cw.tap(tag)
     count = tags[tag.lower()]
     check(cw.has(f"{count} wallpaper", timeout=8), f"{tag}'s page says {count} wallpapers, as the gallery does")
-    check(cw.has("Save offline", timeout=10), "and offers Save offline")
+    check(cw.has("Add to library", timeout=10), "and offers Add to library")
     cw.d.press("back")
     cw.d.press("back")
     check(cw.has("See all", timeout=6), "back returns to Explore")
@@ -791,15 +791,15 @@ def t_collection_own():
 
 
 def t_collection_offline_signed_out():
-    """Signed out, Save offline asks for the free account in the app's own sheet and keeps nothing on the phone."""
+    """Signed out, a collection's Add to library asks for the free account in the app's own sheet and keeps nothing on the phone."""
     explore_shelf()
     before = kept_files()
     # Explore's tag chips share the shelf card's label; the manager has only the card.
     cw.tap("See all")
     tag = first_gallery_tag()
     cw.tap(tag)
-    cw.tap("Save offline")
-    check(cw.has(f"Save {tag} offline", timeout=6), "Save offline asks for the account, named for what it saves")
+    cw.tap("Add to library")
+    check(cw.has(f"Add {tag} to your library", timeout=6), "Add to library asks for the account, named for what it adds")
     check(cw.has("Sign in with Connections"), "with the app's own Sign in with Connections button")
     cw.d.press("back")
     time.sleep(2)
@@ -807,6 +807,45 @@ def t_collection_offline_signed_out():
     check(after == before, f"nothing was fetched while signed out ({len(before)} files before, {len(after)} after)")
     cw.d.press("back")
     cw.d.press("back")
+
+
+def t_collections_select():
+    """A long press on a collection card picks it, in the manager and on Explore's shelf; taps toggle; signed out, Add to
+    library asks for the account, named for what it adds, and fetches nothing; Delete is only for the member's own."""
+    tags = gallery_tags()
+    explore_shelf()
+    before = kept_files()
+    cw.tap("See all")
+    check(cw.has("From the gallery", timeout=8), "the manager has a From the gallery list")
+    labels = cw.labels()
+    names = [l for l in labels[labels.index("From the gallery") + 1:] if l.lower() in tags]
+    check(len(names) >= 2, "the manager shows at least two gallery collections")
+    first, second = names[0], names[1]
+    cw.d(text=first).long_click()
+    check(cw.has("1 selected", timeout=5), "a long press picks the collection and the bar counts it")
+    check(not cw.d(description="Delete").exists, "Delete is not offered for the gallery's collections")
+    cw.tap(second)
+    check(cw.has("2 selected", timeout=5), "a tap on another collection picks it too")
+    cw.tap(second)
+    check(cw.has("1 selected", timeout=5) and not cw.has("2 selected"), "a tap on a picked collection takes it back out")
+    cw.tap(second)
+    check(cw.has("2 selected", timeout=5), "and a tap picks it again")
+    cw.tap("Add to library")
+    check(cw.has("Add 2 collections to your library", timeout=6), "signed out, Add to library asks for the account, named for what it adds")
+    check(cw.has("Sign in with Connections"), "with the app's own Sign in with Connections button")
+    cw.d.press("back")
+    time.sleep(2)
+    check(kept_files() == before, "nothing was fetched while signed out")
+    check(wait_until(lambda: not cw.d(textContains="selected").exists, 4), "and the selection ended with the add")
+    cw.d.press("back")
+    check(cw.has("See all", timeout=6), "back returns to Explore")
+    # A shelf card's count line: the tag chips above share the card's name, but no chip shows a count.
+    card = cw.d(textMatches=r"^\d+ wallpapers?$")
+    check(card.wait(timeout=8), "Explore's shelf shows its collections")
+    card.long_click()
+    check(cw.has("1 selected", timeout=5), "on Explore's shelf, a long press picks a collection too")
+    cw.d.press("back")
+    check(wait_until(lambda: not cw.d(textContains="selected").exists, 4), "and back leaves selection mode")
 
 
 def t_collection_offline_opens():
@@ -880,7 +919,8 @@ def t_multi_select():
 TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
          t_timer_toggle, t_unlock_off, t_pause, t_update_keeps_watcher, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
          t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out, t_explore_set_keeps_live,
-         t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collection_offline_opens, t_multi_select, t_add_to_library_signed_out]
+         t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collections_select, t_collection_offline_opens, t_multi_select,
+         t_add_to_library_signed_out]
 
 
 def unknown_tests(names: list[str]) -> list[str]:

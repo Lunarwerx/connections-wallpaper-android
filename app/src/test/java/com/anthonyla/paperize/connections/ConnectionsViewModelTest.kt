@@ -7,8 +7,11 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
+import io.mockk.verify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -26,6 +29,10 @@ class ConnectionsViewModelTest {
     private val preferences = mockk<ExplorePreferences>(relaxUnitFun = true)
     private val albums = mockk<AlbumRepository>()
     private val collections = mockk<ConnectionsCollections> { every { all } returns flowOf(emptyList()) }
+    private val offline = mockk<OfflineCollections>(relaxUnitFun = true) {
+        every { progress } returns MutableStateFlow(emptyMap())
+        every { results } returns MutableSharedFlow()
+    }
     private val store = ViewModelStore()
     private val phone = DeviceFit.of(411f, 914f, foldable = false, computer = false)
 
@@ -44,8 +51,24 @@ class ConnectionsViewModelTest {
     }
 
     private fun viewModel(): ConnectionsViewModel =
-        ConnectionsViewModel(api, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), preferences, albums, collections)
+        ConnectionsViewModel(api, mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), mockk(relaxed = true), preferences, albums, collections, offline)
             .also { store.put("explore", it) }
+
+    @Test fun `collections added signed out wait for the account, then start once the member signs in`() = runTest {
+        val viewModel = viewModel()
+        viewModel.addCollectionsToLibrary(listOf("tag:art", "own-1"), signedIn = false)
+        advanceUntilIdle()
+
+        verify(exactly = 0) { offline.start(any<String>()) }
+        assertEquals(listOf("tag:art", "own-1"), viewModel.collectionsWaiting.value)
+
+        viewModel.resumeLibrary()
+        advanceUntilIdle()
+
+        verify(exactly = 1) { offline.start("tag:art") }
+        verify(exactly = 1) { offline.start("own-1") }
+        assertEquals(null, viewModel.collectionsWaiting.value)
+    }
 
     @Test fun `Explore waits for the screen, then asks for its shape with the closest picture first`() = runTest {
         coEvery { api.wallpapers(any(), any(), any(), any()) } returns ConnectionsWallpaperPage(

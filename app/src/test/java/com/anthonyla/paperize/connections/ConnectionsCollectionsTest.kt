@@ -32,4 +32,16 @@ class ConnectionsCollectionsTest {
         assertEquals(listOf("b", "a"), saved.single().wallpapers.map { it.id })
         assertTrue(saved.single().own)
     }
+
+    @Test fun `an add to the Library that finishes after its own collection was deleted does not bring the collection back`() = runTest {
+        val phone = CollectionsTestStore(folder.root.resolve("collections.preferences_pb"))
+        val beach = phone.store.create("Beach", listOf(galleryWallpaper("a")))
+        phone.store.delete(beach.id)
+
+        phone.store.recordSave(beach, beach.wallpapers, albumId = "album-1", savedIds = listOf("a"), complete = true, now = 1L)
+        val saved = phone.store.all.first()
+        phone.close()
+
+        assertEquals(emptyList<WallpaperCollection>(), saved)
+    }
 }

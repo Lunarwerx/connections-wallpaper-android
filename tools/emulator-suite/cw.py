@@ -212,8 +212,10 @@ def fresh_app(grant: bool = True) -> None:
 
 
 def onboard(mode: str = "Static") -> None:
-    tap("Agree")
-    tap(mode)
+    # A fresh install's first screens can take past tap's 8 s on a loaded PC (the mode chooser came at ~10 s,
+    # 2026-10-23); they still fail if they never come.
+    tap("Agree", timeout=20)
+    tap(mode, timeout=20)
     tap("I'm In")
     for _ in range(4):  # notification and battery pages, whichever this build shows
         found = d(text="Skip").wait(timeout=2) or d(text="Library").exists

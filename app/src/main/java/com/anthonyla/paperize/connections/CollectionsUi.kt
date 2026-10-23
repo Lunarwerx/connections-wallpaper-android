@@ -1,7 +1,10 @@
 package com.anthonyla.paperize.connections
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,17 +24,21 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.CollectionsBookmark
 import androidx.compose.material.icons.outlined.Explore
-import androidx.compose.material.icons.outlined.OfflinePin
+import androidx.compose.material.icons.outlined.LibraryAddCheck
 import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,9 +64,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -68,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.toColorInt
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -83,11 +93,13 @@ internal fun shelfCards(cards: List<CollectionCard>): List<CollectionCard> =
 
 /**
  * Explore's Collections shelf, above the wall of pictures: a card per collection (the member's own first), and
- * See all for the manager. It runs edge to edge inside a grid that pads its items by [bleed].
+ * See all for the manager. A long press picks cards into [selection]. It runs edge to edge inside a grid that pads
+ * its items by [bleed].
  */
 @Composable
 internal fun CollectionsShelf(
     cards: List<CollectionCard>,
+    selection: WallSelection,
     onOpen: (String) -> Unit,
     onSeeAll: () -> Unit,
     bleed: Dp = 0.dp
@@ -132,26 +144,64 @@ internal fun CollectionsShelf(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(cards, key = { it.id }) { card ->
-                CollectionCardTile(card = card, onClick = { onOpen(card.id) }, modifier = Modifier.width(SHELF_CARD_WIDTH))
+                SelectableCard(card = card, selection = selection, onOpen = onOpen, modifier = Modifier.width(SHELF_CARD_WIDTH))
             }
         }
     }
 }
 
-/** A collection's card: its cover, its name, and its count, marked when it is saved offline. */
+/** A card that opens its collection, or in selection mode is picked and put back by a tap; a long press picks it. */
 @Composable
-internal fun CollectionCardTile(card: CollectionCard, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun SelectableCard(card: CollectionCard, selection: WallSelection, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
+    CollectionCardTile(
+        card = card,
+        onClick = { if (selection.active) selection.toggle(card.id) else onOpen(card.id) },
+        selected = card.id in selection.ids,
+        picking = selection.active,
+        onLongClick = { selection.enter(card.id) },
+        modifier = modifier
+    )
+}
+
+/**
+ * A collection's card: its cover, its name, and its count, marked when it is in the Library, or how far its add has
+ * got while one runs. With [onLongClick], a long press picks it; in selection mode every card shows its circle,
+ * filled when picked, as the pictures on a wall do.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun CollectionCardTile(
+    card: CollectionCard,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    picking: Boolean = false,
+    onLongClick: (() -> Unit)? = null
+) {
+    val haptics = LocalHapticFeedback.current
+    val ring = MaterialTheme.colorScheme.primary
     Column(
         modifier = modifier
             .clip(CARD_SHAPE)
-            .clickable(role = Role.Button, onClick = onClick)
+            .combinedClickable(
+                role = Role.Button,
+                onClick = onClick,
+                // The phone ticks once to say the card is picked.
+                onLongClick = onLongClick?.let { pick ->
+                    {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        pick()
+                    }
+                }
+            )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
                 .clip(CARD_SHAPE)
-                .background(cardSwatch(card.color)),
+                .background(cardSwatch(card.color))
+                .then(if (selected) Modifier.border(SELECTED_RING, ring, CARD_SHAPE) else Modifier),
             contentAlignment = Alignment.Center
         ) {
             if (card.cover != null) {
@@ -169,6 +219,18 @@ internal fun CollectionCardTile(card: CollectionCard, onClick: () -> Unit, modif
                     modifier = Modifier.size(32.dp)
                 )
             }
+            if (picking) {
+                Icon(
+                    imageVector = if (selected) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                    contentDescription = null,
+                    tint = if (selected) ring else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .size(24.dp)
+                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                )
+            }
         }
         Text(
             text = card.name,
@@ -182,52 +244,98 @@ internal fun CollectionCardTile(card: CollectionCard, onClick: () -> Unit, modif
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp)
         ) {
-            if (card.offline) {
-                Icon(
-                    Icons.Outlined.OfflinePin,
-                    contentDescription = stringResource(R.string.connections_saved_offline),
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(14.dp)
+            val adding = card.adding
+            if (adding != null) {
+                CircularProgressIndicator(
+                    progress = { if (adding.total > 0) adding.done.toFloat() / adding.total else 0f },
+                    modifier = Modifier.size(12.dp),
+                    strokeWidth = 1.5.dp
+                )
+                Text(
+                    text = stringResource(R.string.connections_adding_to_library, adding.done, adding.total),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                if (card.offline) {
+                    Icon(
+                        Icons.Outlined.LibraryAddCheck,
+                        contentDescription = stringResource(R.string.connections_in_library),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+                Text(
+                    text = pluralStringResource(R.plurals.wallpaper_count, card.count, card.count),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Text(
-                text = pluralStringResource(R.plurals.wallpaper_count, card.count, card.count),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
 
 /**
  * The collections manager: the member's own collections (and a card to start one), then the gallery's tags.
- * A card opens that collection's page.
+ * A card opens that collection's page; a long press picks cards to add to the Library together (or delete, when
+ * all are the member's own). Signed out, the add asks for the free account first and starts once they are in.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CollectionsScreen(
     onBack: () -> Unit,
     onOpen: (String) -> Unit,
-    viewModel: ConnectionsViewModel
+    onOpenAlbum: (String) -> Unit,
+    viewModel: ConnectionsViewModel,
+    accountViewModel: AccountViewModel = hiltViewModel()
 ) {
     val cards by viewModel.cards.collectAsStateWithLifecycle()
+    val accountState by accountViewModel.state.collectAsStateWithLifecycle()
+    val signInStatus by accountViewModel.signIn.collectAsStateWithLifecycle()
+    val signIn = rememberSignIn(accountViewModel)
+    val signedIn = accountState is AccountState.SignedIn
     val snackbarHostState = remember { SnackbarHostState() }
     var naming by rememberSaveable { mutableStateOf(false) }
-    // The manager adds no pictures to the Library, so its snackbars never offer an album.
-    ConnectionsMessageEffect(viewModel, snackbarHostState, onSignInNeeded = {}, onOpenAlbum = {})
+    var showAccount by rememberSaveable { mutableStateOf(false) }
+    val selection = remember { WallSelection() }
+    ConnectionsMessageEffect(viewModel, snackbarHostState, onSignInNeeded = { showAccount = true }, onOpenAlbum = onOpenAlbum)
+    OfflineResultsEffect(
+        results = viewModel.offlineResults,
+        snackbarHostState = snackbarHostState,
+        // Queued for the account, and the sheet opens now: the account state may still read signed in.
+        onSignInNeeded = { id ->
+            viewModel.addCollectionsToLibrary(listOf(id), signedIn = false)
+            showAccount = true
+        },
+        onOpenAlbum = onOpenAlbum
+    )
+    ResumeLibraryAdd(viewModel, signedIn = signedIn, onNeedAccount = { showAccount = true })
+    // Signing in from the sheet starts what waited (ResumeLibraryAdd), so the sheet has nothing left to ask.
+    LaunchedEffect(signedIn) { if (signedIn) showAccount = false }
+    val waitingTitle = libraryWaitingTitle(viewModel)
+    val waitingBody = libraryWaitingBody(viewModel)
     val own = cards.filter { it.own }
     val gallery = cards.filterNot { it.own }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.connections_collections)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+            if (selection.active) {
+                CollectionSelectionBar(
+                    selection = selection,
+                    cards = cards,
+                    onAddToLibrary = { ids -> viewModel.addCollectionsToLibrary(ids, signedIn) },
+                    onDelete = viewModel::deleteCollections
+                )
+            } else {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.connections_collections)) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
                     }
-                }
-            )
+                )
+            }
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
@@ -244,14 +352,33 @@ fun CollectionsScreen(
                 SectionHeader(Icons.Outlined.Bookmarks, stringResource(R.string.connections_collections_yours))
             }
             item(key = NEW_KEY) { NewCollectionCard(onClick = { naming = true }) }
-            items(own, key = { it.id }) { card -> CollectionCardTile(card = card, onClick = { onOpen(card.id) }) }
+            items(own, key = { it.id }) { card -> SelectableCard(card = card, selection = selection, onOpen = onOpen) }
             if (gallery.isNotEmpty()) {
                 item(key = GALLERY_KEY, span = { GridItemSpan(maxLineSpan) }) {
                     SectionHeader(Icons.Outlined.Explore, stringResource(R.string.connections_collections_gallery))
                 }
-                items(gallery, key = { it.id }) { card -> CollectionCardTile(card = card, onClick = { onOpen(card.id) }) }
+                items(gallery, key = { it.id }) { card -> SelectableCard(card = card, selection = selection, onOpen = onOpen) }
             }
         }
+    }
+
+    if (showAccount) {
+        AccountSheet(
+            state = accountState,
+            status = signInStatus,
+            onSignIn = signIn,
+            onSignOut = {
+                accountViewModel.signOut()
+                showAccount = false
+            },
+            onDismiss = {
+                showAccount = false
+                viewModel.cancelLibraryAdd()
+                accountViewModel.dismissSignInError()
+            },
+            title = waitingTitle,
+            body = waitingBody
+        )
     }
 
     if (naming) {
@@ -374,6 +501,7 @@ private fun Modifier.fullBleed(bleed: Dp): Modifier = if (bleed == 0.dp) this el
 }
 
 private val CARD_SHAPE = RoundedCornerShape(16.dp)
+private val SELECTED_RING = 3.dp
 private val SHELF_CARD_WIDTH = 136.dp
 private val MANAGER_CARD_MIN_WIDTH = 150.dp
 private const val YOURS_KEY = "__yours__"

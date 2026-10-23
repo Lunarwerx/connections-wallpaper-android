@@ -5,8 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- * The pictures picked on a Connections wall. A long press on a picture starts selection mode with it picked;
- * while any picture is picked the wall is in selection mode, and taps toggle instead of opening the viewer.
+ * What is picked, by id: pictures on a Connections wall, or collections on the shelf and in the manager. A long
+ * press starts selection mode with that one picked; while any is picked, taps toggle instead of opening it.
  * Clearing the last one leaves selection mode, and so does the back key.
  */
 class WallSelection {
