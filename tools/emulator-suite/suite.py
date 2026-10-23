@@ -1064,7 +1064,9 @@ def t_library_picture_streams():
     check(tab_bottom_has("Change wallpaper now"), "Change wallpaper now ends the tab")
     cw.tap("Change wallpaper now")
     check(wait_until(lambda: ids()["lock"] not in (None, before["lock"]), 40), f"the lock screen shows the album, fetched as it went up ({before} -> {ids()})")
-    check(wait_until(lambda: len(screen_copies()) == 2, 30), f"the next picture was fetched ahead of its change ({screen_copies()})")
+    # Both finished: a copy still downloading is listed as <name>.part (2026-10-23: the check below caught one mid-rename).
+    check(wait_until(lambda: len(c := screen_copies()) == 2 and not any(n.endswith(".part") for n in c), 30),
+          f"the next picture was fetched ahead of its change ({screen_copies()})")
     check(all(name.endswith(".webp") for name in screen_copies()), f"each is the compact WebP screen copy ({screen_copies()})")
     for turn in range(2):
         shown = ids()["lock"]
