@@ -41,8 +41,10 @@ android {
         // nobody could tell whether the phone had the newest one.
         val commits = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim()
         val commit = providers.exec { commandLine("git", "rev-parse", "--short=7", "HEAD") }.standardOutput.asText.get().trim()
+        // A build from uncommitted changes says so, so a test build never passes for the commit it started from.
+        val dirty = providers.exec { commandLine("git", "status", "--porcelain", "--untracked-files=no") }.standardOutput.asText.get().isNotBlank()
         versionCode = commits.toInt()
-        versionName = "1.0.$commits ($commit)"
+        versionName = "1.0.$commits ($commit${if (dirty) "-dirty" else ""})"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

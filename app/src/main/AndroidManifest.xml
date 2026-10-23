@@ -13,11 +13,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
-    <!-- WorkManager contributes this permission for optional network constraints. Paperize never
-         schedules network-constrained work, so keep it out of the final manifest. -->
-    <uses-permission
-        android:name="android.permission.ACCESS_NETWORK_STATE"
-        tools:node="remove" />
+    <!-- Connections Analytics records whether the phone is on Wi-Fi or cellular (AnalyticsDevice); without
+         this permission that read throws and every analytics event fails. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Live mode asks whether this device has a screen that turns on a live wallpaper (canPickLiveWallpaper). -->
     <queries>
         <intent>

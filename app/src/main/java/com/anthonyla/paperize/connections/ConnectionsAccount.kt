@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.runCatchingCancellable
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -176,7 +177,9 @@ class ConnectionsAccount @Inject constructor(
     /** The intent that opens Connections sign-in in the phone's browser (never an in-app view). */
     suspend fun signInIntent(): Intent {
         val verifier = randomToken(32)
-        val state = STATE_PREFIX + randomToken(16)
+        // The callback page strips STATE_PREFIX and hands back only the rest (appHandoff in Connections'
+        // infra/shared/auth/desktop-sign-in-handoff.ts), so the rest is what this phone keeps and matches.
+        val state = randomToken(16)
         store.edit {
             it[PENDING_STATE] = state
             it[PENDING_VERIFIER] = verifier
@@ -187,7 +190,7 @@ class ConnectionsAccount @Inject constructor(
             .appendQueryParameter("redirect_uri", REDIRECT_URI)
             .appendQueryParameter("response_type", "code")
             .appendQueryParameter("scope", SCOPE)
-            .appendQueryParameter("state", state)
+            .appendQueryParameter("state", STATE_PREFIX + state)
             .appendQueryParameter("code_challenge", challengeOf(verifier))
             .appendQueryParameter("code_challenge_method", "S256")
             .build()
@@ -197,9 +200,17 @@ class ConnectionsAccount @Inject constructor(
     /** The browser came back to icu.connections.wallpaper://aegis-handoff?state=…&code=… */
     fun finishSignIn(uri: Uri) {
         scope.launch {
-            // Only the link for the sign-in this phone started counts, and only once: a replayed or
-            // forged link finds no pending sign-in and changes nothing on screen.
-            val verifier = claimPending(uri.getQueryParameter("state")) ?: return@launch
+            // Only the link for the sign-in this phone started counts, and only once: a replayed link
+            // finds no pending sign-in and changes nothing on screen. A link that does not match the
+            // pending sign-in says so: staying silent there hid a state mismatch that broke every sign-in.
+            val verifier = when (val claim = claimPending(uri.getQueryParameter("state"))) {
+                is Claim.Mine -> claim.verifier
+                Claim.NonePending -> return@launch
+                Claim.NotMine -> {
+                    _signIn.value = SignInStatus.Failed(context.getString(R.string.connections_sign_in_other_attempt))
+                    return@launch
+                }
+            }
             _signIn.value = SignInStatus.Finishing
             _signIn.value = runCatchingCancellable { redeem(uri, verifier) }
                 .fold(onSuccess = { SignInStatus.Idle }, onFailure = { SignInStatus.Failed(it.message) })
@@ -215,17 +226,28 @@ class ConnectionsAccount @Inject constructor(
         if (_signIn.value is SignInStatus.Failed) _signIn.value = SignInStatus.Idle
     }
 
-    /** The verifier of the pending sign-in whose state this is, removed so it redeems once. */
-    private suspend fun claimPending(state: String?): String? {
-        var verifier: String? = null
+    private sealed interface Claim {
+        data class Mine(val verifier: String) : Claim
+        data object NonePending : Claim
+        /** A sign-in is pending and this link is not it (an older browser tab, or a link this app did not start). */
+        data object NotMine : Claim
+    }
+
+    /** The pending sign-in this state belongs to; its verifier is removed so it redeems once. */
+    private suspend fun claimPending(state: String?): Claim {
+        var claim: Claim = Claim.NonePending
         store.edit {
-            if (state != null && state == it[PENDING_STATE]) {
-                verifier = it[PENDING_VERIFIER]
+            val pending = it[PENDING_STATE] ?: return@edit
+            val verifier = it[PENDING_VERIFIER]
+            if (state == pending && verifier != null) {
+                claim = Claim.Mine(verifier)
                 it.remove(PENDING_STATE)
                 it.remove(PENDING_VERIFIER)
+            } else {
+                claim = Claim.NotMine
             }
         }
-        return verifier
+        return claim
     }
 
     /** A live access token, refreshed when it is about to run out; null when nobody is signed in. */

@@ -254,6 +254,7 @@
   <string name="connections_sign_in_action">登录</string>
   <string name="connections_signing_in">正在登录…</string>
   <string name="connections_sign_in_failed">登录未完成：%1$s</string>
+  <string name="connections_sign_in_other_attempt">返回的是之前的一次登录，请重新登录</string>
   <string name="connections_sign_in_needed">使用免费账号登录即可将壁纸保存到手机</string>
   <string name="connections_no_browser">此手机上没有可以打开 Connections 登录页面的浏览器</string>
   <string name="connections_signed_in">已登录为 %1$s</string>
