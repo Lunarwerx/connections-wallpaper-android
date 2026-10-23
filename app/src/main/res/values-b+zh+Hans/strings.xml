@@ -212,6 +212,7 @@
 
   <!-- Connections: Explore, the viewer and sign-in -->
   <string name="explore">探索</string>
+  <string name="explore_wallpapers">探索壁纸</string>
   <string name="connections_search_hint">搜索壁纸</string>
   <string name="connections_clear_search">清除搜索</string>
   <string name="connections_all">全部</string>

@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PhotoAlbum
 import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -27,6 +28,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
@@ -80,7 +82,8 @@ class AlbumPickerDraft(initial: List<String>, private val onApply: (List<String>
 
 /**
  * Multi-select of a screen's albums. Each row toggles its checkbox; the draft is applied once when the sheet
- * closes (Done, a swipe down, or back). [onAddFolder] applies the draft first, then goes to add a folder.
+ * closes (Done, a swipe down, or back). [onAddFolder] applies the draft first, then goes to add a folder; with no albums
+ * at all, [onExplore] does the same and goes to the Connections gallery.
  * An album with no pictures is not checked: [onEmptyAlbum] reports it instead (one already checked can be unchecked).
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +93,7 @@ fun AlbumSelectionBottomSheet(
     selectedAlbumIds: List<String>,
     onApply: (List<String>) -> Unit,
     onAddFolder: () -> Unit,
+    onExplore: () -> Unit,
     onEmptyAlbum: (AlbumSummary) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -178,6 +182,14 @@ fun AlbumSelectionBottomSheet(
                         Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
                         Text(stringResource(R.string.add_folder))
+                    }
+                    OutlinedButton(onClick = {
+                        draft.close()
+                        onExplore()
+                    }) {
+                        Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(stringResource(R.string.explore_wallpapers))
                     }
                 }
             }

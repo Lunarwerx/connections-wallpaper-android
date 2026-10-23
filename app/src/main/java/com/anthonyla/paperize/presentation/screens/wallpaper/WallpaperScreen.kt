@@ -22,6 +22,7 @@ import androidx.compose.material.icons.outlined.AspectRatio
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Lock
@@ -103,6 +104,8 @@ fun WallpaperScreen(
     onUpdateScheduleSettingsDebounced: (ScheduleSettings) -> Unit,
     onChangeWallpaperNow: () -> Unit,
     onAddFolder: (ScreenType) -> Unit,
+    /** Opens Explore, the Connections gallery: offered under the album rows while the Library has no albums. */
+    onExplore: () -> Unit,
     onOpenVisualEffects: () -> Unit,
     /** Opens an album in Library: a current picture opens the album it comes from. */
     onOpenAlbum: (String) -> Unit,
@@ -183,15 +186,18 @@ fun WallpaperScreen(
                     onClick = { albumPickerScreen = ScreenType.HOME }
                 )
             }
+            // A fresh install has nothing to pick yet: the Connections gallery is one tap away.
+            if (albums.isEmpty()) albumRows.add { ExploreRow(onExplore) }
             if (albumRows.isNotEmpty()) SettingsGroup(*albumRows.toTypedArray())
         } else {
-            SettingsGroup({
+            val liveRow = @Composable {
                 AlbumRow(
                     icon = Icons.Outlined.PhotoLibrary, label = stringResource(R.string.currently_selected_album),
                     albumIds = scheduleSettings.liveAlbumIds, albums = albums,
                     onClick = { albumPickerScreen = ScreenType.LIVE }
                 )
-            })
+            }
+            if (albums.isEmpty()) SettingsGroup(liveRow, { ExploreRow(onExplore) }) else SettingsGroup(liveRow)
         }
 
         // When it changes.
@@ -491,6 +497,10 @@ fun WallpaperScreen(
                 albumPickerScreen = null
                 onAddFolder(selection)
             },
+            onExplore = {
+                albumPickerScreen = null
+                onExplore()
+            },
             onEmptyAlbum = { showEmptyAlbumWarning = true },
             onDismiss = { albumPickerScreen = null }
         )
@@ -562,6 +572,21 @@ private fun ScreenToggleCard(
             }
         }
     }
+}
+
+/** Explore, the Connections gallery, as the album section's last line: in the accent, with › since it opens another tab. */
+@Composable
+private fun ExploreRow(onClick: () -> Unit) {
+    SettingsRow(
+        icon = Icons.Outlined.Explore,
+        title = stringResource(R.string.explore_wallpapers),
+        iconTint = MaterialTheme.colorScheme.primary,
+        titleColor = MaterialTheme.colorScheme.primary,
+        onClick = onClick,
+        trailing = {
+            Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    )
 }
 
 /** The screen's album on one line: what it is on the left, the album on the right, opening the picker sheet. */

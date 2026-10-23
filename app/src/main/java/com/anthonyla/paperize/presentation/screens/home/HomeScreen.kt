@@ -299,6 +299,7 @@ fun HomeScreen(
                                 onUpdateScheduleSettingsDebounced = viewModel::updateScheduleSettingsDebounced,
                                 onChangeWallpaperNow = viewModel::changeWallpaperNow,
                                 onAddFolder = { addFolder(it) },
+                                onExplore = { selectTab(EXPLORE_PAGE) },
                                 onOpenVisualEffects = onNavigateToVisualEffects,
                                 // A current picture opens its album from Library, so back lands in Library.
                                 onOpenAlbum = openAlbum,
@@ -325,7 +326,8 @@ fun HomeScreen(
                         albums = albums,
                         onViewAlbum = onNavigateToAlbum,
                         onAddFolder = { addFolder(null) },
-                        onAddPhotos = { photoPicker.launch(arrayOf("image/*")) }
+                        onAddPhotos = { photoPicker.launch(arrayOf("image/*")) },
+                        onExplore = { selectTab(EXPLORE_PAGE) }
                     )
                     else -> ConnectionsScreen(
                         onOpen = { index ->

@@ -178,6 +178,17 @@ def tab_bottom_has(text: str, timeout: float = 8) -> bool:
     return wait_until(at_end, timeout)
 
 
+def t_fresh_install_explores():
+    """A fresh install has no albums, so the Wallpaper tab it lands on points to Explore, the Connections gallery, and the
+    row opens it (Michael, 2026-10-23, from his brother: a fresh onboarding never suggested the Connections library)."""
+    cw.fresh_app()
+    cw.onboard()
+    open_tab("Wallpaper")
+    check(tab_top_has("Explore wallpapers"), "the Wallpaper tab offers Explore under the album rows")
+    cw.tap("Explore wallpapers")
+    check(cw.has("Search wallpapers", timeout=6), "the row opens Explore")
+
+
 def t_lock_first_folder():
     """The user's path: turn on Lock, open its album picker, add a folder from there."""
     cw.fresh_app()
@@ -1064,7 +1075,7 @@ def t_library_picture_streams():
     check(len(screen_copies()) == 3, f"three pictures, three fetches, however often they show ({screen_copies()})")
 
 
-TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
+TESTS = [t_fresh_install_explores, t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
          t_timer_toggle, t_unlock_off, t_pause, t_update_keeps_watcher, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
          t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out, t_explore_set_keeps_live,
          t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collections_select, t_collection_offline_opens, t_multi_select,

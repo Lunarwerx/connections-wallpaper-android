@@ -89,7 +89,7 @@ class AlbumUiInstrumentedTest {
         var photos = 0
         compose.setContent {
             PaperizeTheme(false, false) {
-                LibraryScreen(listOf(AlbumSummary.empty("beach").copy(name = "Beach")), {}, { folders++ }, { photos++ })
+                LibraryScreen(listOf(AlbumSummary.empty("beach").copy(name = "Beach")), {}, { folders++ }, { photos++ }, {})
             }
         }
         compose.onNodeWithContentDescription(context.getString(R.string.add_album)).performClick()

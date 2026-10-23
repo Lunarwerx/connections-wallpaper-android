@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Explore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -26,6 +27,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,13 +49,17 @@ import com.anthonyla.paperize.presentation.common.theme.AppIconSizes
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import com.anthonyla.paperize.presentation.screens.library.components.AlbumItem
 
-/** Albums are made from what they hold: a folder (named after it) or picked photos, never a name first. */
+/**
+ * Albums are made from what they hold: a folder (named after it) or picked photos, never a name first. An empty Library
+ * also offers [onExplore], the Connections gallery's collections, so a fresh install has somewhere to start.
+ */
 @Composable
 fun LibraryScreen(
     albums: List<AlbumSummary>,
     onViewAlbum: (String) -> Unit,
     onAddFolder: () -> Unit,
     onAddPhotos: () -> Unit,
+    onExplore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val gridState = rememberLazyGridState()
@@ -125,6 +131,11 @@ fun LibraryScreen(
                         Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
                         Text(stringResource(R.string.add_folder))
+                    }
+                    OutlinedButton(onClick = onExplore) {
+                        Icon(Icons.Outlined.Explore, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text(stringResource(R.string.explore_wallpapers))
                     }
                 }
             }

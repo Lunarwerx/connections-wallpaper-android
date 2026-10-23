@@ -214,6 +214,7 @@
 
   <!-- Connections: Explore, the viewer and sign-in -->
   <string name="explore">Explore</string>
+  <string name="explore_wallpapers">Explore wallpapers</string>
   <string name="connections_search_hint">Search wallpapers</string>
   <string name="connections_clear_search">Clear search</string>
   <string name="connections_all">All</string>
