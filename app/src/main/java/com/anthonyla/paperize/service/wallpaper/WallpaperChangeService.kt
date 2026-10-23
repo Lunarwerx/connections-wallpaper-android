@@ -22,6 +22,7 @@ import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
 import com.anthonyla.paperize.presentation.MainActivity
 import com.anthonyla.paperize.service.WallpaperChangeLock
+import com.anthonyla.paperize.service.WallpaperWork
 import com.anthonyla.paperize.service.livewallpaper.PaperizeLiveWallpaperService
 import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,6 +45,7 @@ class WallpaperChangeService : Service() {
     @Inject lateinit var wallpaperScheduler: WallpaperScheduler
     @Inject lateinit var wallpaperRepository: WallpaperRepository
     @Inject lateinit var analytics: ConnectionsAnalytics
+    @Inject lateinit var work: WallpaperWork
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -54,24 +56,33 @@ class WallpaperChangeService : Service() {
         val action = intent?.action
         val screen = intent?.getStringExtra(EXTRA_SCREEN_TYPE)?.let(ScreenType::fromString)
         val wallpaperId = intent?.getStringExtra(EXTRA_WALLPAPER_ID)
+        val tracked = intent?.getBooleanExtra(EXTRA_TRACKED, false) == true
         serviceScope.launch {
-            wallpaperChangeLock.mutex.withLock {
-                try {
-                    when (action) {
-                        ACTION_CHANGE_WALLPAPER -> changeWallpaper(screen)
-                        ACTION_REPLACE_LIVE -> replaceFrozenLive()
-                        ACTION_APPLY_SPECIFIC_WALLPAPER -> applySpecificWallpaper(wallpaperId, screen ?: ScreenType.BOTH)
-                        ACTION_REAPPLY_EFFECTS -> reapplyEffects()
-                        else -> Log.w(TAG, "Unknown action: $action")
+            var succeeded = false
+            try {
+                wallpaperChangeLock.mutex.withLock {
+                    try {
+                        // A change that moved no screen (an emptied album) is not done either.
+                        succeeded = when (action) {
+                            ACTION_CHANGE_WALLPAPER -> changeWallpaper(screen)
+                            ACTION_REPLACE_LIVE -> { replaceFrozenLive(); true }
+                            ACTION_APPLY_SPECIFIC_WALLPAPER -> { applySpecificWallpaper(wallpaperId, screen ?: ScreenType.BOTH); true }
+                            ACTION_REAPPLY_EFFECTS -> reapplyEffects()
+                            else -> { Log.w(TAG, "Unknown action: $action"); false }
+                        }
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Wallpaper action $action failed", e)
+                        showErrorNotification(getString(R.string.app_name), errorMessage(e))
+                    } finally {
+                        stopSelf(startId)
                     }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    Log.e(TAG, "Wallpaper action $action failed", e)
-                    showErrorNotification(getString(R.string.app_name), errorMessage(e))
-                } finally {
-                    stopSelf(startId)
                 }
+            } finally {
+                // Counted when the screen started it, even if it never got the lock; only a success says done.
+                if (action == ACTION_REAPPLY_EFFECTS) work.reapplyDone(applied = succeeded)
+                if (action == ACTION_CHANGE_WALLPAPER && tracked) work.changeDone(changed = succeeded)
             }
         }
         return START_NOT_STICKY
@@ -79,19 +90,24 @@ class WallpaperChangeService : Service() {
 
     /**
      * Changes [screen], or without one every screen the current settings rotate, then replaces a frozen live wallpaper:
-     * the first album picked for one screen can leave the other on it.
+     * the first album picked for one screen can leave the other on it. Returns whether any screen changed.
      */
-    private suspend fun changeWallpaper(screen: ScreenType?) {
+    private suspend fun changeWallpaper(screen: ScreenType?): Boolean {
         analytics.hintTrigger("manual")
         val mode = settingsRepository.getWallpaperMode()
         val targets = screen?.let(::setOf) ?: settingsRepository.getScheduleSettings().activeScreens(mode)
+        var changed = false
         for (target in targets) {
             val settings = settingsRepository.getScheduleSettings()
-            val outcome = wallpaperController.change(target, settings)
+            val outcome = wallpaperController.change(target, settings, now = true)
             if (outcome.emptyAlbum) showEmptyAlbumNotification()
-            if (outcome.changed) wallpaperScheduler.resetAfterManualChange(target, settings, mode)
+            if (outcome.changed) {
+                changed = true
+                wallpaperScheduler.resetAfterManualChange(target, settings, mode)
+            }
         }
         replaceFrozenLive()
+        return changed
     }
 
     /**
@@ -126,12 +142,17 @@ class WallpaperChangeService : Service() {
         wallpaperScheduler.resetAfterManualChange(screen, settings, mode)
     }
 
-    private suspend fun reapplyEffects() {
+    /** Redraws the active screens with the current look; returns whether any screen was redrawn. */
+    private suspend fun reapplyEffects(): Boolean {
         val mode = settingsRepository.getWallpaperMode()
         val settings = settingsRepository.getScheduleSettings()
+        var redrawn = false
         for (target in settings.activeScreens(mode)) {
-            if (wallpaperController.reapply(target, settings).emptyAlbum) showEmptyAlbumNotification()
+            val outcome = wallpaperController.reapply(target, settings)
+            if (outcome.emptyAlbum) showEmptyAlbumNotification()
+            if (outcome.changed) redrawn = true
         }
+        return redrawn
     }
 
     private fun errorMessage(e: Exception): String = when (e) {
@@ -186,11 +207,16 @@ class WallpaperChangeService : Service() {
         private const val ACTION_REAPPLY_EFFECTS = "com.anthonyla.paperize.ACTION_REAPPLY_EFFECTS"
         private const val EXTRA_SCREEN_TYPE = Constants.EXTRA_SCREEN_TYPE
         private const val EXTRA_WALLPAPER_ID = "wallpaper_id"
+        /** Started by a screen that shows it running ([WallpaperWork]). */
+        private const val EXTRA_TRACKED = "tracked"
         private const val ERROR_NOTIFICATION_ID = Constants.NOTIFICATION_ID + 1
 
         /** Without a [screen], changes every screen the current settings rotate (or the live wallpaper). */
-        fun changeWallpaper(context: Context, screen: ScreenType? = null) =
-            start(context, ACTION_CHANGE_WALLPAPER) { screen?.let { putExtra(EXTRA_SCREEN_TYPE, it.name) } }
+        fun changeWallpaper(context: Context, screen: ScreenType? = null, tracked: Boolean = false) =
+            start(context, ACTION_CHANGE_WALLPAPER) {
+                screen?.let { putExtra(EXTRA_SCREEN_TYPE, it.name) }
+                if (tracked) putExtra(EXTRA_TRACKED, true)
+            }
 
         /** In static mode, put a static picture where Paperize's live wallpaper still shows, moving no rotation on. */
         fun replaceLiveWallpaper(context: Context) = start(context, ACTION_REPLACE_LIVE)

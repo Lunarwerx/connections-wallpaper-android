@@ -15,6 +15,11 @@ object Constants {
 
     // Services
     const val ACTION_RELOAD_WALLPAPER = "com.anthonyla.paperize.ACTION_RELOAD_WALLPAPER"
+    /** Our live wallpaper shows the picture at [EXTRA_PICTURE_URI] until the album's next one. */
+    const val ACTION_SHOW_PICTURE = "com.anthonyla.paperize.ACTION_SHOW_PICTURE"
+    const val EXTRA_PICTURE_URI = "picture_uri"
+    /** On [ACTION_RELOAD_WALLPAPER]: asked for by the person, so a live wallpaper hidden behind the app opens its next picture now. */
+    const val EXTRA_NOW = "now"
 
     // WorkManager
     const val WORK_NAME_HOME = "wallpaper_change_home"

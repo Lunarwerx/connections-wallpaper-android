@@ -24,13 +24,15 @@ import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.core.util.isValid
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.model.Wallpaper
+import com.anthonyla.paperize.domain.model.WallpaperEffects
 import com.anthonyla.paperize.domain.model.usesVisibleLiveTimer
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.usecase.ChangeWallpaperUseCase
+import com.anthonyla.paperize.service.WallpaperWork
 import com.anthonyla.paperize.service.livewallpaper.gl.GLWallpaperService
 import com.anthonyla.paperize.service.livewallpaper.renderer.ContentUriImageLoader
 import com.anthonyla.paperize.service.livewallpaper.renderer.EmptyImageLoader
-import com.anthonyla.paperize.service.livewallpaper.renderer.ImageLoader
+import com.anthonyla.paperize.service.livewallpaper.renderer.OpenedArtwork
 import com.anthonyla.paperize.service.livewallpaper.renderer.PaperizeRenderController
 import com.anthonyla.paperize.service.livewallpaper.renderer.PaperizeWallpaperRenderer
 import dagger.hilt.android.AndroidEntryPoint
@@ -53,6 +55,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var changeWallpaperUseCase: ChangeWallpaperUseCase
     @Inject lateinit var analytics: ConnectionsAnalytics
+    @Inject lateinit var work: WallpaperWork
 
     companion object {
         private const val TAG = "PaperizeLiveWallpaper"
@@ -107,6 +110,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
         private var currentAlbumId: String? = null
         @Volatile private var currentWallpaper: Wallpaper? = null
         private var observedScalingType: ScalingType? = null
+        private var observedLook: Triple<ScalingType, WallpaperEffects, Boolean>? = null
         private var hasShownParallaxWarning = false
         private var engineVisible = false
         private var latestSettings = ScheduleSettings()
@@ -125,10 +129,19 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
 
         private val reloadReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action == Constants.ACTION_RELOAD_WALLPAPER) {
-                    Log.d(TAG, "Received reload broadcast")
-                    renderController.reloadCurrentArtwork(immediate = true)
-                    restartLiveIntervalTimer()
+                when (intent?.action) {
+                    Constants.ACTION_RELOAD_WALLPAPER -> {
+                        Log.d(TAG, "Received reload broadcast")
+                        // Asked for in the app, whose window hides the wallpaper: waiting to be seen left the app showing the
+                        // same picture after Change wallpaper now (owner report, 2026-10-22), so it opens the next one now.
+                        if (intent.getBooleanExtra(Constants.EXTRA_NOW, false) && !engineVisible) {
+                            renderController.forceReloadCurrentArtwork()
+                        } else {
+                            renderController.reloadCurrentArtwork(immediate = true)
+                        }
+                        restartLiveIntervalTimer()
+                    }
+                    Constants.ACTION_SHOW_PICTURE -> intent.getStringExtra(Constants.EXTRA_PICTURE_URI)?.let(::showPicture)
                 }
             }
         }
@@ -170,7 +183,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
 
             observeSettings()
 
-            val filter = IntentFilter(Constants.ACTION_RELOAD_WALLPAPER)
+            val filter = IntentFilter(Constants.ACTION_RELOAD_WALLPAPER).apply { addAction(Constants.ACTION_SHOW_PICTURE) }
             ContextCompat.registerReceiver(
                 applicationContext,
                 reloadReceiver,
@@ -195,29 +208,45 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
         }
 
         /** Dequeue the next readable live wallpaper. Queue and database errors reach the controller. */
-        private suspend fun openNextWallpaper(): ImageLoader {
+        private suspend fun openNextWallpaper(): OpenedArtwork {
+            val empty = OpenedArtwork(EmptyImageLoader)
             // In STATIC mode the static wallpaper worker owns HOME/LOCK; the engine stays empty.
-            if (settingsRepository.getWallpaperMode() != WallpaperMode.LIVE) return EmptyImageLoader
+            if (settingsRepository.getWallpaperMode() != WallpaperMode.LIVE) return empty
             val settings = settingsRepository.getScheduleSettings()
-            val albumId = settings.liveAlbumId ?: return EmptyImageLoader
+            val albumId = settings.liveAlbumId ?: return empty
 
             repeat(Constants.MAX_WALLPAPER_LOAD_RETRIES) {
                 val candidate = try {
                     changeWallpaperUseCase.dequeueNext(albumId, ScreenType.LIVE, settings.shuffleEnabled)
                 } catch (_: EmptyAlbumException) {
                     Log.w(TAG, "No wallpapers in album $albumId")
-                    return EmptyImageLoader
+                    return empty
                 }
                 // Skip unreadable items without deleting them: a permission or storage issue may be
                 // transient. AlbumRefreshWorker prunes documents that are actually gone.
                 if (candidate.uri.toUri().isValid(contentResolver)) {
-                    currentWallpaper = candidate
-                    analytics.liveWallpaperShown(albumId, candidate)
-                    return ContentUriImageLoader(contentResolver, candidate.uri.toUri(), settings.liveScalingType)
+                    return OpenedArtwork(ContentUriImageLoader(contentResolver, candidate.uri.toUri(), settings.liveScalingType)) {
+                        currentWallpaper = candidate
+                        // Recorded as the album's current picture, as a static change records its own, so the app shows
+                        // what the live wallpaper shows: it showed a stale one (owner report, 2026-10-22). A picture set
+                        // from outside the library stops being the one shown.
+                        withContext(Dispatchers.IO) {
+                            changeWallpaperUseCase.completeSpecific(albumId, ScreenType.LIVE, candidate.id, settings.shuffleEnabled)
+                        }
+                        analytics.liveWallpaperShown(albumId, candidate)
+                    }
                 }
             }
             Log.w(TAG, "No valid wallpaper found after retries")
-            return EmptyImageLoader
+            return empty
+        }
+
+        /** A picture from outside the library (a Connections wallpaper), shown until the album's next one; the interval starts again from it. */
+        private fun showPicture(uri: String) {
+            val picture = Wallpaper(id = uri, albumId = currentAlbumId.orEmpty(), uri = uri, fileName = uri.substringAfterLast('/'), dateModified = 0)
+            currentWallpaper = picture
+            renderController.show(ContentUriImageLoader(contentResolver, uri.toUri(), latestSettings.liveScalingType))
+            restartLiveIntervalTimer()
         }
 
         private fun observeSettings() {
@@ -274,6 +303,13 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                         }
                     }
                     
+                    // A look edit takes effect here, with nothing for the app to wait on; counting it lets the app say
+                    // Applied (owner report, 2026-10-22: a scaling change gave no sign it reached the phone).
+                    val drawn = effects.copy(enableDoubleTap = false, enableParallax = false, parallaxIntensity = 0)
+                    val look = Triple(scalingType, drawn, settings.appliesAdaptiveBrightness)
+                    if (observedLook != null && observedLook != look) work.liveLookApplied()
+                    observedLook = look
+
                     if (effects.enableParallax && !hasShownParallaxWarning && launcherMayIgnoreParallax()) {
                         hasShownParallaxWarning = true
                         Toast.makeText(

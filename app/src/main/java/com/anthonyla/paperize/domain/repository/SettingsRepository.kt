@@ -44,4 +44,11 @@ interface SettingsRepository {
     suspend fun updateFirstLaunch(isFirstLaunch: Boolean)
 
     suspend fun updateEnableChanger(enabled: Boolean)
+
+    /** A picture from outside the library (a Connections wallpaper) that [screen] shows until its album moves on. */
+    fun getShownPictureFlow(screen: ScreenType): Flow<String?>
+    suspend fun getShownPicture(screen: ScreenType): String?
+
+    /** Null clears it: [screens] show their album's current picture again. */
+    suspend fun setShownPicture(screens: Collection<ScreenType>, uri: String?)
 }

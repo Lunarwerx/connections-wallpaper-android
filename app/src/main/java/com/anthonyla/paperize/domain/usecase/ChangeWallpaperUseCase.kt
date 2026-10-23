@@ -94,6 +94,9 @@ class ChangeWallpaperUseCase @Inject constructor(
                 Log.e(TAG, "Applied wallpaper could not be recorded as current", it)
                 return
             }
+        // The album's picture now replaces one set from outside the library.
+        runCatchingCancellable { settingsRepository.setShownPicture(listOf(screenType), null) }
+            .onFailure { Log.w(TAG, "The picture shown before could not be cleared", it) }
 
         runCatchingCancellable {
             wallpaperRepository.ensureWallpaperQueue(albumId, screenType, shuffle)

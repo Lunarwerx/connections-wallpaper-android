@@ -33,9 +33,12 @@ class WallpaperController @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val ready: ReadyWallpapers
 ) {
-    suspend fun change(screen: ScreenType, settings: ScheduleSettings): WallpaperChangeOutcome = when (screen) {
+    /** [now]: the person asked (Change wallpaper now, the shortcut), so our live wallpaper moves on even while hidden. */
+    suspend fun change(screen: ScreenType, settings: ScheduleSettings, now: Boolean = false): WallpaperChangeOutcome = when (screen) {
         ScreenType.LIVE -> {
-            context.sendBroadcast(Intent(Constants.ACTION_RELOAD_WALLPAPER).setPackage(context.packageName))
+            context.sendBroadcast(
+                Intent(Constants.ACTION_RELOAD_WALLPAPER).setPackage(context.packageName).putExtra(Constants.EXTRA_NOW, now)
+            )
             WallpaperChangeOutcome(changed = true)
         }
         ScreenType.HOME -> changeSelected(settings.homeAlbumId, screen, settings)
@@ -109,6 +112,24 @@ class WallpaperController @Inject constructor(
                 target.staticScreens().forEach {
                     prepare.completeSpecific(albumId, it, wallpaperId, settings.shuffleEnabled)
                 }
+            }
+        }
+    }
+
+    /**
+     * A picture from outside the library on [screen] (HOME, LOCK or BOTH), drawn with that screen's look (in live mode,
+     * the live wallpaper's) and recorded as what the screen shows until its album moves on.
+     */
+    suspend fun applyPicture(uri: String, screen: ScreenType, settings: ScheduleSettings, mode: WallpaperMode) {
+        val separate = screen == ScreenType.BOTH && mode == WallpaperMode.STATIC && !settings.homeAndLockLookAlike
+        for (target in if (separate) listOf(ScreenType.HOME, ScreenType.LOCK) else listOf(screen)) {
+            val look = when {
+                mode == WallpaperMode.LIVE -> ScreenType.LIVE
+                target == ScreenType.BOTH -> ScreenType.HOME
+                else -> target
+            }
+            applyImage(WallpaperImage.Drawn(render.picture(uri, look)), target) {
+                settingsRepository.setShownPicture(target.staticScreens(), uri)
             }
         }
     }

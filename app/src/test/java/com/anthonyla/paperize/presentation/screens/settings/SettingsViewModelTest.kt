@@ -9,6 +9,7 @@ import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.repository.AlbumRepository
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.service.SettingsCoordinator
+import com.anthonyla.paperize.service.WallpaperWork
 import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
@@ -34,7 +35,7 @@ class SettingsViewModelTest {
         every { Log.e(any(), any(), any()) } returns 0
         every { settings.getAppSettingsFlow() } returns flowOf(AppSettings())
         every { settings.getWallpaperModeFlow() } returns flowOf(WallpaperMode.STATIC)
-        viewModel = SettingsViewModel(settings, SettingsCoordinator(mockk(), settings, mockk(), albums, scheduler))
+        viewModel = SettingsViewModel(settings, SettingsCoordinator(mockk(), settings, mockk(), albums, scheduler, WallpaperWork()))
         store.put("settings", viewModel)
     }
 

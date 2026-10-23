@@ -70,8 +70,9 @@ def open_tab(name: str) -> None:
         page.scroll.toBeginning(max_swipes=10)
 
 
-def pick_folder(folder: str = FOLDER) -> None:
-    """Drive the system folder picker to Pictures/<folder> and allow it."""
+def pick_folder(folder: str = FOLDER, first: bool = False) -> None:
+    """Drive the system folder picker to Pictures/<folder> and allow it. The [first] album a signed-out install adds
+    brings the one-time free-account note, which this dismisses; later albums bring none, so they do not wait for it."""
     d = cw.d
     for _ in range(14):
         time.sleep(0.5)
@@ -92,8 +93,8 @@ def pick_folder(folder: str = FOLDER) -> None:
     d(textMatches="(?i)use this folder").click(timeout=5)
     d(textMatches="(?i)^allow$").click(timeout=5)
     check(wait_until(lambda: not d(packageName="com.google.android.documentsui").exists, 10), "picker closed")
-    # The first album added while signed out brings the one-time free-account note; the suite stays signed out.
-    if d(text="Not now").wait(timeout=8):  # a loaded PC's fresh emulator took over 3 s to show it
+    # The suite stays signed out. A fresh emulator on a PC busy with a Gradle build took over 8 s to show the note.
+    if first and d(text="Not now").wait(timeout=20):
         d(text="Not now").click()
 
 
@@ -151,11 +152,14 @@ def scroll_to(text: str) -> None:
         cw.d(scrollable=True).scroll.to(text=text)
 
 
-def tab_bottom_has(text: str, timeout: float = 4) -> bool:
+def tab_bottom_has(text: str, timeout: float = 8) -> bool:
     """Scroll the tab to its end, again until the timeout, so a row that just appeared below the fold counts."""
     def at_end() -> bool:
         # toEnd stops at the end; the Wallpaper tab with both albums takes more than five swipes on a 1080x2400 screen.
-        cw.d(scrollable=True).scroll.toEnd(max_swipes=20)
+        # A tab still sliding in (back from a page) has no scrollable for a moment: that try counts as not there yet.
+        page = cw.d(scrollable=True)
+        if page.exists:
+            page.scroll.toEnd(max_swipes=20)
         return cw.has(text)
     return wait_until(at_end, timeout)
 
@@ -171,7 +175,7 @@ def t_lock_first_folder():
     check(cw.has("No albums yet", timeout=4), "empty picker says No albums yet")
     cw.d.screenshot("shots/suite/empty-picker.jpg")
     cw.tap("Add folder")
-    pick_folder()
+    pick_folder(first=True)
     check(cw.has(FOLDER, timeout=10), "album named after the folder shows on the Wallpaper tab")
     check(wait_until(lambda: ids()["lock"] not in (None, before["lock"]), 15), f"lock wallpaper set ({before} -> {ids()})")
     check(ids()["system"] == before["system"], "home untouched (home is off)")
@@ -391,9 +395,23 @@ def t_pause():
     check(wait_until(lambda: not watcher_running(), 6), "pausing stops the watcher")
     check(wait_until(lambda: not cw.has("Change on unlock"), 4), "paused, when it changes is hidden")
     cw.d.screenshot("shots/suite/wallpaper-tab-paused.jpg")
+    # Review (2026-10-22): paused, a look edit leaves the phone as it is and the header says why; resuming draws it.
+    to_scaling()
+    check(cw.has("Wallpaper changing is off", timeout=4), "paused, the Scaling header says changing is off")
+    before = ids()
+    cw.tap("Fit")
+    time.sleep(2)
+    check(ids() == before, f"paused, the edit leaves the phone as it is ({before} -> {ids()})")
     open_tab("Wallpaper")
     cw.tap("Wallpaper changing")
     check(wait_until(watcher_running, 6), "resuming starts it again")
+    check(wait_until(lambda: ids()["system"] != before["system"] or ids()["lock"] != before["lock"], 15),
+          f"resuming draws the look edited while paused ({before} -> {ids()})")
+    to_scaling()
+    check(wait_until(lambda: not cw.has("Applying") and not cw.has("Applied"), 15), "the redraw's status settles")
+    cw.tap("Fill")
+    check(cw.has("Applied", timeout=12), "with changing on, a scaling edit says Applied")
+    open_tab("Wallpaper")
     check(switch_state("Change on unlock"), "resumed, Change on unlock is back and still on")
 
 
@@ -418,7 +436,7 @@ def t_library_folder_fills_both():
     open_tab("Library")
     cw.tap("Add album")
     cw.tap("Add folder")
-    pick_folder()
+    pick_folder(first=True)
     check(cw.has(FOLDER, timeout=10), "album named after the folder, no name prompt")
     check(not cw.has("Enter the name"), "no name dialog")
     check(wait_until(lambda: ids()["system"] != before["system"], 15), f"wallpaper set ({before} -> {ids()})")
@@ -518,7 +536,8 @@ def t_effects():
     check(cw.has("Grayscale"), "the Adjust row names the effect that is on")
     cw.d.screenshot("shots/suite/wallpaper-tab-effects.jpg")
     cw.tap("Visual effects")
-    check(wait_until(lambda: tab_bottom_has("Visual effects", 1) and not cw.has("Adjust visual effects"), 4),
+    # 10 s: the redraw re-themes the app from the new wallpaper's colours, which recreates this screen (slow when busy).
+    check(wait_until(lambda: tab_bottom_has("Visual effects", 1) and not cw.has("Adjust visual effects"), 10),
           "switching visual effects off hides Adjust")
     check(wait_until(lambda: not cw.is_gray(cw.wall_rgb("lock")), 20), f"and the lock wallpaper has its colour back {cw.wall_rgb('lock')}")
 
@@ -588,6 +607,64 @@ def t_explore_set_signed_out():
     cw.tap("Save to phone")
     check(cw.has("Sign in with Connections", timeout=6), "Save to phone asks a signed-out visitor to sign in")
     cw.d.press("back")
+
+
+def scaling_thumb() -> str:
+    """The test colour the Scaling picker's Fill phone shows: the live wallpaper's picture now, drawn in the app."""
+    b = cw.d(text="Fill").info["bounds"]
+    # The phone stands above its label; 120 px up is well inside its picture on a 1080x2400 screen.
+    return cw.nearest(cw.d.screenshot().convert("RGB").getpixel(((b["left"] + b["right"]) // 2, b["top"] - 120)))
+
+
+def to_scaling() -> None:
+    page = cw.d(scrollable=True)
+    page.scroll.toBeginning(max_swipes=20)
+    page.scroll.to(text="Fill")
+
+
+def t_explore_set_keeps_live():
+    """Owner report (2026-10-22): in live mode a gallery picture set on both screens replaced our live wallpaper, so
+    rotation stopped and Change wallpaper now did nothing. Our live wallpaper now stays on and shows the picture, and
+    Change wallpaper now moves on from it."""
+    sizes = gallery_sizes()
+    pick_mode("Live wallpaper")
+    set_live_in_picker()
+    check(wait_until(live_is_ours, 12), f"our live wallpaper is the phone's ({ids()['component']})")
+    # Until it draws its album's picture the screen still shows the last flow's gallery picture, the one set below.
+    check(wait_until(lambda: cw.home_color() in cw.COLORS, 30), f"it shows its album's picture ({cw.home_color()})")
+    before = cw.home_color()
+    cw.sh("shell", "am", "start", "-n", cw.MAIN)
+    open_tab("Explore")
+    check(cw.has("Search wallpapers", timeout=6), "Explore loads")
+    title = next((l for l in cw.labels() if l in sizes), None)
+    check(title is not None, "a gallery wallpaper is on screen")
+    cw.tap(title)
+    cw.tap("Set wallpaper")
+    cw.tap("Home and lock screens")
+    check(wait_until(lambda: cw.home_color() != before, 20), f"our live wallpaper shows the picture ({before})")
+    shown = cw.home_color()
+    check(live_is_ours(), f"and stays the phone's ({ids()})")
+    cw.sh("shell", "am", "start", "-n", cw.MAIN)
+    if cw.has("Set wallpaper", timeout=3):
+        cw.d.press("back")
+    open_tab("Wallpaper")
+    check(switch_state("Wallpaper changing"), "rotation stays on")
+    to_scaling()
+    thumb = scaling_thumb()
+    check(tab_bottom_has("Change wallpaper now"), "Change wallpaper now ends the tab")
+    cw.tap("Change wallpaper now")
+    check(cw.has("Changed", timeout=6), "the button says Changed")
+    # The app's window hides the wallpaper: the next picture must still come at once, not when the home screen shows.
+    to_scaling()
+    check(wait_until(lambda: scaling_thumb() not in (thumb, "other"), 15), f"the app shows the next picture at once ({thumb} -> {scaling_thumb()})")
+    cw.tap("Fit")
+    check(cw.has("Applied", timeout=6), "a live scaling change says Applied")
+    cw.tap("Fill")
+    check(wait_until(lambda: cw.home_color() in cw.COLORS, 20), f"Change wallpaper now moves on from the picture to the album's ({shown})")
+    check(live_is_ours(), f"with our live wallpaper still the phone's ({ids()})")
+    cw.sh("shell", "am", "start", "-n", cw.MAIN)
+    pick_mode("Static")
+    check(wait_until(lambda: not live_anywhere(), 12), "static mode again for the tests after")
 
 
 
@@ -802,7 +879,7 @@ def t_multi_select():
 
 TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
          t_timer_toggle, t_unlock_off, t_pause, t_update_keeps_watcher, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
-         t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out,
+         t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out, t_explore_set_keeps_live,
          t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collection_offline_opens, t_multi_select, t_add_to_library_signed_out]
 
 
@@ -820,6 +897,8 @@ def main() -> None:
     # A CPU-starved emulator raises "System UI isn't responding" over every screen; Wait lets the system catch up.
     cw.d.watcher.when("%responding%").when("Wait").click()
     cw.d.watcher.start(1.0)
+    # The AVD keeps its data across boots, so a run stopped inside an offline flow left it offline for every run after.
+    cw.sh("shell", "cmd", "connectivity", "airplane-mode", "disable")
     results = []
     for test in TESTS:
         name = test.__name__[2:]
@@ -827,12 +906,16 @@ def main() -> None:
             continue
         start = time.time()
         print(f"> {name}", flush=True)
+        cw.sh("logcat", "-c")
         try:
             test()
             results.append((name, "PASS", time.time() - start, ""))
         except Exception as e:  # noqa: BLE001 - the suite reports every failure and goes on
             try:
                 cw.d.screenshot(f"shots/suite/FAIL-{name}.jpg")
+                # The flow's log beside its screenshot: why a set or a switch did nothing is in the app's warnings.
+                with open(f"shots/suite/FAIL-{name}.log", "w", encoding="utf-8") as out:
+                    out.write(cw.sh("logcat", "-d", "-v", "time"))
                 seen = cw.labels()
             except Exception:  # noqa: BLE001
                 seen = []

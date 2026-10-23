@@ -15,6 +15,7 @@ import com.anthonyla.paperize.service.worker.WallpaperScheduler
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,7 +30,8 @@ class SettingsCoordinator @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val wallpaperRepository: WallpaperRepository,
     private val albumRepository: AlbumRepository,
-    private val scheduler: WallpaperScheduler
+    private val scheduler: WallpaperScheduler,
+    private val work: WallpaperWork
 ) {
     private val mutex = Mutex()
 
@@ -106,6 +108,7 @@ class SettingsCoordinator @Inject constructor(
         val settings = settingsRepository.getScheduleSettings()
         val mode = settingsRepository.getWallpaperMode()
         scheduler.updateSchedules(settings, mode, onlyIfNotScheduled = true)
+        if (enabled && lookWaiting && mode == WallpaperMode.STATIC && settings.hasRequiredAlbums(mode)) reapplyLook()
         enabled && mode == WallpaperMode.LIVE && settings.hasRequiredAlbums(mode) &&
             !PaperizeLiveWallpaperService.isActive(context)
     }
@@ -131,15 +134,56 @@ class SettingsCoordinator @Inject constructor(
         }
         val mode = settingsRepository.getWallpaperMode()
         if (updated.hasSchedulingChanges(previous)) scheduler.updateSchedules(updated, mode)
-        if (updated.hasDisplayChanges(previous) && updated.enableChanger &&
-            updated.hasRequiredAlbums(mode) && mode == WallpaperMode.STATIC
-        ) {
-            WallpaperChangeService.reapplyEffects(context)
+        if (updated.hasDisplayChanges(previous) && updated.hasRequiredAlbums(mode) && mode == WallpaperMode.STATIC) {
+            // Changing off, the phone keeps its pictures as they are (a person may have set one elsewhere).
+            if (updated.enableChanger) reapplyLook() else lookWaiting = true
         }
     }
 
-    /** Change every screen the current settings rotate, or reload the live wallpaper. */
-    fun changeWallpaperNow() = WallpaperChangeService.changeWallpaper(context)
+    // A look edit made while changing was off, drawn once it is on again (review, 2026-10-22).
+    private var lookWaiting = false
+
+    private fun reapplyLook() {
+        lookWaiting = false
+        work.reapplyStarted()
+        try {
+            WallpaperChangeService.reapplyEffects(context)
+        } catch (e: Exception) {
+            work.reapplyDone(applied = false)
+            throw e
+        }
+    }
+
+    /** True from a look edit until its redrawn wallpaper is on the phone. */
+    val reapplying = work.reapplying
+
+    /** True from Change wallpaper now until the next picture is on the phone. */
+    val changing = work.changing
+
+    /** When ([WallpaperWork.now]) a look edit last reached the phone, so the screen says Applied after it. */
+    val looksApplied: StateFlow<Long> = work.looksApplied
+
+    /** When ([WallpaperWork.now]) a Change wallpaper now tap last put its picture up, so the button says Changed. */
+    val changesApplied: StateFlow<Long> = work.changesApplied
+
+    /**
+     * Change every screen the current settings rotate, or show the live wallpaper's next picture. In live mode with
+     * Paperize's live wallpaper replaced, nothing would show it: rotation turns back on and this returns true, since the
+     * live wallpaper must be picked again first.
+     */
+    suspend fun changeWallpaperNow(): Boolean {
+        if (settingsRepository.getWallpaperMode() == WallpaperMode.LIVE && !PaperizeLiveWallpaperService.isActive(context)) {
+            return setChangerEnabled(true)
+        }
+        work.changeStarted()
+        try {
+            WallpaperChangeService.changeWallpaper(context, tracked = true)
+        } catch (e: Exception) {
+            work.changeDone(changed = false)
+            throw e
+        }
+        return false
+    }
 
     /**
      * Square the settings with what the phone shows. In live mode, Paperize's live wallpaper replaced outside the app

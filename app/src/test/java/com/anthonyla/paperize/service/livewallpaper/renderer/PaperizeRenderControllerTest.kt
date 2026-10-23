@@ -3,6 +3,7 @@ package com.anthonyla.paperize.service.livewallpaper.renderer
 import com.anthonyla.paperize.core.constants.Constants
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -20,7 +21,7 @@ class PaperizeRenderControllerTest {
         val current = mockk<ContentUriImageLoader>()
         var selections = 0
         val controller = PaperizeRenderController({ loader, skip -> uploads.add(loader to skip) }, backgroundScope) {
-            if (selections++ == 0) first.await() else current
+            OpenedArtwork(if (selections++ == 0) first.await() else current)
         }
         controller.visible = true
         controller.reloadCurrentArtwork(immediate = true)
@@ -35,7 +36,7 @@ class PaperizeRenderControllerTest {
     @Test fun `hidden debounce waits until visible without selecting twice`() = runTest {
         val uploads = mutableListOf<Pair<ImageLoader, Boolean>>()
         val loader = mockk<ContentUriImageLoader>()
-        val controller = PaperizeRenderController({ loader, skip -> uploads.add(loader to skip) }, backgroundScope) { loader }
+        val controller = PaperizeRenderController({ loader, skip -> uploads.add(loader to skip) }, backgroundScope) { OpenedArtwork(loader) }
         controller.visible = true
         controller.reloadCurrentArtwork()
         runCurrent()
@@ -47,5 +48,25 @@ class PaperizeRenderControllerTest {
         controller.visible = true
         runCurrent()
         assertEquals(listOf(loader to false), uploads)
+    }
+
+    @Test fun `a picture shown while a reload is opening stays, and the reload's pick is not recorded`() = runTest {
+        val uploads = mutableListOf<Pair<ImageLoader, Boolean>>()
+        val opening = CompletableDeferred<ImageLoader>()
+        val picked = mockk<ContentUriImageLoader>()
+        val shown = mockk<ContentUriImageLoader>()
+        var recorded = false
+        val controller = PaperizeRenderController({ loader, skip -> uploads.add(loader to skip) }, backgroundScope) {
+            OpenedArtwork(opening.await()) { recorded = true }
+        }
+        controller.visible = true
+        controller.reloadCurrentArtwork(immediate = true)
+        runCurrent()
+        controller.show(shown)
+        opening.complete(picked)
+        runCurrent()
+
+        assertEquals(listOf(shown to false), uploads)
+        assertFalse(recorded)
     }
 }

@@ -1,6 +1,5 @@
 package com.anthonyla.paperize.connections
 
-import android.app.WallpaperManager
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -8,9 +7,11 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
+import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.util.generateId
 import com.anthonyla.paperize.domain.model.Wallpaper
 import com.anthonyla.paperize.domain.repository.AlbumRepository
+import com.anthonyla.paperize.service.worker.ApplyPictureWorker
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -19,10 +20,10 @@ import java.io.IOException
 import javax.inject.Inject
 
 /** Where a Connections wallpaper goes on the phone: the home or lock screen right now. */
-enum class WallpaperTarget(val flags: Int) {
-    BOTH(WallpaperManager.FLAG_SYSTEM or WallpaperManager.FLAG_LOCK),
-    HOME(WallpaperManager.FLAG_SYSTEM),
-    LOCK(WallpaperManager.FLAG_LOCK)
+enum class WallpaperTarget(val screen: ScreenType) {
+    BOTH(ScreenType.BOTH),
+    HOME(ScreenType.HOME),
+    LOCK(ScreenType.LOCK)
 }
 
 /**
@@ -72,12 +73,14 @@ class ConnectionsOriginals @Inject constructor(
     /** The saved preview of [wallpaper], when there is one. */
     fun savedPreview(wallpaper: ConnectionsWallpaper): File? = previewFile(wallpaper).takeIf { it.isFile }
 
+    /**
+     * Sets [wallpaper] through the app's own wallpaper work ([ApplyPictureWorker]), never straight on the phone: it is drawn with the screen's
+     * scaling and effects, our live wallpaper stays on and shows it, and rotation goes on from it (owner report, 2026-10-22:
+     * a picture set from a collection broke the rotator and Change wallpaper now).
+     */
     suspend fun setAsWallpaper(wallpaper: ConnectionsWallpaper, target: WallpaperTarget) {
         val (uri, _) = kept(wallpaper)
-        withContext(Dispatchers.IO) {
-            val input = context.contentResolver.openInputStream(uri) ?: throw IOException("The saved picture could not be opened")
-            input.use { WallpaperManager.getInstance(context).setStream(it, null, true, target.flags) }
-        }
+        ApplyPictureWorker.set(context, uri.toString(), target.screen)
     }
 
     /** Saves the original into the phone's pictures with a member's [token]; a copy saved before is kept as it is. */

@@ -307,6 +307,12 @@
   <string name="mode_switch_keeps">Your albums and settings stay when you switch.</string>
   <string name="mode_switch_failed">Couldn\'t switch modes. Please try again.</string>
   <string name="scaling_original">Original</string>
+  <string name="scaling_fits_screen">Fits your screen, so Fill, Fit and Stretch match</string>
+  <string name="applying">Applying</string>
+  <string name="applied">Applied</string>
+  <string name="changing_is_off">Wallpaper changing is off</string>
+  <string name="changing">Changing</string>
+  <string name="changed">Changed</string>
   <string name="horizontal_scrolling_on">The picture slides a little as you swipe home pages</string>
   <string name="horizontal_scrolling_off">The picture stays put as you swipe home pages</string>
   <string name="horizontal_scrolling_fill_only">Slides only with Fill scaling; with this scaling the picture stays put</string>

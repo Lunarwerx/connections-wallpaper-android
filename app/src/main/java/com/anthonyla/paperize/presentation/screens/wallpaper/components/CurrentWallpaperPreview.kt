@@ -27,8 +27,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -41,6 +41,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import coil3.size.Size
 import com.anthonyla.paperize.R
+import com.anthonyla.paperize.core.ScalingType
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 import kotlin.math.max
@@ -48,12 +49,15 @@ import kotlin.math.min
 
 
 /** Shows the last applied source URIs; WallpaperManager readback is restricted on modern Android.
- * Cropping and effects applied to the actual wallpaper are not included in this preview.
+ * Each is drawn with its screen's scaling, as the phone draws it (owner report, 2026-10-22: a scaling change never
+ * showed here); effects are not included.
  */
 @Composable
 fun CurrentWallpaperPreview(
     homeWallpaperUri: String?,
     lockWallpaperUri: String?,
+    homeScaling: ScalingType,
+    lockScaling: ScalingType,
     modifier: Modifier = Modifier,
     animate: Boolean = true,
     /** Opens the album the lock screen's picture comes from; null when no album is picked. */
@@ -98,6 +102,7 @@ fun CurrentWallpaperPreview(
             ) {
                 WallpaperPreviewBox(
                     wallpaperUri = lockWallpaperUri,
+                    scaling = lockScaling,
                     label = stringResource(R.string.lock),
                     icon = Icons.Outlined.Lock,
                     aspectRatio = screenAspectRatio,
@@ -109,6 +114,7 @@ fun CurrentWallpaperPreview(
 
                 WallpaperPreviewBox(
                     wallpaperUri = homeWallpaperUri,
+                    scaling = homeScaling,
                     label = stringResource(R.string.home),
                     icon = Icons.Outlined.Home,
                     aspectRatio = screenAspectRatio,
@@ -125,6 +131,7 @@ fun CurrentWallpaperPreview(
 @Composable
 private fun WallpaperPreviewBox(
     wallpaperUri: String?,
+    scaling: ScalingType,
     label: String,
     icon: ImageVector,
     aspectRatio: Float,
@@ -143,7 +150,8 @@ private fun WallpaperPreviewBox(
                 .fillMaxWidth()
                 .aspectRatio(aspectRatio)
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                // Black behind a picture, as the phone shows around one that does not fill it.
+                .background(if (wallpaperUri == null) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Black)
                 .then(if (onClick == null) Modifier else Modifier.clickable(onClickLabel = openLabel, role = Role.Button, onClick = onClick))
         ) {
             // A screen this app has not set yet shows its own glyph, not a blank tile.
@@ -162,7 +170,7 @@ private fun WallpaperPreviewBox(
                         .crossfade(animate)
                         .build(),
                     contentDescription = contentDescription,
-                    contentScale = ContentScale.Crop,
+                    contentScale = rememberScalingContentScale(wallpaperUri, scaling),
                     modifier = Modifier.matchParentSize()
                 )
             }

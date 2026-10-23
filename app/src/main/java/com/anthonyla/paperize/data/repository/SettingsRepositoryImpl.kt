@@ -20,6 +20,7 @@ import com.anthonyla.paperize.domain.model.WallpaperEffects
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -189,6 +190,17 @@ class SettingsRepositoryImpl @Inject constructor(
     override suspend fun updateEnableChanger(enabled: Boolean) {
         dataStore.edit { it[ENABLE_CHANGER] = enabled }
     }
+
+    override fun getShownPictureFlow(screen: ScreenType): Flow<String?> =
+        dataStore.data.map { it[shownPictureKey(screen)] }.distinctUntilChanged()
+
+    override suspend fun getShownPicture(screen: ScreenType): String? = getShownPictureFlow(screen).first()
+
+    override suspend fun setShownPicture(screens: Collection<ScreenType>, uri: String?) {
+        dataStore.edit { prefs -> screens.forEach { prefs.setOrRemove(shownPictureKey(it), uri) } }
+    }
+
+    private fun shownPictureKey(screen: ScreenType) = stringPreferencesKey("shown_picture_${screen.name.lowercase()}")
 
     private fun scheduleSettings(prefs: Preferences): ScheduleSettings {
         val defaults = ScheduleSettings()

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -18,6 +19,7 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Autorenew
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.Home
@@ -35,22 +37,30 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.ScalingType
 import com.anthonyla.paperize.core.ScreenType
@@ -73,6 +83,8 @@ import com.anthonyla.paperize.presentation.screens.wallpaper.components.CurrentW
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.ScalingPicker
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.SettingSwitchWithSlider
 import com.anthonyla.paperize.presentation.screens.wallpaper.components.TimeIntervalPicker
+import com.anthonyla.paperize.service.WallpaperWork
+import kotlinx.coroutines.delay
 
 /**
  * Settings are grouped rows at Android's list height (one rounded block per section), not a card per
@@ -96,6 +108,14 @@ fun WallpaperScreen(
     homeWallpaperUri: String?,
     lockWallpaperUri: String?,
     liveWallpaperUri: String?,
+    /** A look edit is still redrawing the wallpaper on the phone. */
+    applyingLook: Boolean,
+    /** Change wallpaper now is still putting the next picture on the phone. */
+    changingNow: Boolean,
+    /** How many look edits reached the phone; each new one shows Applied. */
+    looksApplied: Long,
+    /** How many Change wallpaper now taps put their picture up; each new one shows Changed. */
+    changesApplied: Long,
     modifier: Modifier = Modifier,
     /** Shown just above Change wallpaper now, which stays the last thing on the page. */
     sponsored: (@Composable () -> Unit)? = null
@@ -298,6 +318,8 @@ fun WallpaperScreen(
             CurrentWallpaperPreview(
                 homeWallpaperUri = homeWallpaperUri,
                 lockWallpaperUri = lockWallpaperUri,
+                homeScaling = scheduleSettings.homeScalingType,
+                lockScaling = scheduleSettings.lockScalingType,
                 animate = appSettings.animate,
                 onOpenLock = opener(scheduleSettings.lockAlbumId.takeIf { lockEnabled }),
                 onOpenHome = opener(scheduleSettings.homeAlbumId.takeIf { homeEnabled })
@@ -312,14 +334,25 @@ fun WallpaperScreen(
                 modifier = Modifier.padding(horizontal = AppSpacing.medium, vertical = AppSpacing.small),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(Modifier.heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.AspectRatio, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.width(AppSpacing.medium))
                     Text(
                         text = stringResource(R.string.scaling),
                         style = MaterialTheme.typography.bodyLarge,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    // Owner report (2026-10-22): a scaling change gave no sign it reached the phone.
+                    WorkStatus(
+                        running = applyingLook,
+                        doneAt = looksApplied,
+                        runningText = R.string.applying,
+                        doneText = R.string.applied,
+                        // Paused, the phone keeps its pictures as they are: the new look waits for changing to be on.
+                        idleText = if (wallpaperMode == WallpaperMode.STATIC && !scheduleSettings.enableChanger) R.string.changing_is_off else null,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
                 // Each choice drawn with the wallpaper showing now, as the lock screen shows it.
@@ -330,6 +363,7 @@ fun WallpaperScreen(
                         lockEnabled -> lockWallpaperUri ?: homeWallpaperUri
                         else -> homeWallpaperUri ?: lockWallpaperUri
                     },
+                    otherWallpaperUri = if (wallpaperMode == WallpaperMode.STATIC && lockEnabled && homeEnabled) homeWallpaperUri else null,
                     animate = appSettings.animate,
                     onSelect = { scalingType ->
                         updateSettingsImmediate(
@@ -432,7 +466,16 @@ fun WallpaperScreen(
         sponsored?.invoke()
         if (hasAlbumSelected) {
             Button(onClick = onChangeWallpaperNow, modifier = Modifier.fillMaxWidth().padding(top = AppSpacing.small)) {
-                Text(text = stringResource(R.string.change_wallpaper_now))
+                // Owner report (2026-10-22): a tap here gave no sign it did anything.
+                WorkStatus(
+                    running = changingNow,
+                    doneAt = changesApplied,
+                    runningText = R.string.changing,
+                    doneText = R.string.changed,
+                    idleText = R.string.change_wallpaper_now,
+                    color = LocalContentColor.current,
+                    accent = LocalContentColor.current
+                )
             }
         }
     }
@@ -552,3 +595,48 @@ private fun AlbumRow(icon: ImageVector, label: String, albumId: String?, albums:
         }
     )
 }
+
+/**
+ * What wallpaper work a tap started says: [runningText] with a spinner while it runs, [doneText] with a check for a moment
+ * after the work finishes at [doneAt] ([WallpaperWork.now], 0 when it never has), then [idleText] (nothing when null). Done
+ * is marked where the work ends, not read off a run here: our live wallpaper takes a look edit with nothing running here
+ * to watch, and a static wallpaper set recreates this screen (the system re-themes apps from its colours).
+ */
+@Composable
+private fun WorkStatus(
+    running: Boolean,
+    doneAt: Long,
+    @StringRes runningText: Int,
+    @StringRes doneText: Int,
+    @StringRes idleText: Int? = null,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    accent: Color = MaterialTheme.colorScheme.primary,
+    style: TextStyle = LocalTextStyle.current
+) {
+    var showDone by remember { mutableStateOf(false) }
+    LaunchedEffect(doneAt) {
+        val left = doneAt + DONE_SHOWN_MS - WallpaperWork.now()
+        if (doneAt == 0L || left <= 0) return@LaunchedEffect
+        showDone = true
+        delay(left)
+        showDone = false
+    }
+    // Read off the clock too, so the first frame after it finished (or after the screen was recreated) already says done.
+    val doneShowing = showDone || (doneAt != 0L && WallpaperWork.now() - doneAt < DONE_SHOWN_MS)
+    val text = when {
+        running -> runningText
+        doneShowing -> doneText
+        else -> idleText
+    } ?: return
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (running) {
+            CircularProgressIndicator(Modifier.size(16.dp), color = color, strokeWidth = 2.dp)
+        } else if (doneShowing) {
+            Icon(Icons.Outlined.CheckCircle, contentDescription = null, tint = accent, modifier = Modifier.size(18.dp))
+        }
+        if (running || doneShowing) Spacer(Modifier.width(6.dp))
+        Text(text = stringResource(text), style = style, color = color)
+    }
+}
+
+private const val DONE_SHOWN_MS = 2500L

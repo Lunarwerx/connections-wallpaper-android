@@ -95,8 +95,10 @@ def log_tail(path: str) -> str:
 def start(name: str, port: int) -> tuple[subprocess.Popen, str]:
     log = os.path.join(HERE, "shots", f"{name}-{port}-emulator.log")
     os.makedirs(os.path.dirname(log), exist_ok=True)
+    # Public resolvers, not the host's: the emulator takes every host adapter's DNS, a VPN's tunnel-only one included,
+    # and lost DNS mid-run when that tunnel dropped, failing every gallery flow after it (2026-10-22).
     cmd = [emulator_exe(), "-avd", name, "-port", str(port), "-no-window", "-no-audio", "-no-boot-anim",
-           "-gpu", "swiftshader_indirect", "-no-snapshot", "-memory", "3072"]
+           "-gpu", "swiftshader_indirect", "-no-snapshot", "-memory", "3072", "-dns-server", "1.1.1.1,8.8.8.8"]
     with open(log, "w", encoding="utf-8") as out:
         return subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT, creationflags=cw.NO_WINDOW), log
 

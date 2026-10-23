@@ -100,6 +100,10 @@ fun HomeScreen(
     val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
     val wallpaperMode by viewModel.wallpaperMode.collectAsStateWithLifecycle()
     val showLiveWallpaperPrompt by viewModel.showLiveWallpaperPrompt.collectAsStateWithLifecycle()
+    val applyingLook by viewModel.applyingLook.collectAsStateWithLifecycle()
+    val changingNow by viewModel.changingNow.collectAsStateWithLifecycle()
+    val looksApplied by viewModel.looksApplied.collectAsStateWithLifecycle()
+    val changesApplied by viewModel.changesApplied.collectAsStateWithLifecycle()
     val currentHomeWallpaperUri by viewModel.currentHomeWallpaperUri.collectAsStateWithLifecycle()
     val currentLockWallpaperUri by viewModel.currentLockWallpaperUri.collectAsStateWithLifecycle()
     val currentLiveWallpaperUri by viewModel.currentLiveWallpaperUri.collectAsStateWithLifecycle()
@@ -286,6 +290,10 @@ fun HomeScreen(
                                 homeWallpaperUri = currentHomeWallpaperUri,
                                 lockWallpaperUri = currentLockWallpaperUri,
                                 liveWallpaperUri = currentLiveWallpaperUri,
+                                applyingLook = applyingLook,
+                                changingNow = changingNow,
+                                looksApplied = looksApplied,
+                                changesApplied = changesApplied,
                                 sponsored = banner?.let { ad ->
                                     @Composable {
                                         SponsoredBanner(

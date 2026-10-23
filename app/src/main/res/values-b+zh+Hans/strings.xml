@@ -303,6 +303,12 @@
   <string name="mode_switch_keeps">切换时会保留你的相册和设置。</string>
   <string name="mode_switch_failed">无法切换模式，请重试。</string>
   <string name="scaling_original">原始</string>
+  <string name="scaling_fits_screen">图片已适合屏幕，填充、适应和拉伸效果相同</string>
+  <string name="applying">正在应用</string>
+  <string name="applied">已应用</string>
+  <string name="changing_is_off">壁纸更换已关闭</string>
+  <string name="changing">正在更换</string>
+  <string name="changed">已更换</string>
   <string name="horizontal_scrolling_on">翻动主屏幕页面时，图片会随之轻微移动</string>
   <string name="horizontal_scrolling_off">翻动主屏幕页面时，图片保持不动</string>
   <string name="horizontal_scrolling_fill_only">仅在「填充」缩放下移动；当前缩放下图片保持不动</string>

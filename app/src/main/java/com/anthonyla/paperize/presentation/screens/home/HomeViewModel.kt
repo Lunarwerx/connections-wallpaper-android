@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     albumRepository: AlbumRepository,
-    settingsRepository: SettingsRepository,
+    private val settingsRepository: SettingsRepository,
     private val wallpaperRepository: WallpaperRepository,
     private val importWallpapersUseCase: ImportWallpapersUseCase,
     private val coordinator: SettingsCoordinator
@@ -66,6 +66,18 @@ class HomeViewModel @Inject constructor(
     val currentLockWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LOCK) { it.lockAlbumId }
 
     val currentLiveWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LIVE) { it.liveAlbumId }
+
+    /** True from a look edit until its redrawn wallpaper is on the phone. */
+    val applyingLook: StateFlow<Boolean> = coordinator.reapplying.stateWhileSubscribed(viewModelScope, false)
+
+    /** True from Change wallpaper now until the next picture is on the phone. */
+    val changingNow: StateFlow<Boolean> = coordinator.changing.stateWhileSubscribed(viewModelScope, false)
+
+    /** How many look edits reached the phone; each new one shows Applied. */
+    val looksApplied: StateFlow<Long> = coordinator.looksApplied
+
+    /** How many Change wallpaper now taps put their picture up; each new one shows Changed. */
+    val changesApplied: StateFlow<Long> = coordinator.changesApplied
 
     private val _showLiveWallpaperPrompt = MutableStateFlow(false)
     val showLiveWallpaperPrompt: StateFlow<Boolean> = _showLiveWallpaperPrompt.asStateFlow()
@@ -174,14 +186,20 @@ class HomeViewModel @Inject constructor(
         pendingSettings?.let(::updateScheduleSettings)
     }
 
-    fun changeWallpaperNow() = coordinator.changeWallpaperNow()
+    fun changeWallpaperNow() {
+        viewModelScope.launch { if (coordinator.changeWallpaperNow()) _showLiveWallpaperPrompt.value = true }
+    }
 
+    /** A picture set from outside the library while it shows, else the album's current one. */
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun currentWallpaperUri(screen: ScreenType, albumId: (ScheduleSettings) -> String?): StateFlow<String?> =
-        scheduleSettings
-            .map(albumId)
-            .distinctUntilChanged()
-            .flatMapLatest { id -> if (id == null) flowOf(null) else currentWallpaperUriFlow(id, screen) }
+        combine(
+            settingsRepository.getShownPictureFlow(screen),
+            scheduleSettings
+                .map(albumId)
+                .distinctUntilChanged()
+                .flatMapLatest { id -> if (id == null) flowOf(null) else currentWallpaperUriFlow(id, screen) }
+        ) { shown, current -> shown ?: current }
             .stateWhileSubscribed(viewModelScope, null)
 
     private fun currentWallpaperUriFlow(albumId: String, screen: ScreenType): Flow<String?> = combine(
