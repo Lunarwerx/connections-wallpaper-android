@@ -37,8 +37,12 @@ android {
         applicationId = "icu.connections.wallpaper"
         minSdk = 31
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        // Each build names the commit it came from (Settings and App info show it): every build said 1.0.0, so
+        // nobody could tell whether the phone had the newest one.
+        val commits = providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim()
+        val commit = providers.exec { commandLine("git", "rev-parse", "--short=7", "HEAD") }.standardOutput.asText.get().trim()
+        versionCode = commits.toInt()
+        versionName = "1.0.$commits ($commit)"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
