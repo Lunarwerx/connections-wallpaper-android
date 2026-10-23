@@ -24,7 +24,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -127,7 +126,6 @@ fun AlbumSelectionBottomSheet(
                             if (album.wallpaperCount == 0 && album.id !in draft.selected) onEmptyAlbum(album) else draft.toggle(album.id)
                         }
                     )
-                    HorizontalDivider()
                 }
                 if (albums.isNotEmpty()) item(key = "add_folder") {
                     Row(
