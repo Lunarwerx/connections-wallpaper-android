@@ -312,8 +312,9 @@ fun CollectionScreen(
 }
 
 /**
- * Add to library (instant), In your library with Download beside it until every original is on the phone, how far a
- * download has got (and Stop), or Update library when the collection has grown since it was added.
+ * Add to library (instant: In your library shows from the tap, while the rest of the list joins), In your library with
+ * Download beside it until every original is on the phone, how far a download has got (and Stop), or Update library
+ * when the collection has grown since it was added.
  */
 @Composable
 private fun OfflineControl(offline: OfflineState, enabled: Boolean, onAdd: () -> Unit, onDownload: () -> Unit, onStop: () -> Unit) {
@@ -323,10 +324,7 @@ private fun OfflineControl(offline: OfflineState, enabled: Boolean, onAdd: () ->
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.connections_add_to_library))
         }
-        OfflineState.Adding -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-            Text(stringResource(R.string.connections_adding), style = MaterialTheme.typography.labelLarge)
-        }
+        OfflineState.Adding -> InLibraryChip()
         OfflineState.Stale -> FilledTonalButton(onClick = onAdd, enabled = enabled) {
             Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -347,21 +345,7 @@ private fun OfflineControl(offline: OfflineState, enabled: Boolean, onAdd: () ->
             }
         }
         is OfflineState.Added -> Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.LibraryAddCheck,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text(stringResource(R.string.connections_in_library), style = MaterialTheme.typography.labelLarge)
-                }
-            }
+            InLibraryChip()
             if (offline.downloaded < offline.total) {
                 IconButton(onClick = onDownload) {
                     Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.connections_download))
@@ -374,6 +358,25 @@ private fun OfflineControl(offline: OfflineState, enabled: Boolean, onAdd: () ->
                     modifier = Modifier.padding(horizontal = 12.dp).size(20.dp)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun InLibraryChip() {
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Icon(
+                Icons.Outlined.LibraryAddCheck,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Text(stringResource(R.string.connections_in_library), style = MaterialTheme.typography.labelLarge)
         }
     }
 }

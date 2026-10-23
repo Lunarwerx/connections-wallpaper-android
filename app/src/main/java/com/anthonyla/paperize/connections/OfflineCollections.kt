@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -32,9 +34,15 @@ sealed interface OfflineResult {
     data class Failed(override val id: String, val reason: String?) : OfflineResult
 }
 
+/** What a page already listed of a gallery collection: its pictures so far, and where the gallery goes on from. */
+data class KnownPages(val items: List<ConnectionsWallpaper>, val cursor: String?)
+
 /**
- * Whole collections in the Library. Add to library makes one an album at once: only its list is read, and each
- * picture comes to the phone when the wallpaper first shows it (ConnectionsPictures). Signed out, nothing is read and
+ * Whole collections in the Library. Add to library makes one an album at once: only its list is read, a page at a
+ * time, and the album is made and recorded with the first page (with no request at all when the page on screen has
+ * listed it), so the collection is in the Library before the rest is listed (Michael, 2026-10-23, on 1.0.929: "there
+ * was still a delay when I clicked Add to Library"). Each picture comes to the phone when the wallpaper first shows it
+ * (ConnectionsPictures). Signed out, nothing is read and
  * the member is asked for the free account (Michael, 2026-10-21: ask when it makes sense, never earlier). Download is
  * the separate choice to keep every original on the phone so the album rotates with no internet; each original stays
  * once it is kept, so a download stopped or cut short keeps what it got and the next one goes on from there (Michael,
@@ -53,7 +61,7 @@ class OfflineCollections @Inject constructor(
     private val downloads = mutableMapOf<String, Job>()
 
     private val _adding = MutableStateFlow<Set<String>>(emptySet())
-    /** The collections being added now, while their list is read. */
+    /** The collections being added now, from the tap until their whole list has joined the album. */
     val adding: StateFlow<Set<String>> = _adding.asStateFlow()
 
     private val _progress = MutableStateFlow<Map<String, OfflineProgress>>(emptyMap())
@@ -63,19 +71,27 @@ class OfflineCollections @Inject constructor(
     private val _results = MutableSharedFlow<OfflineResult>(extraBufferCapacity = RESULTS_BUFFER)
     val results: SharedFlow<OfflineResult> = _results.asSharedFlow()
 
-    /** Adds [collection] to the Library unless it is being added; the result arrives on [results]. */
-    fun start(collection: WallpaperCollection) {
+    /**
+     * Adds [collection] to the Library unless it is being added, starting from what [known] already listed; the
+     * result arrives on [results] as soon as it is in the Library (after its first page), and a failure after that too.
+     */
+    fun start(collection: WallpaperCollection, known: KnownPages? = null) {
         run(adds, collection.id, onEnd = { _adding.update { it - collection.id } }) {
             _adding.update { it + collection.id }
-            add(collection)
+            var told = false
+            add(collection, known) { told = true; _results.emit(it) }.takeUnless { told && it is OfflineResult.Added }
         }
     }
 
     /**
      * Adds the collection [id]: one of the member's own as the phone keeps it, or a gallery tag's (its record once
-     * added, else the tag itself). An own collection no longer on the phone adds nothing.
+     * added, else the tag itself). It counts as being added from this call on. An own collection no longer on the
+     * phone adds nothing.
      */
-    fun start(id: String) = withCollection(id) { start(it) }
+    fun start(id: String, known: KnownPages? = null) {
+        _adding.update { it + id }
+        withCollection(id, onMissing = { _adding.update { it - id } }) { start(it, known) }
+    }
 
     /** Downloads the collection [id]'s originals unless they are downloading; the result arrives on [results]. */
     fun download(id: String) = withCollection(id) { collection ->
@@ -90,11 +106,26 @@ class OfflineCollections @Inject constructor(
         }
     }
 
-    /** Adds [collection] and says how it went; the account is asked for before anything is read. */
-    suspend fun add(collection: WallpaperCollection): OfflineResult {
+    /**
+     * Adds [collection] and says how it went; the account is asked for before anything is read. Every page is recorded
+     * as it joins the album, and [inLibrary] hears the first: from then on the collection is in the Library.
+     */
+    suspend fun add(
+        collection: WallpaperCollection,
+        known: KnownPages? = null,
+        inLibrary: suspend (OfflineResult.Added) -> Unit = {}
+    ): OfflineResult {
+        var told = false
         val result = library.addToAlbum(
-            pick = { collection.tag?.let { allOf(it) } ?: collection.wallpapers },
-            albumFor = { albumFor(collection) }
+            pages = pagesOf(collection, known),
+            albumFor = { albumFor(collection) },
+            onPage = { albumId, wanted ->
+                collections.recordSave(collection, wanted, albumId, wanted.map { it.id }, complete = true, System.currentTimeMillis())
+                if (!told) {
+                    told = true
+                    inLibrary(OfflineResult.Added(collection.id, collection.name, wanted.size, albumId))
+                }
+            }
         )
         return when (result) {
             LibraryAdd.SignInNeeded -> OfflineResult.SignInNeeded(collection.id)
@@ -128,13 +159,15 @@ class OfflineCollections @Inject constructor(
         }
     }
 
-    private fun withCollection(id: String, then: (WallpaperCollection) -> Unit) {
+    /** Runs [then] with the collection [id] once it is found; [onMissing] when it is not. */
+    private fun withCollection(id: String, onMissing: () -> Unit = {}, then: (WallpaperCollection) -> Unit) {
         scope.launch {
             val collection = runCatchingCancellable { find(id) }.getOrElse {
+                onMissing()
                 _results.emit(OfflineResult.Failed(id, it.message))
                 return@launch
-            } ?: return@launch
-            then(collection)
+            }
+            if (collection == null) onMissing() else then(collection)
         }
     }
 
@@ -144,12 +177,15 @@ class OfflineCollections @Inject constructor(
         return record ?: tag?.let { WallpaperCollection(id = id, name = tagTitle(it), tag = it) }
     }
 
-    /** Runs [work] for [id] in [jobs] unless one runs there already, and says how it went; [onEnd] runs however it ends. */
-    private fun run(jobs: MutableMap<String, Job>, id: String, onEnd: () -> Unit, work: suspend () -> OfflineResult) {
+    /**
+     * Runs [work] for [id] in [jobs] unless one runs there already, and says how it went unless [work] said so itself
+     * (null); [onEnd] runs however it ends.
+     */
+    private fun run(jobs: MutableMap<String, Job>, id: String, onEnd: () -> Unit, work: suspend () -> OfflineResult?) {
         synchronized(this) {
             if (jobs[id]?.isActive == true) return
             jobs[id] = scope.launch {
-                _results.emit(runCatchingCancellable { work() }.getOrElse { OfflineResult.Failed(id, it.message) })
+                (runCatchingCancellable { work() }.getOrElse { OfflineResult.Failed(id, it.message) })?.let { _results.emit(it) }
             }.also { job ->
                 job.invokeOnCompletion {
                     onEnd()
@@ -159,16 +195,22 @@ class OfflineCollections @Inject constructor(
         }
     }
 
-    /** Every picture a gallery tag holds now, page by page. */
-    private suspend fun allOf(tag: String): List<ConnectionsWallpaper> {
-        val all = mutableListOf<ConnectionsWallpaper>()
+    /**
+     * [collection]'s pictures a page at a time: one of the member's own in one; a gallery tag's from what [known]
+     * already listed, then the rest from the gallery, in the longest pages it gives.
+     */
+    private fun pagesOf(collection: WallpaperCollection, known: KnownPages?): Flow<List<ConnectionsWallpaper>> = flow {
+        val tag = collection.tag ?: return@flow emit(collection.wallpapers)
         var cursor: String? = null
+        if (known != null) {
+            emit(known.items)
+            cursor = known.cursor ?: return@flow
+        }
         do {
-            val page = api.wallpapers("", tag, null, cursor)
-            all += page.items
+            val page = api.wallpapers("", tag, null, cursor, ConnectionsApi.LONGEST_PAGE)
+            emit(page.items)
             cursor = page.nextCursor
         } while (cursor != null)
-        return all.distinctBy { it.id }
     }
 
     /** The album an earlier add made, while it still exists; else a new one named for the collection. */

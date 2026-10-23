@@ -23,7 +23,7 @@ import javax.inject.Inject
 /** Where a collection stands in the Library. */
 sealed interface OfflineState {
     data object NotAdded : OfflineState
-    /** Being added: its list is being read. */
+    /** Being added: in the Library from the tap, while the rest of its list joins the album. */
     data object Adding : OfflineState
     /** In the Library; [downloaded] of its [total] originals are on the phone. */
     data class Added(val downloaded: Int, val total: Int) : OfflineState
@@ -126,8 +126,11 @@ class CollectionViewModel @Inject constructor(
         if (pages.value.loaded) loadMore() else load(cursor = null)
     }
 
-    /** Adds it to the Library as an album, at once; the account is asked for first (OfflineCollections). */
-    fun addToLibrary() = offline.start(id)
+    /**
+     * Adds it to the Library as an album, at once, from the pages already listed here; the account is asked for first
+     * (OfflineCollections).
+     */
+    fun addToLibrary() = offline.start(id, pages.value.takeIf { tag != null && it.loaded }?.let { KnownPages(it.items, it.cursor) })
 
     /** Keeps its originals on the phone, so it rotates with no internet. */
     fun download() = offline.download(id)

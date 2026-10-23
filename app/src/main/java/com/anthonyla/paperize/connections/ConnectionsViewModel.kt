@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.map
@@ -229,7 +230,7 @@ class ConnectionsViewModel @Inject constructor(
             var albumName = ""
             val result = runCatchingCancellable {
                 library.addToAlbum(
-                    pick = { request.wallpapers },
+                    pages = flowOf(request.wallpapers),
                     albumFor = { albumOf(request.target).let { (id, name) -> albumName = name; id } }
                 )
             }.getOrElse {

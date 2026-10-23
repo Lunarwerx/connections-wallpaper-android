@@ -12,7 +12,6 @@
   <string name="connections_collection_empty">点按壁纸上的书签，即可添加到这里</string>
   <string name="connections_update_library">更新资料库</string>
   <string name="connections_in_library">已在资料库中</string>
-  <string name="connections_adding">正在添加…</string>
   <string name="connections_download">下载</string>
   <string name="connections_downloaded">已下载</string>
   <string name="connections_downloading">正在下载 %1$d / %2$d</string>

@@ -13,7 +13,6 @@
   <!-- A whole collection added to the Library: an album at once, each picture fetched when it first shows. Download keeps every original on the phone. -->
   <string name="connections_update_library">Update library</string>
   <string name="connections_in_library">In your library</string>
-  <string name="connections_adding">Adding…</string>
   <string name="connections_download">Download</string>
   <string name="connections_downloaded">Downloaded</string>
   <string name="connections_downloading">Downloading %1$d of %2$d</string>

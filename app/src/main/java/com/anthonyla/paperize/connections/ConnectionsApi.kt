@@ -88,9 +88,9 @@ class ConnectionsApi @Inject constructor() {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** [orientation] is the gallery's portrait, landscape or square; null lists every shape. */
-    suspend fun wallpapers(query: String, tag: String?, orientation: String?, cursor: String?): ConnectionsWallpaperPage {
+    suspend fun wallpapers(query: String, tag: String?, orientation: String?, cursor: String?, limit: Int = PAGE_SIZE): ConnectionsWallpaperPage {
         val params = buildList {
-            add("limit" to PAGE_SIZE.toString())
+            add("limit" to limit.toString())
             query.trim().takeIf { it.isNotEmpty() }?.let { add("q" to it) }
             tag?.let { add("tag" to it) }
             orientation?.let { add("orientation" to it) }
@@ -178,6 +178,8 @@ class ConnectionsApi @Inject constructor() {
         const val BASE_URL = "https://wallpaper.connectionsapi.com"
         const val GALLERY_URL = "https://wallpaper.connections.icu"
         private const val PAGE_SIZE = 30
+        /** The most one page holds (the gallery's own ceiling): what reading a whole collection asks for, in fewer requests. */
+        const val LONGEST_PAGE = 60
         private const val TIMEOUT_MS = 20_000
     }
 }
