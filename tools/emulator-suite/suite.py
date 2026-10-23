@@ -155,6 +155,17 @@ def scroll_to(text: str) -> None:
         cw.d(scrollable=True).scroll.to(text=text)
 
 
+def tab_top_has(text: str, timeout: float = 8) -> bool:
+    """Scroll the tab to its start, again until the timeout: a tab still sliding in has no scrollable for a moment, and
+    open_tab's one scroll then misses (2026-10-23: the Wallpaper tab stayed scrolled past Lock and Home)."""
+    def at_start() -> bool:
+        page = cw.d(scrollable=True)
+        if page.exists:
+            page.scroll.toBeginning(max_swipes=20)
+        return cw.has(text)
+    return wait_until(at_start, timeout)
+
+
 def tab_bottom_has(text: str, timeout: float = 8) -> bool:
     """Scroll the tab to its end, again until the timeout, so a row that just appeared below the fold counts."""
     def at_end() -> bool:
@@ -467,22 +478,32 @@ def t_same_folder_numbered():
 
 
 def t_home_fill_empty_slot():
-    """Home on with no album, Lock already set: a new album from Library fills only the empty slot."""
+    """Home's album deleted, Lock's kept: a new album from Library fills only the empty slot. A screen switched off keeps
+    its album (e7a7761), so the empty slot is made the way a person makes one: by deleting the album Home uses."""
+    second = f"{FOLDER} 2"
     open_tab("Wallpaper")
-    # Turn home off and on again: its album is cleared, lock keeps its own.
-    cw.tap("Home")
-    time.sleep(0.6)
-    cw.tap("Home")
-    check(cw.has("No album selected", timeout=4), "home has no album")
-    before = ids()
+    check(tab_top_has("Home album"), "the Home album row is on screen")
+    cw.tap("Home album")
+    cw.tap(second)
+    cw.d.press("back")
+    check(wait_until(lambda: cw.labels().count(second) == 1, 6), f"Home uses {second}, Lock keeps {FOLDER}")
+    open_tab("Library")
+    cw.tap(second)
+    cw.tap("Delete")
+    cw.tap("Confirm")
+    check(wait_until(lambda: not cw.has(second), 10), f"{second} is deleted")
+    open_tab("Wallpaper")
+    check(tab_top_has("No album selected"), "home has no album")
+    check(FOLDER in cw.labels(), f"lock keeps {FOLDER}")
     open_tab("Library")
     cw.tap("Add album")
     cw.tap("Add folder")
     pick_folder()
-    check(cw.has(f"{FOLDER} 3", timeout=10), "third album added")
+    check(cw.has(second, timeout=10), f"the new album is {second} again: the name is free")
     open_tab("Wallpaper")
-    check(cw.has(f"{FOLDER} 3", timeout=4) and not cw.has("No album selected"), "the empty home slot took the new album")
-    log(f"ids {before} -> {ids()}")
+    check(tab_top_has(second), f"{second} is on the Wallpaper tab")
+    labels = cw.labels()
+    check(second in labels and FOLDER in labels and not cw.has("No album selected"), f"the empty home slot took the new album, lock kept its own: {labels[5:25]}")
 
 
 def app_is_dark() -> bool:
@@ -1017,11 +1038,20 @@ def t_library_picture_streams():
     time.sleep(3)
     check(screen_copies() == [], f"the album's thumbnails are the gallery's previews: nothing was fetched ({screen_copies()})")
     open_tab("Wallpaper")
-    before = ids()
-    cw.tap("Lock")
+    check(tab_top_has("Lock"), "the Lock row is on screen")
+    if cw.has("Home album"):
+        cw.tap("Home")  # the lock screen alone: home would need an album of its own
+    if not cw.has("Lock album"):
+        cw.tap("Lock")
     cw.tap("Lock album")
     cw.tap("Streamed")
-    check(wait_until(lambda: ids()["lock"] not in (None, before["lock"]), 40), f"the lock screen shows the album, fetched as it went up ({ids()})")
+    cw.d.press("back")
+    if not switch_state("Wallpaper changing"):
+        cw.tap("Wallpaper changing")
+    before = ids()
+    check(tab_bottom_has("Change wallpaper now"), "Change wallpaper now ends the tab")
+    cw.tap("Change wallpaper now")
+    check(wait_until(lambda: ids()["lock"] not in (None, before["lock"]), 40), f"the lock screen shows the album, fetched as it went up ({before} -> {ids()})")
     check(wait_until(lambda: len(screen_copies()) == 2, 30), f"the next picture was fetched ahead of its change ({screen_copies()})")
     check(all(name.endswith(".webp") for name in screen_copies()), f"each is the compact WebP screen copy ({screen_copies()})")
     for turn in range(2):
