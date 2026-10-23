@@ -12,12 +12,15 @@ saves shots/suite/FAIL-<test>.jpg and the labels on screen, then the run goes on
 
 Each run wipes the app's data first (the same as a fresh install) and takes about six minutes.
 """
+import json
 import os
 import re
 import sys
 import tempfile
 import time
 import traceback
+import urllib.parse
+import urllib.request
 from xml.etree import ElementTree
 
 import cw
@@ -916,11 +919,125 @@ def t_multi_select():
     check(cw.has("See all", timeout=6), "back returns to Explore")
 
 
+def chrome_opens_links() -> None:
+    """Chrome opens a link at once, with no first-run screens: it reads this file on a debuggable build (the emulator)."""
+    check("package:" in cw.sh("shell", "pm", "path", "com.android.chrome"), "the emulator has Chrome")
+    cw.sh("shell", "sh", "-c", "'echo \"_ --disable-fre --no-default-browser-check --no-first-run\" > /data/local/tmp/chrome-command-line"
+                                " && chmod 644 /data/local/tmp/chrome-command-line'")
+    cw.sh("shell", "am", "set-debug-app", "--persistent", "com.android.chrome")
+    cw.sh("shell", "am", "force-stop", "com.android.chrome")
+
+
+def pending_sign_in_state(timeout: float = 20):
+    """The state the app sent to AEGIS for the sign-in it started, as AEGIS hands it to the callback page: read from the
+    app's own store (adb root). A fixed build keeps the bare token and sends it behind app-handoff.wallpaper.; the old
+    build kept and sent the prefixed one; either way the callback gets app-handoff.wallpaper.<token>."""
+    store = f"/data/data/{cw.PKG}/files/datastore/connections_account.preferences_pb"
+
+    def find():
+        raw = cw.sh("exec-out", "cat", store).encode("utf-8", "replace")
+        found = re.search(rb"pending_state.{1,16}?(?:app-handoff\.wallpaper\.)?([A-Za-z0-9_-]{16,})", raw, re.S)
+        return "app-handoff.wallpaper." + found.group(1).decode() if found else None
+    return wait_until(find, timeout, every=1)
+
+
+def t_sign_in_handoff():
+    """Sign in with Connections comes back through the live callback page, and the app redeems what it brings. The
+    code is made up, so Connections refuses it and the app says why; what this proves is that the state the browser
+    carries finds the sign-in the app started (fails on 1.0.924, passes from 97386d8). From 858b361 every sign-in did nothing: the page hands the state back
+    without its app-handoff.wallpaper. prefix, the app compared it with the prefixed one, and said nothing."""
+    chrome_opens_links()
+    cw.fresh_app()
+    cw.onboard()
+    cw.d(description="Account").click()
+    cw.tap("Sign in with Connections")
+    state = pending_sign_in_state()
+    check(state, "the app started a sign-in and keeps its state")
+    # Chrome's first screens ask about notifications over the page; the flow drives the page, not Chrome's setup.
+    if cw.d(text="No thanks").wait(timeout=8):
+        cw.d(text="No thanks").click()
+    callback = "https://wallpaper.connections.icu/aegis/callback?" + urllib.parse.urlencode(
+        {"state": state, "code": "emulator-suite-not-a-real-code"})
+    # Quoted: adb runs the command through the device's shell, where & would end it.
+    cw.sh("shell", "am", "start", "-a", "android.intent.action.VIEW", "-p", "com.android.chrome", "-d", f"'{callback}'")
+    # The page opens the app's link itself; a browser may hold back a link nobody tapped, so the page offers it as a button.
+    if not wait_until(lambda: cw.d.app_current().get("package") == cw.PKG, 10):
+        if cw.d(textContains="Open Wallpaper").wait(timeout=10):
+            cw.d(textContains="Open Wallpaper").click()
+    check(cw.has("Sign-in didn't finish", timeout=40), "the app took the code back and tried it at Connections")
+    check(not cw.has("earlier attempt"), "the state the browser carried matched the sign-in the app started")
+    log(f"Connections refused the made-up code: {next((l for l in cw.labels() if 'finish' in l), '')}")
+    cw.d.press("back")
+
+
+def library_pictures(n: int) -> list[dict]:
+    """The first n published wallpapers, as the live gallery lists them."""
+    url = f"https://wallpaper.connectionsapi.com/v1/wallpapers?limit={n}"
+    with urllib.request.urlopen(urllib.request.Request(url, headers={"accept": "application/json", "user-agent": cw.UA}), timeout=20) as res:
+        return json.load(res)["items"][:n]
+
+
+def add_streamed_album(name: str, pictures: list[dict]) -> None:
+    """Puts gallery pictures in a new album as Add to library leaves them (by reference, nothing on the phone), straight
+    into the app's database: the emulator has no Connections account to add them with. Stops the app; needs adb root."""
+    app = f"/data/data/{cw.PKG}"
+    now = int(time.time() * 1000)
+    q = lambda text: text.replace("'", "''")
+    rows = [f"INSERT INTO albums (id, name, coverUri, createdAt, modifiedAt) VALUES ('streamed', '{q(name)}', NULL, {now}, {now});"]
+    for i, picture in enumerate(pictures):
+        uri = f"content://{cw.PKG}.pictures/{picture['id']}/{picture['slug']}?preview=" + urllib.parse.quote(picture["previewUrl"], safe="")
+        rows.append("INSERT INTO wallpapers (id, albumId, folderId, uri, fileName, dateModified, displayOrder, sourceType, addedAt, mediaType) "
+                    f"VALUES ('streamed-{i}', 'streamed', NULL, '{q(uri)}', '{q(picture['title'])}', {now}, {i}, 'DIRECT', {now}, 'IMAGE');")
+    local = os.path.join(tempfile.gettempdir(), "cwall-streamed.sql")
+    with open(local, "w", encoding="utf-8", newline="\n") as f:
+        f.write("\n".join(rows) + "\n")
+    cw.sh("shell", "am", "force-stop", cw.PKG)
+    cw.sh("push", local, "/data/local/tmp/cwall-streamed.sql")
+    out = cw.sh("shell", f"sqlite3 {app}/databases/paperize_database < /data/local/tmp/cwall-streamed.sql && "
+                         f"chown -R $(stat -c %u:%g {app}) {app}/databases && echo injected")
+    check("injected" in out, f"the album went into the app's database ({out.strip()[-200:]})")
+
+
+def screen_copies() -> list[str]:
+    """The screen copies the app keeps of Library pictures it has shown (files/connections/screen); needs adb root."""
+    out = cw.sh("shell", "ls", f"/data/data/{cw.PKG}/files/connections/screen")
+    return sorted(l.strip() for l in out.splitlines() if l.strip() and "No such file" not in l)
+
+
+def t_library_picture_streams():
+    """Owner (2026-10-23): "it should just instantly add ... I didn't choose download". A gallery picture in an album is
+    held by reference: nothing is on the phone until the wallpaper first shows it, then its compact screen copy is kept,
+    the next picture is fetched ahead of its change, and a picture fetched once is never fetched again."""
+    pictures = library_pictures(3)
+    cw.fresh_app()
+    cw.onboard()
+    add_streamed_album("Streamed", pictures)
+    open_tab("Library")
+    cw.tap("Streamed")
+    time.sleep(3)
+    check(screen_copies() == [], f"the album's thumbnails are the gallery's previews: nothing was fetched ({screen_copies()})")
+    open_tab("Wallpaper")
+    before = ids()
+    cw.tap("Lock")
+    cw.tap("Lock album")
+    cw.tap("Streamed")
+    check(wait_until(lambda: ids()["lock"] not in (None, before["lock"]), 40), f"the lock screen shows the album, fetched as it went up ({ids()})")
+    check(wait_until(lambda: len(screen_copies()) == 2, 30), f"the next picture was fetched ahead of its change ({screen_copies()})")
+    check(all(name.endswith(".webp") for name in screen_copies()), f"each is the compact WebP screen copy ({screen_copies()})")
+    for turn in range(2):
+        shown = ids()["lock"]
+        check(tab_bottom_has("Change wallpaper now"), "Change wallpaper now ends the tab")
+        cw.tap("Change wallpaper now")
+        check(wait_until(lambda: ids()["lock"] != shown, 30), f"change {turn + 1} shows the next picture ({ids()})")
+    time.sleep(5)
+    check(len(screen_copies()) == 3, f"three pictures, three fetches, however often they show ({screen_copies()})")
+
+
 TESTS = [t_lock_first_folder, t_unlock_changes, t_preview_opens_album, t_unlock_notice, t_live_to_static, t_static_replaces_live,
          t_timer_toggle, t_unlock_off, t_pause, t_update_keeps_watcher, t_effects, t_library_folder_fills_both, t_live_to_static_both, t_live_to_static_home_only,
          t_same_folder_numbered, t_home_fill_empty_slot, t_theme, t_swipe_back, t_shortcut, t_explore, t_explore_set_signed_out, t_explore_set_keeps_live,
          t_collections_browse, t_collection_own, t_collection_offline_signed_out, t_collections_select, t_collection_offline_opens, t_multi_select,
-         t_add_to_library_signed_out]
+         t_add_to_library_signed_out, t_sign_in_handoff, t_library_picture_streams]
 
 
 def unknown_tests(names: list[str]) -> list[str]:
@@ -936,6 +1053,8 @@ def main() -> None:
     cw.connect()
     # A CPU-starved emulator raises "System UI isn't responding" over every screen; Wait lets the system catch up.
     cw.d.watcher.when("%responding%").when("Wait").click()
+    # A system app crashing on the emulator ("Bluetooth keeps stopping", 2026-10-23) covers the app's first screen.
+    cw.d.watcher.when("%keeps stopping%").when("Close app").click()
     cw.d.watcher.start(1.0)
     # The AVD keeps its data across boots, so a run stopped inside an offline flow left it offline for every run after.
     cw.sh("shell", "cmd", "connectivity", "airplane-mode", "disable")
