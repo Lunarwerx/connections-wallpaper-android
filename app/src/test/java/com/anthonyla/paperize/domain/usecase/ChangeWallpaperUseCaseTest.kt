@@ -38,8 +38,8 @@ class ChangeWallpaperUseCaseTest {
     @Test
     fun `complete fetches the next picture of that screen ahead of its change`() = runTest {
         val prepared = preparedWallpaper()
-        val next = Wallpaper(id = "next", albumId = prepared.albumId, uri = "content://next", fileName = "next", dateModified = 0)
-        coEvery { repository.peekNextWallpaper(prepared.albumId, ScreenType.HOME) } returns next
+        val next = Wallpaper(id = "next", albumId = prepared.pictureAlbumId, uri = "content://next", fileName = "next", dateModified = 0)
+        coEvery { repository.peekNextWallpaper(prepared.albumIds, ScreenType.HOME) } returns next
 
         useCase.complete(prepared, ScreenType.HOME)
 
@@ -50,20 +50,20 @@ class ChangeWallpaperUseCaseTest {
     fun `complete records current then synchronizes exact queue item`() = runTest {
         val prepared = preparedWallpaper()
         coEvery {
-            repository.ensureWallpaperQueue(prepared.albumId, ScreenType.LOCK, false)
+            repository.ensureWallpaperQueue(prepared.albumIds, ScreenType.LOCK, false)
         } just Runs
 
         useCase.complete(prepared, ScreenType.LOCK)
 
         coVerifyOrder {
             repository.setCurrentWallpaper(
-                prepared.albumId,
+                prepared.pictureAlbumId,
                 ScreenType.LOCK,
                 prepared.wallpaperId
             )
-            repository.ensureWallpaperQueue(prepared.albumId, ScreenType.LOCK, false)
+            repository.ensureWallpaperQueue(prepared.albumIds, ScreenType.LOCK, false)
             repository.removeWallpaperFromQueue(
-                prepared.albumId,
+                prepared.albumIds,
                 ScreenType.LOCK,
                 prepared.wallpaperId
             )
@@ -78,7 +78,7 @@ class ChangeWallpaperUseCaseTest {
 
         coVerify(exactly = 1) {
             repository.restoreWallpaperToQueueFront(
-                prepared.albumId,
+                prepared.albumIds,
                 prepared.screenType,
                 prepared.wallpaperId
             )
@@ -91,28 +91,28 @@ class ChangeWallpaperUseCaseTest {
     @Test
     fun `complete specific records selected item and respects shuffle`() = runTest {
         coEvery {
-            repository.ensureWallpaperQueue("album", ScreenType.HOME, true)
+            repository.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, true)
         } just Runs
 
-        useCase.completeSpecific("album", ScreenType.HOME, "selected", shuffle = true)
+        useCase.completeSpecific(listOf("album"), "album", ScreenType.HOME, "selected", shuffle = true)
 
         coVerifyOrder {
             repository.setCurrentWallpaper("album", ScreenType.HOME, "selected")
-            repository.ensureWallpaperQueue("album", ScreenType.HOME, true)
-            repository.removeWallpaperFromQueue("album", ScreenType.HOME, "selected")
+            repository.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, true)
+            repository.removeWallpaperFromQueue(listOf("album"), ScreenType.HOME, "selected")
         }
     }
 
     @Test(expected = kotlinx.coroutines.CancellationException::class)
     fun `cancelled rendering restores the dequeued item without retrying`() = runTest {
         val wallpaper = com.anthonyla.paperize.domain.model.Wallpaper.empty("image", "album")
-        coEvery { repository.getAndDequeueWallpaper("album", ScreenType.HOME) } returns wallpaper
+        coEvery { repository.getAndDequeueWallpaper(listOf("album"), ScreenType.HOME) } returns wallpaper
         coEvery { renderer.render(wallpaper, ScreenType.HOME, any()) } throws kotlinx.coroutines.CancellationException()
         try {
-            useCase("album", ScreenType.HOME)
+            useCase(listOf("album"), ScreenType.HOME)
         } finally {
-            coVerify(exactly = 1) { repository.getAndDequeueWallpaper("album", ScreenType.HOME) }
-            coVerify(exactly = 1) { repository.restoreWallpaperToQueueFront("album", ScreenType.HOME, "image") }
+            coVerify(exactly = 1) { repository.getAndDequeueWallpaper(listOf("album"), ScreenType.HOME) }
+            coVerify(exactly = 1) { repository.restoreWallpaperToQueueFront(listOf("album"), ScreenType.HOME, "image") }
         }
     }
 
@@ -120,29 +120,30 @@ class ChangeWallpaperUseCaseTest {
     fun `unreadable single image album is not reported as empty`() = runTest {
         val wallpaper = com.anthonyla.paperize.domain.model.Wallpaper.empty("image", "album")
         var dequeues = 0
-        coEvery { repository.getAndDequeueWallpaper("album", ScreenType.HOME) } answers {
+        coEvery { repository.getAndDequeueWallpaper(listOf("album"), ScreenType.HOME) } answers {
             if (dequeues++ % 2 == 0) null else wallpaper
         }
-        coEvery { repository.ensureWallpaperQueue("album", ScreenType.HOME, any()) } just Runs
+        coEvery { repository.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, any()) } just Runs
         coEvery { renderer.render(wallpaper, ScreenType.HOME, any()) } returns null
 
-        assertTrue(runCatching { useCase("album", ScreenType.HOME) }.exceptionOrNull() is NoValidWallpaperException)
+        assertTrue(runCatching { useCase(listOf("album"), ScreenType.HOME) }.exceptionOrNull() is NoValidWallpaperException)
         coVerify(exactly = Constants.MAX_WALLPAPER_LOAD_RETRIES) { renderer.render(wallpaper, ScreenType.HOME, any()) }
     }
 
     @Test
     fun `empty album stops after rebuilding once`() = runTest {
-        coEvery { repository.getAndDequeueWallpaper("album", ScreenType.HOME) } returns null
-        coEvery { repository.ensureWallpaperQueue("album", ScreenType.HOME, any()) } just Runs
+        coEvery { repository.getAndDequeueWallpaper(listOf("album"), ScreenType.HOME) } returns null
+        coEvery { repository.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, any()) } just Runs
 
-        assertTrue(runCatching { useCase("album", ScreenType.HOME) }.exceptionOrNull() is EmptyAlbumException)
-        coVerify(exactly = 1) { repository.ensureWallpaperQueue("album", ScreenType.HOME, any()) }
+        assertTrue(runCatching { useCase(listOf("album"), ScreenType.HOME) }.exceptionOrNull() is EmptyAlbumException)
+        coVerify(exactly = 1) { repository.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, any()) }
         coVerify(exactly = 0) { renderer.render(any(), any(), any()) }
     }
 
     private fun preparedWallpaper() = PreparedWallpaper(
         image = WallpaperImage.Drawn(mockk<Bitmap>(relaxed = true)),
-        albumId = "album",
+        albumIds = listOf("album"),
+        pictureAlbumId = "album",
         screenType = ScreenType.HOME,
         wallpaperId = "wallpaper",
         shuffle = false

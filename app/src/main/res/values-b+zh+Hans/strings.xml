@@ -85,6 +85,11 @@
   <string name="changing_wallpaper">正在更换壁纸…</string>
   <string name="add_wallpapers">添加壁纸</string>
   <string name="select_album">选择相册</string>
+  <string name="done">Done</string>
+  <plurals name="album_row_more">
+    <item quantity="one">%1$s + %2$d more</item>
+    <item quantity="other">%1$s + %2$d more</item>
+  </plurals>
   <string name="sort">排序</string>
   <string name="notification_permission_title">开启通知</string>
   <string name="notification_permission_description">允许 Connections Wallpaper 发送壁纸更换通知，以及在后台运行时显示通知。你可以随时在设置中更改。</string>

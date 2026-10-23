@@ -49,14 +49,31 @@ class AlbumRepositoryInstrumentedTest {
         db.albumDao().insertAlbum(AlbumEntity("album", "Album", null))
         val first = Wallpaper.empty("first", "album").copy(uri = "content://first")
         db.wallpaperDao().insertWallpaper(first.toEntity())
-        db.wallpaperQueueDao().rebuildQueue("album", ScreenType.HOME, listOf("first"))
+        db.wallpaperQueueDao().rebuildQueue(ScreenType.HOME, listOf("album"), listOf("album" to "first"))
         db.folderDao().insertFolder(Folder.empty("folder", "album").toEntity())
         val second = first.copy(id = "second", uri = "content://second", folderId = "folder")
 
         assertEquals(1, albums.addWallpapersToAlbum("album", listOf(second)))
-        assertTrue(db.wallpaperQueueDao().getQueueItems("album", ScreenType.HOME).isEmpty())
+        assertTrue(db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.HOME).isEmpty())
         assertEquals(2, db.wallpaperDao().getWallpaperCountByAlbum("album"))
         assertEquals("content://second", db.folderDao().getFolderById("folder")?.coverUri)
+    }
+
+    @Test fun shuffledHomeAndLockOnDifferentAlbumsKeepEachOthersQueues() = runBlocking {
+        db.albumDao().insertAlbum(AlbumEntity("one", "One", null))
+        db.albumDao().insertAlbum(AlbumEntity("two", "Two", null))
+        db.wallpaperDao().insertWallpapers(
+            listOf("one" to "a1", "one" to "a2", "two" to "b1", "two" to "b2")
+                .map { (album, id) -> Wallpaper.empty(id, album).copy(uri = "content://$id").toEntity() }
+        )
+
+        wallpapers.ensureWallpaperQueue(listOf("two"), ScreenType.LOCK, shuffle = true)
+        wallpapers.ensureWallpaperQueue(listOf("one"), ScreenType.HOME, shuffle = true)
+
+        val lock = db.wallpaperQueueDao().getQueueItems(listOf("two"), ScreenType.LOCK).map { it.wallpaperId }.toSet()
+        val home = db.wallpaperQueueDao().getQueueItems(listOf("one"), ScreenType.HOME).map { it.wallpaperId }.toSet()
+        assertEquals(setOf("b1", "b2"), lock)
+        assertEquals(setOf("a1", "a2"), home)
     }
 
     @Test fun removingCoverUsesOnlyWallpapersFromThatAlbum() = runBlocking {
@@ -103,20 +120,33 @@ class AlbumRepositoryInstrumentedTest {
         assertEquals(0, albums.addWallpapersToAlbum("album", listOf(image.copy(id = "stale", folderId = "folder"))))
     }
 
+    @Test fun twoAlbumsOnOneScreenFillOneQueueWithEachPictureOwnAlbum() = runBlocking {
+        db.albumDao().insertAlbum(AlbumEntity("album", "Album", null))
+        db.albumDao().insertAlbum(AlbumEntity("two", "Two", null))
+        albums.addWallpapersToAlbum("album", listOf(Wallpaper.empty("first", "album").copy(uri = "content://first")))
+        albums.addWallpapersToAlbum("two", listOf(Wallpaper.empty("second", "two").copy(uri = "content://second")))
+
+        wallpapers.ensureWallpaperQueue(listOf("album", "two"), ScreenType.HOME, false)
+
+        val queue = db.wallpaperQueueDao().getQueueItems(listOf("album", "two"), ScreenType.HOME)
+        assertEquals(listOf("first", "second"), queue.map { it.wallpaperId })
+        assertEquals(listOf("album", "two"), queue.map { it.albumId })
+    }
+
     @Test fun reorderPersistsNestedImagesWithoutOverwritingMetadata() = runBlocking {
         db.albumDao().insertAlbum(AlbumEntity("album", "Album", null))
         val first = Wallpaper.empty("first", "album").copy(uri = "content://first", folderId = "folder")
         val second = first.copy(id = "second", uri = "content://second")
         val folder = Folder.empty("folder", "album").copy(wallpapers = listOf(first, second))
         albums.addFolderToAlbum("album", folder)
-        wallpapers.ensureWallpaperQueue("album", ScreenType.HOME, false)
+        wallpapers.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, false)
         db.wallpaperDao().updateWallpaper(first.copy(fileName = "new-name.jpg").toEntity())
 
         albums.reorderAlbum("album", listOf(folder.copy(wallpapers = listOf(second, first))), emptyList())
         assertEquals(listOf("second", "first"), db.wallpaperDao().getOrderedWallpaperIdsByAlbum("album"))
         assertEquals("new-name.jpg", db.wallpaperDao().getWallpaperById("first")?.fileName)
         assertEquals("content://second", db.folderDao().getFolderById("folder")?.coverUri)
-        assertTrue(db.wallpaperQueueDao().getQueueItems("album", ScreenType.HOME).isEmpty())
+        assertTrue(db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.HOME).isEmpty())
     }
 
     @Test fun failedReorderRollsBackEarlierRowsAndPreservesQueue() = runBlocking {
@@ -124,14 +154,14 @@ class AlbumRepositoryInstrumentedTest {
         val first = Wallpaper.empty("first", "album").copy(uri = "content://first")
         val second = first.copy(id = "second", uri = "content://second")
         albums.addWallpapersToAlbum("album", listOf(first, second))
-        wallpapers.ensureWallpaperQueue("album", ScreenType.HOME, false)
+        wallpapers.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, false)
         db.openHelper.writableDatabase.execSQL("""
             CREATE TRIGGER reject_order BEFORE UPDATE OF displayOrder ON wallpapers
             WHEN NEW.id = 'first' BEGIN SELECT RAISE(ABORT, 'test write failure'); END
         """)
         assertTrue(runCatching { albums.reorderAlbum("album", emptyList(), listOf(second, first)) }.isFailure)
         assertEquals(listOf("first", "second"), db.wallpaperDao().getOrderedWallpaperIdsByAlbum("album"))
-        assertEquals(listOf("first", "second"), db.wallpaperQueueDao().getQueueItems("album", ScreenType.HOME).map { it.wallpaperId })
+        assertEquals(listOf("first", "second"), db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.HOME).map { it.wallpaperId })
     }
 
     @Test fun concurrentQueueCreationKeepsBothScreensInSyncAndDoesNotRefillConsumedItems() = runBlocking {
@@ -139,14 +169,14 @@ class AlbumRepositoryInstrumentedTest {
         albums.addWallpapersToAlbum("album", (1..8).map {
             Wallpaper.empty("image-$it", "album").copy(uri = "content://image-$it")
         })
-        val home = async(Dispatchers.IO) { wallpapers.ensureWallpaperQueue("album", ScreenType.HOME, true) }
-        val lock = async(Dispatchers.IO) { wallpapers.ensureWallpaperQueue("album", ScreenType.LOCK, true) }
+        val home = async(Dispatchers.IO) { wallpapers.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, true) }
+        val lock = async(Dispatchers.IO) { wallpapers.ensureWallpaperQueue(listOf("album"), ScreenType.LOCK, true) }
         home.await(); lock.await()
-        val expected = db.wallpaperQueueDao().getQueueItems("album", ScreenType.HOME).map { it.wallpaperId }
+        val expected = db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.HOME).map { it.wallpaperId }
         assertEquals(8, expected.toSet().size)
-        assertEquals(expected, db.wallpaperQueueDao().getQueueItems("album", ScreenType.LOCK).map { it.wallpaperId })
-        wallpapers.getAndDequeueWallpaper("album", ScreenType.HOME)
-        wallpapers.ensureWallpaperQueue("album", ScreenType.HOME, true)
-        assertEquals(expected.drop(1), db.wallpaperQueueDao().getQueueItems("album", ScreenType.HOME).map { it.wallpaperId })
+        assertEquals(expected, db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.LOCK).map { it.wallpaperId })
+        wallpapers.getAndDequeueWallpaper(listOf("album"), ScreenType.HOME)
+        wallpapers.ensureWallpaperQueue(listOf("album"), ScreenType.HOME, true)
+        assertEquals(expected.drop(1), db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.HOME).map { it.wallpaperId })
     }
 }

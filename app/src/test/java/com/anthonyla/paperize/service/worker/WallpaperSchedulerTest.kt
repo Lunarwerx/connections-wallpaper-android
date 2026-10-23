@@ -61,7 +61,7 @@ class WallpaperSchedulerTest {
 
     @Test fun `missing required album cancels every schedule including refresh`() = runTest {
         scheduler.updateSchedules(
-            ScheduleSettings(intervalEnabled = true, enableChanger = true, homeEnabled = true, lockEnabled = true, homeAlbumId = "home"),
+            ScheduleSettings(intervalEnabled = true, enableChanger = true, homeEnabled = true, lockEnabled = true, homeAlbumIds = listOf("home")),
             WallpaperMode.STATIC
         )
         assertTrue(enqueued.isEmpty())
@@ -73,7 +73,7 @@ class WallpaperSchedulerTest {
         scheduler.updateSchedules(
             ScheduleSettings(
                 enableChanger = true, changeOnUnlock = true, intervalEnabled = false,
-                homeEnabled = true, lockEnabled = true, homeAlbumId = "album", lockAlbumId = "album"
+                homeEnabled = true, lockEnabled = true, homeAlbumIds = listOf("album"), lockAlbumIds = listOf("album")
             ),
             WallpaperMode.STATIC
         )
@@ -83,7 +83,7 @@ class WallpaperSchedulerTest {
 
     @Test fun `live mode leaves change on unlock to its engine`() = runTest {
         scheduler.updateSchedules(
-            ScheduleSettings(enableChanger = true, changeOnUnlock = true, liveAlbumId = "live"),
+            ScheduleSettings(enableChanger = true, changeOnUnlock = true, liveAlbumIds = listOf("live")),
             WallpaperMode.LIVE
         )
         verify { UnlockChangeService.sync(context, false) }
@@ -91,7 +91,7 @@ class WallpaperSchedulerTest {
 
     @Test fun `short live intervals cancel static jobs and keep only library refresh`() = runTest {
         scheduler.updateSchedules(
-            ScheduleSettings(intervalEnabled = true, enableChanger = true, liveAlbumId = "live", liveIntervalMinutes = 1),
+            ScheduleSettings(intervalEnabled = true, enableChanger = true, liveAlbumIds = listOf("live"), liveIntervalMinutes = 1),
             WallpaperMode.LIVE, onlyIfNotScheduled = true
         )
         assertEquals(Constants.WORK_NAME_REFRESH, enqueued.single().first)
@@ -145,7 +145,7 @@ class WallpaperSchedulerTest {
             ScreenType.LOCK,
             ScheduleSettings(intervalEnabled = true,
                 enableChanger = true, separateSchedules = false,
-                homeEnabled = true, lockEnabled = true, homeAlbumId = "home", lockAlbumId = "lock",
+                homeEnabled = true, lockEnabled = true, homeAlbumIds = listOf("home"), lockAlbumIds = listOf("lock"),
                 homeIntervalMinutes = 30, lockIntervalMinutes = 90
             ),
             WallpaperMode.STATIC
@@ -161,7 +161,7 @@ class WallpaperSchedulerTest {
             ScreenType.LOCK,
             ScheduleSettings(intervalEnabled = true,
                 enableChanger = true, separateSchedules = true,
-                homeEnabled = false, lockEnabled = true, lockAlbumId = "lock",
+                homeEnabled = false, lockEnabled = true, lockAlbumIds = listOf("lock"),
                 homeIntervalMinutes = 30, lockIntervalMinutes = 90
             ),
             WallpaperMode.STATIC
@@ -179,8 +179,8 @@ class WallpaperSchedulerTest {
                 separateSchedules = true,
                 homeEnabled = true,
                 lockEnabled = true,
-                homeAlbumId = "home",
-                lockAlbumId = "lock",
+                homeAlbumIds = listOf("home"),
+                lockAlbumIds = listOf("lock"),
                 homeIntervalMinutes = 60,
                 lockIntervalMinutes = 90
             ),

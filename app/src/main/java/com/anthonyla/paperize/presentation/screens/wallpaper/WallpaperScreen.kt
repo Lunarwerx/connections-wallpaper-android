@@ -55,6 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -97,7 +98,7 @@ fun WallpaperScreen(
     appSettings: AppSettings,
     wallpaperMode: WallpaperMode,
     onToggleChanger: (Boolean) -> Unit,
-    onSelectAlbum: (ScreenType, AlbumSummary?) -> Unit,
+    onSetAlbums: (ScreenType, List<String>) -> Unit,
     onUpdateScheduleSettings: (ScheduleSettings) -> Unit,
     onUpdateScheduleSettingsDebounced: (ScheduleSettings) -> Unit,
     onChangeWallpaperNow: () -> Unit,
@@ -171,14 +172,14 @@ fun WallpaperScreen(
             if (lockEnabled) albumRows.add {
                 AlbumRow(
                     icon = Icons.Outlined.Lock, label = stringResource(R.string.lock_album_label),
-                    albumId = scheduleSettings.lockAlbumId, albums = albums,
+                    albumIds = scheduleSettings.lockAlbumIds, albums = albums,
                     onClick = { albumPickerScreen = ScreenType.LOCK }
                 )
             }
             if (homeEnabled) albumRows.add {
                 AlbumRow(
                     icon = Icons.Outlined.Home, label = stringResource(R.string.home_album_label),
-                    albumId = scheduleSettings.homeAlbumId, albums = albums,
+                    albumIds = scheduleSettings.homeAlbumIds, albums = albums,
                     onClick = { albumPickerScreen = ScreenType.HOME }
                 )
             }
@@ -187,7 +188,7 @@ fun WallpaperScreen(
             SettingsGroup({
                 AlbumRow(
                     icon = Icons.Outlined.PhotoLibrary, label = stringResource(R.string.currently_selected_album),
-                    albumId = scheduleSettings.liveAlbumId, albums = albums,
+                    albumIds = scheduleSettings.liveAlbumIds, albums = albums,
                     onClick = { albumPickerScreen = ScreenType.LIVE }
                 )
             })
@@ -287,7 +288,7 @@ fun WallpaperScreen(
             // The launcher slides only a filled picture; any other scaling sets one that fits the screen exactly.
             // Only the home screen has pages to swipe, so the switch shows while Home rotates an album; its value is kept.
             val slides = scheduleSettings.homeScrollingEnabled && scheduleSettings.scalingType(ScreenType.HOME) == ScalingType.FILL
-            if (homeEnabled && scheduleSettings.homeAlbumId != null) SettingsGroup({
+            if (homeEnabled && scheduleSettings.homeAlbumIds.isNotEmpty()) SettingsGroup({
                 Column {
                     SwitchRow(
                         icon = Icons.Outlined.SwapHoriz,
@@ -311,7 +312,8 @@ fun WallpaperScreen(
                     )
                 }
             })
-            // Owner ask (2026-10-21): a picture whose screen rotates an album opens that album.
+            // Owner ask (2026-10-21): a picture whose screen rotates an album opens that album. With several albums
+            // the preview opens the first one, since it does not know which album the picture came from.
             val opener = { albumId: String? ->
                 albumId?.takeIf { id -> albums.any { it.id == id } }?.let { id -> { onOpenAlbum(id) } }
             }
@@ -321,8 +323,8 @@ fun WallpaperScreen(
                 homeScaling = scheduleSettings.homeScalingType,
                 lockScaling = scheduleSettings.lockScalingType,
                 animate = appSettings.animate,
-                onOpenLock = opener(scheduleSettings.lockAlbumId.takeIf { lockEnabled }),
-                onOpenHome = opener(scheduleSettings.homeAlbumId.takeIf { homeEnabled })
+                onOpenLock = opener(scheduleSettings.lockAlbumIds.firstOrNull().takeIf { lockEnabled }),
+                onOpenHome = opener(scheduleSettings.homeAlbumIds.firstOrNull().takeIf { homeEnabled })
             )
         }
 
@@ -481,25 +483,15 @@ fun WallpaperScreen(
     }
 
     albumPickerScreen?.let { selection ->
-        val selectedId = when (selection) {
-            ScreenType.LOCK -> scheduleSettings.lockAlbumId
-            ScreenType.LIVE -> scheduleSettings.liveAlbumId
-            else -> scheduleSettings.homeAlbumId
-        }
         AlbumSelectionBottomSheet(
             albums = albums,
-            selectedAlbumId = selectedId,
-            onAlbumSelect = { album ->
-                when {
-                    album.id == selectedId -> onSelectAlbum(selection, null)
-                    album.wallpaperCount == 0 -> showEmptyAlbumWarning = true
-                    else -> onSelectAlbum(selection, album)
-                }
-            },
+            selectedAlbumIds = scheduleSettings.albumIds(selection),
+            onApply = { albumIds -> onSetAlbums(selection, albumIds) },
             onAddFolder = {
                 albumPickerScreen = null
                 onAddFolder(selection)
             },
+            onEmptyAlbum = { showEmptyAlbumWarning = true },
             onDismiss = { albumPickerScreen = null }
         )
     }
@@ -574,8 +566,14 @@ private fun ScreenToggleCard(
 
 /** The screen's album on one line: what it is on the left, the album on the right, opening the picker sheet. */
 @Composable
-private fun AlbumRow(icon: ImageVector, label: String, albumId: String?, albums: List<AlbumSummary>, onClick: () -> Unit) {
-    val album = albums.find { it.id == albumId }
+private fun AlbumRow(icon: ImageVector, label: String, albumIds: List<String>, albums: List<AlbumSummary>, onClick: () -> Unit) {
+    val first = albums.find { it.id == albumIds.firstOrNull() }
+    val summary = when {
+        albumIds.isEmpty() -> stringResource(R.string.no_album_selected)
+        first == null -> stringResource(R.string.loading_placeholder)
+        albumIds.size == 1 -> first.name
+        else -> pluralStringResource(R.plurals.album_row_more, albumIds.size - 1, first.name, albumIds.size - 1)
+    }
     SettingsRow(
         icon = icon,
         title = label,
@@ -583,9 +581,9 @@ private fun AlbumRow(icon: ImageVector, label: String, albumId: String?, albums:
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = album?.name ?: stringResource(if (albumId == null) R.string.no_album_selected else R.string.loading_placeholder),
+                    text = summary,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (albumId == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (albumIds.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 180.dp)

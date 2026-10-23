@@ -17,13 +17,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.PhotoAlbum
-import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,8 +32,11 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +45,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImagePainter
@@ -55,19 +59,49 @@ import com.anthonyla.paperize.domain.model.AlbumSummary
 import com.anthonyla.paperize.presentation.common.theme.AppIconSizes
 import com.anthonyla.paperize.presentation.common.theme.AppSpacing
 
+/**
+ * The picker's edits. Taps change [selected] only; [close] hands the result to [onApply] the first time the
+ * sheet closes, and a later close applies nothing more. Checked albums keep the order they were checked in.
+ */
+class AlbumPickerDraft(initial: List<String>, private val onApply: (List<String>) -> Unit) {
+    var selected by mutableStateOf(initial)
+        private set
+    private var closed = false
+
+    fun toggle(albumId: String) {
+        selected = if (albumId in selected) selected - albumId else selected + albumId
+    }
+
+    fun close() {
+        if (closed) return
+        closed = true
+        onApply(selected)
+    }
+}
+
+/**
+ * Multi-select of a screen's albums. Each row toggles its checkbox; the draft is applied once when the sheet
+ * closes (Done, a swipe down, or back). [onAddFolder] applies the draft first, then goes to add a folder.
+ * An album with no pictures is not checked: [onEmptyAlbum] reports it instead (one already checked can be unchecked).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlbumSelectionBottomSheet(
     albums: List<AlbumSummary>,
-    selectedAlbumId: String?,
-    onAlbumSelect: (AlbumSummary) -> Unit,
+    selectedAlbumIds: List<String>,
+    onApply: (List<String>) -> Unit,
     onAddFolder: () -> Unit,
+    onEmptyAlbum: (AlbumSummary) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val draft = remember { AlbumPickerDraft(selectedAlbumIds, onApply) }
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden)
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            draft.close()
+            onDismiss()
+        },
         sheetState = sheetState
     ) {
         Column(
@@ -85,11 +119,13 @@ fun AlbumSelectionBottomSheet(
 
             LazyColumn {
                 items(albums, key = { it.id }) { album ->
-                    val isSelected = selectedAlbumId == album.id
                     AlbumSelectionItem(
                         album = album,
-                        isSelected = isSelected,
-                        onClick = { onAlbumSelect(album) }
+                        isSelected = album.id in draft.selected,
+                        onClick = {
+                            // An empty album can still be unchecked; it only cannot be checked.
+                            if (album.wallpaperCount == 0 && album.id !in draft.selected) onEmptyAlbum(album) else draft.toggle(album.id)
+                        }
                     )
                     HorizontalDivider()
                 }
@@ -97,7 +133,10 @@ fun AlbumSelectionBottomSheet(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable(role = Role.Button, onClick = onAddFolder)
+                            .clickable(role = Role.Button) {
+                                draft.close()
+                                onAddFolder()
+                            }
                             .padding(horizontal = AppSpacing.extraLarge, vertical = AppSpacing.medium),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -134,11 +173,28 @@ fun AlbumSelectionBottomSheet(
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Button(onClick = onAddFolder) {
+                    Button(onClick = {
+                        draft.close()
+                        onAddFolder()
+                    }) {
                         Icon(Icons.Outlined.CreateNewFolder, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
                         Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
                         Text(stringResource(R.string.add_folder))
                     }
+                }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppSpacing.extraLarge, vertical = AppSpacing.medium),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Button(onClick = {
+                    draft.close()
+                    onDismiss()
+                }) {
+                    Text(stringResource(R.string.done))
                 }
             }
         }
@@ -158,6 +214,7 @@ private fun AlbumSelectionItem(
         contentScale = ContentScale.Crop
     )
     val coverState by cover.state.collectAsState()
+    val selectedDescription = stringResource(R.string.currently_selected_album)
 
     Row(
         modifier = modifier
@@ -214,10 +271,10 @@ private fun AlbumSelectionItem(
             )
         }
 
-        Icon(
-            imageVector = if (isSelected) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
-            contentDescription = if (isSelected) stringResource(R.string.currently_selected_album) else null,
-            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+        Checkbox(
+            checked = isSelected,
+            onCheckedChange = null,
+            modifier = Modifier.semantics { if (isSelected) stateDescription = selectedDescription }
         )
     }
 }

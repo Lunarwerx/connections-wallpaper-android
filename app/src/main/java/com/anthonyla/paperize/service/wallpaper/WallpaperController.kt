@@ -41,44 +41,45 @@ class WallpaperController @Inject constructor(
             )
             WallpaperChangeOutcome(changed = true)
         }
-        ScreenType.HOME -> changeSelected(settings.homeAlbumId, screen, settings)
-        ScreenType.LOCK -> changeSelected(settings.lockAlbumId, screen, settings)
+        ScreenType.HOME -> changeSelected(settings.albumIds(ScreenType.HOME), screen, settings)
+        ScreenType.LOCK -> changeSelected(settings.albumIds(ScreenType.LOCK), screen, settings)
         ScreenType.BOTH -> {
-            val home = settings.homeAlbumId
-            if (home != null && home == settings.lockAlbumId && !settings.appliesSeparateSchedules) {
+            val home = settings.homeAlbumIds
+            if (home.isNotEmpty() && home.toSet() == settings.lockAlbumIds.toSet() && !settings.appliesSeparateSchedules) {
                 changeSynchronized(home, settings)
             } else {
-                combine(changeSelected(home, ScreenType.HOME, settings), changeSelected(settings.lockAlbumId, ScreenType.LOCK, settings))
+                combine(changeSelected(home, ScreenType.HOME, settings), changeSelected(settings.lockAlbumIds, ScreenType.LOCK, settings))
             }
         }
     }
 
-    private suspend fun changeSelected(albumId: String?, screen: ScreenType, settings: ScheduleSettings): WallpaperChangeOutcome {
-        if (albumId == null) return WallpaperChangeOutcome()
-        val prepared = prepareOrDisable(albumId, screen, settings) ?: return WallpaperChangeOutcome(emptyAlbum = true)
+    private suspend fun changeSelected(albumIds: List<String>, screen: ScreenType, settings: ScheduleSettings): WallpaperChangeOutcome {
+        if (albumIds.isEmpty()) return WallpaperChangeOutcome()
+        val prepared = prepareOrDisable(albumIds, screen, settings) ?: return WallpaperChangeOutcome(emptyAlbum = true)
         applyPrepared(prepared, screen)
         return WallpaperChangeOutcome(changed = true)
     }
 
-    private suspend fun changeSynchronized(albumId: String, settings: ScheduleSettings): WallpaperChangeOutcome {
-        val prepared = prepareOrDisable(albumId, ScreenType.BOTH, settings) ?: return WallpaperChangeOutcome(emptyAlbum = true)
+    private suspend fun changeSynchronized(albumIds: List<String>, settings: ScheduleSettings): WallpaperChangeOutcome {
+        val prepared = prepareOrDisable(albumIds, ScreenType.BOTH, settings) ?: return WallpaperChangeOutcome(emptyAlbum = true)
         if (settings.homeAndLockLookAlike) {
             applyPrepared(prepared, ScreenType.BOTH)
         } else {
             applyPrepared(prepared, ScreenType.HOME)
             val lockImage = ready.take(prepared.wallpaperId, ScreenType.LOCK, settings)?.let(WallpaperImage::Encoded)
-                ?: WallpaperImage.Drawn(render(albumId, ScreenType.LOCK, prepared.wallpaperId))
+                ?: WallpaperImage.Drawn(render(albumIds, ScreenType.LOCK, prepared.wallpaperId))
             applyImage(lockImage, ScreenType.LOCK) { prepare.complete(prepared, ScreenType.LOCK) }
         }
         return WallpaperChangeOutcome(changed = true)
     }
 
-    private suspend fun prepareOrDisable(albumId: String, screen: ScreenType, settings: ScheduleSettings): PreparedWallpaper? {
+    private suspend fun prepareOrDisable(albumIds: List<String>, screen: ScreenType, settings: ScheduleSettings): PreparedWallpaper? {
         val queue = if (screen == ScreenType.BOTH) ScreenType.HOME else screen
         try {
-            return ready.takeNext(albumId, queue, settings) ?: prepare(albumId, queue)
+            return ready.takeNext(albumIds, queue, settings) ?: prepare(albumIds, queue)
         } catch (_: EmptyAlbumException) {
-            settingsRepository.clearEmptyAlbumSelection(albumId, screen)
+            // The queue is drawn from every album, so this means each of them is empty.
+            albumIds.forEach { settingsRepository.clearEmptyAlbumSelection(it, screen) }
             return null
         }
     }
@@ -101,16 +102,17 @@ class WallpaperController @Inject constructor(
         }
     }
 
-    suspend fun applySpecific(albumId: String, wallpaperId: String, screen: ScreenType, settings: ScheduleSettings) {
+    /** [pictureAlbumId] is the album the picture belongs to; the queues it leaves are those of [screen]'s albums. */
+    suspend fun applySpecific(pictureAlbumId: String, wallpaperId: String, screen: ScreenType, settings: ScheduleSettings) {
         val targets = if (screen == ScreenType.BOTH && !settings.homeAndLockLookAlike) {
             listOf(ScreenType.HOME, ScreenType.LOCK)
         } else listOf(screen)
         for (target in targets) {
             val renderScreen = if (target == ScreenType.BOTH) ScreenType.HOME else target
-            val bitmap = render(albumId, renderScreen, wallpaperId)
+            val bitmap = render(settings.albumIds(renderScreen), renderScreen, wallpaperId)
             applyImage(WallpaperImage.Drawn(bitmap), target) {
                 target.staticScreens().forEach {
-                    prepare.completeSpecific(albumId, it, wallpaperId, settings.shuffleEnabled)
+                    prepare.completeSpecific(settings.albumIds(it), pictureAlbumId, it, wallpaperId, settings.shuffleEnabled)
                 }
             }
         }
@@ -142,11 +144,11 @@ class WallpaperController @Inject constructor(
     suspend fun replaceLive(screen: ScreenType, settings: ScheduleSettings) {
         val rotating = settings.activeScreens(WallpaperMode.STATIC).flatMap { it.staticScreens() }
         val source = if (screen in rotating) screen else rotating.firstOrNull() ?: return
-        val albumId = (if (source == ScreenType.HOME) settings.homeAlbumId else settings.lockAlbumId) ?: return
-        val bitmap = runCatchingCancellable { render(albumId, source) }.getOrNull()
+        val albumIds = settings.albumIds(source).ifEmpty { return }
+        val bitmap = runCatchingCancellable { render(albumIds, source) }.getOrNull()
         when {
             bitmap != null -> applyImage(WallpaperImage.Drawn(bitmap), screen)
-            screen == source -> changeSelected(albumId, screen, settings)
+            screen == source -> changeSelected(albumIds, screen, settings)
             else -> error("$source has no current picture to lend $screen")
         }
     }
@@ -155,10 +157,10 @@ class WallpaperController @Inject constructor(
         if (screen == ScreenType.LIVE) return WallpaperChangeOutcome()
         var outcome = WallpaperChangeOutcome()
         for (target in screen.staticScreens()) {
-            val albumId = if (target == ScreenType.HOME) settings.homeAlbumId else settings.lockAlbumId
-            if (albumId == null) continue
-            val bitmap = runCatchingCancellable { render(albumId, target) }.getOrNull()
-            val result = if (bitmap == null) changeSelected(albumId, target, settings) else {
+            val albumIds = settings.albumIds(target)
+            if (albumIds.isEmpty()) continue
+            val bitmap = runCatchingCancellable { render(albumIds, target) }.getOrNull()
+            val result = if (bitmap == null) changeSelected(albumIds, target, settings) else {
                 applyImage(WallpaperImage.Drawn(bitmap), target)
                 WallpaperChangeOutcome(changed = true)
             }

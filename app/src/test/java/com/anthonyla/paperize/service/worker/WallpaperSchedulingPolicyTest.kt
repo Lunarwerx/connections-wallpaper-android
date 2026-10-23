@@ -13,8 +13,8 @@ class WallpaperSchedulingPolicyTest {
             enableChanger = true,
             homeEnabled = true,
             lockEnabled = true,
-            homeAlbumId = "album",
-            lockAlbumId = "album"
+            homeAlbumIds = listOf("album"),
+            lockAlbumIds = listOf("album")
         )
 
         assertEquals(
@@ -30,8 +30,8 @@ class WallpaperSchedulingPolicyTest {
             separateSchedules = true,
             homeEnabled = true,
             lockEnabled = true,
-            homeAlbumId = "home",
-            lockAlbumId = "lock"
+            homeAlbumIds = listOf("home"),
+            lockAlbumIds = listOf("lock")
         )
 
         assertEquals(
@@ -59,8 +59,8 @@ class WallpaperSchedulingPolicyTest {
             enableChanger = true,
             homeEnabled = true,
             lockEnabled = true,
-            homeAlbumId = "album",
-            lockAlbumId = "album"
+            homeAlbumIds = listOf("album"),
+            lockAlbumIds = listOf("album")
         )
 
         assertEquals(
@@ -73,7 +73,7 @@ class WallpaperSchedulingPolicyTest {
     fun `short live interval belongs to visible engine instead of WorkManager`() {
         val settings = ScheduleSettings(intervalEnabled = true,
             enableChanger = true,
-            liveAlbumId = "live",
+            liveAlbumIds = listOf("live"),
             liveIntervalMinutes = 14
         )
 

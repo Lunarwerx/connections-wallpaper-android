@@ -31,12 +31,12 @@ class LibraryMigrationInstrumentedTest {
                     assertEquals(7, image.displayOrder)
                     assertEquals(42L, image.addedAt)
                     assertEquals("content://image", db.folderDao().getFolderById("folder")?.coverUri)
-                    assertEquals(listOf("image"), db.wallpaperQueueDao().getQueueItems("album", ScreenType.HOME).map { it.wallpaperId })
-                    assertEquals(if (version >= 3) "image" else null, db.wallpaperCurrentDao().getCurrentWallpaper("album", ScreenType.HOME)?.id)
+                    assertEquals(listOf("image"), db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.HOME).map { it.wallpaperId })
+                    assertEquals(if (version >= 3) "image" else null, db.wallpaperCurrentDao().getCurrentWallpaper(listOf("album"), ScreenType.HOME)?.id)
                     db.openHelper.readableDatabase.query("PRAGMA foreign_key_check").use { assertEquals(0, it.count) }
                     db.albumDao().deleteAlbumById("album")
                     assertNull(db.wallpaperDao().getWallpaperById("image"))
-                    assertTrue(db.wallpaperQueueDao().getQueueItems("album", ScreenType.HOME).isEmpty())
+                    assertTrue(db.wallpaperQueueDao().getQueueItems(listOf("album"), ScreenType.HOME).isEmpty())
                 } finally { db.close() }
             } finally { context.deleteDatabase(name) }
         }

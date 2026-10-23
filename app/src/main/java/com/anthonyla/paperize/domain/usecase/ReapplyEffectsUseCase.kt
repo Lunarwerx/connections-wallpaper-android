@@ -15,10 +15,10 @@ class ReapplyEffectsUseCase @Inject constructor(
     private val renderer: WallpaperRenderer
 ) {
     /** [wallpaperId], else what [screenType] shows now: a picture set from outside the library, else its album's current one. */
-    suspend operator fun invoke(albumId: String, screenType: ScreenType, wallpaperId: String? = null): Bitmap {
+    suspend operator fun invoke(albumIds: List<String>, screenType: ScreenType, wallpaperId: String? = null): Bitmap {
         if (wallpaperId == null) settingsRepository.getShownPicture(screenType)?.let { return picture(it, screenType) }
         val wallpaper = if (wallpaperId != null) wallpaperRepository.getWallpaperById(wallpaperId)
-            else wallpaperRepository.getCurrentWallpaper(albumId, screenType)
+            else wallpaperRepository.getCurrentWallpaper(albumIds, screenType)
         return wallpaper?.let { renderer.render(it, screenType, settingsRepository.getScheduleSettings()) }
             ?: throw NoValidWallpaperException()
     }

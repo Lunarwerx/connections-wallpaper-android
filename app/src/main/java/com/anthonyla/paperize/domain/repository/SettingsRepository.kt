@@ -29,12 +29,13 @@ interface SettingsRepository {
 
     suspend fun clearAllSettings()
 
-    /** BOTH updates the home and lock selections together. */
-    suspend fun updateAlbumId(screen: ScreenType, albumId: String?)
+    /** BOTH updates the home and lock selections together. Ids are kept in the order given. */
+    suspend fun updateAlbumIds(screen: ScreenType, ids: List<String>)
 
-    /** Clears matching selections atomically; returns whether any selection changed. */
+    /** Removes [albumId] from every selection atomically; returns whether any selection held it. */
     suspend fun clearAlbumSelectionsIfMatches(albumId: String): Boolean
 
+    /** Removes [albumId] from the selections of [screen]. */
     suspend fun clearEmptyAlbumSelection(albumId: String, screen: ScreenType)
 
     /** null follows the phone's theme; true or false pins dark or light. */

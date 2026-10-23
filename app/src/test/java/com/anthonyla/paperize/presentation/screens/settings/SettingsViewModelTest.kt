@@ -46,7 +46,7 @@ class SettingsViewModelTest {
     }
 
     @Test fun `mode switch keeps the library and carries the rotating album into the new mode`() = runTest {
-        var stored = ScheduleSettings(lockEnabled = true, lockAlbumId = "album")
+        var stored = ScheduleSettings(lockEnabled = true, lockAlbumIds = listOf("album"))
         coEvery { settings.getWallpaperMode() } returns WallpaperMode.STATIC
         coEvery { settings.updateScheduleSettings(any<(ScheduleSettings) -> ScheduleSettings>()) } answers {
             stored = firstArg<(ScheduleSettings) -> ScheduleSettings>()(stored)
@@ -62,8 +62,8 @@ class SettingsViewModelTest {
         coVerify(exactly = 1) { settings.updateWallpaperMode(any()) }
         coVerify { settings.updateWallpaperMode(WallpaperMode.LIVE) }
         coVerify(exactly = 0) { albums.deleteAllAlbums(); settings.clearAllSettings() }
-        assertEquals("album", stored.liveAlbumId)
-        assertEquals("album", stored.lockAlbumId)
+        assertEquals(listOf("album"), stored.liveAlbumIds)
+        assertEquals(listOf("album"), stored.lockAlbumIds)
         assertEquals(false, needsLivePicker)
         assertNull(viewModel.failure.value)
         assertFalse(viewModel.isBusy.value)

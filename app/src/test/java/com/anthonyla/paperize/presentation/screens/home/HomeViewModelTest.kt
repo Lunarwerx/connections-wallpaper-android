@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModelStore
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
-import com.anthonyla.paperize.domain.model.AlbumSummary
 import com.anthonyla.paperize.domain.model.AppSettings
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.repository.AlbumRepository
@@ -38,7 +37,7 @@ class HomeViewModelTest {
     private val wallpapers = mockk<WallpaperRepository>(relaxed = true)
     private val scheduler = mockk<WallpaperScheduler>(relaxed = true)
     private val importer = mockk<ImportWallpapersUseCase>()
-    private val stored = MutableStateFlow(ScheduleSettings(homeEnabled = true, homeAlbumId = "old"))
+    private val stored = MutableStateFlow(ScheduleSettings(homeEnabled = true, homeAlbumIds = listOf("old")))
     private val store = ViewModelStore()
     private lateinit var viewModel: HomeViewModel
 
@@ -51,7 +50,7 @@ class HomeViewModelTest {
         coEvery { settings.getWallpaperMode() } returns WallpaperMode.STATIC
         coEvery { settings.getScheduleSettings() } answers { stored.value }
         coEvery { settings.updateEnableChanger(any()) } answers { stored.value = stored.value.copy(enableChanger = firstArg()) }
-        coEvery { settings.updateAlbumId(ScreenType.HOME, any()) } answers { stored.value = stored.value.copy(homeAlbumId = secondArg()) }
+        coEvery { settings.updateAlbumIds(ScreenType.HOME, any()) } answers { stored.value = stored.value.copy(homeAlbumIds = secondArg()) }
         coEvery { settings.updateScheduleSettings(any<(ScheduleSettings) -> ScheduleSettings>()) } answers {
             stored.value = firstArg<(ScheduleSettings) -> ScheduleSettings>()(stored.value)
             stored.value
@@ -78,11 +77,11 @@ class HomeViewModelTest {
         viewModel.updateScheduleSettingsDebounced(draft)
         viewModel.setChangerEnabled(false)
         runCurrent()
-        viewModel.selectAlbum(ScreenType.HOME, AlbumSummary.empty("new"))
+        viewModel.setAlbums(ScreenType.HOME, listOf("new"))
         advanceUntilIdle()
 
         assertFalse(stored.value.enableChanger)
-        assertEquals("new", stored.value.homeAlbumId)
+        assertEquals(listOf("new"), stored.value.homeAlbumIds)
         assertEquals(60, stored.value.homeEffects.blurPercentage)
     }
 
@@ -102,15 +101,15 @@ class HomeViewModelTest {
     }
 
     @Test fun `a screen switched off and on again keeps its album`() = runTest {
-        stored.value = stored.value.copy(lockEnabled = true, lockAlbumId = "lock")
+        stored.value = stored.value.copy(lockEnabled = true, lockAlbumIds = listOf("lock"))
         viewModel.updateScheduleSettings(stored.value.copy(homeEnabled = false))
         advanceUntilIdle()
         assertFalse(ScreenType.HOME in stored.value.activeScreens(WallpaperMode.STATIC))
-        assertEquals("lock", stored.value.lockAlbumId)
+        assertEquals(listOf("lock"), stored.value.lockAlbumIds)
 
         viewModel.updateScheduleSettings(stored.value.copy(homeEnabled = true))
         advanceUntilIdle()
-        assertEquals("old", stored.value.homeAlbumId)
+        assertEquals(listOf("old"), stored.value.homeAlbumIds)
         assertTrue(ScreenType.HOME in stored.value.activeScreens(WallpaperMode.STATIC))
     }
 
@@ -156,12 +155,12 @@ class HomeViewModelTest {
         runCurrent()
         stored.value = stored.value.copy(homeEffects = stored.value.homeEffects.copy(blurPercentage = 60))
         runCurrent()
-        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow("old", ScreenType.HOME) }
-        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow("old", ScreenType.BOTH) }
+        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow(listOf("old"), ScreenType.HOME) }
+        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow(listOf("old"), ScreenType.BOTH) }
 
-        stored.value = stored.value.copy(homeAlbumId = "new")
+        stored.value = stored.value.copy(homeAlbumIds = listOf("new"))
         runCurrent()
-        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow("new", ScreenType.HOME) }
-        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow("new", ScreenType.BOTH) }
+        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow(listOf("new"), ScreenType.HOME) }
+        verify(exactly = 1) { wallpapers.getCurrentWallpaperFlow(listOf("new"), ScreenType.BOTH) }
     }
 }

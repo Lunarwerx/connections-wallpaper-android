@@ -32,7 +32,7 @@ class ReadyWallpapersTest {
     private val repository = mockk<WallpaperRepository>(relaxed = true)
     private val renderer = mockk<WallpaperRenderer>()
     private val picture = Wallpaper.empty(id = "next", albumId = "album")
-    private val settings = ScheduleSettings(homeEnabled = true, lockEnabled = true, homeAlbumId = "album", lockAlbumId = "album")
+    private val settings = ScheduleSettings(homeEnabled = true, lockEnabled = true, homeAlbumIds = listOf("album"), lockAlbumIds = listOf("album"))
     private lateinit var ready: ReadyWallpapers
     private var night = false
 
@@ -48,8 +48,8 @@ class ReadyWallpapersTest {
                 every { compress(any(), any(), any()) } answers { thirdArg<OutputStream>().write(byteArrayOf(1, 2, 3)); true }
             }
         }
-        coEvery { repository.peekNextWallpaper("album", ScreenType.HOME) } returns picture
-        coEvery { repository.getAndDequeueWallpaper("album", ScreenType.HOME) } returns picture
+        coEvery { repository.peekNextWallpaper(listOf("album"), ScreenType.HOME) } returns picture
+        coEvery { repository.getAndDequeueWallpaper(listOf("album"), ScreenType.HOME) } returns picture
         ready = ReadyWallpapers(mockk<Context> { every { cacheDir } returns cache }, repository, renderer)
     }
 
@@ -61,17 +61,17 @@ class ReadyWallpapersTest {
     @Test fun `a picture drawn ahead is used once, and only while the settings still draw it that way`() = runTest {
         ready.prepare(listOf(ScreenType.BOTH), settings)
         night = true
-        assertNull("dark mode came on since: adaptive brightness draws it again", ready.takeNext("album", ScreenType.HOME, settings))
+        assertNull("dark mode came on since: adaptive brightness draws it again", ready.takeNext(listOf("album"), ScreenType.HOME, settings))
         night = false
         val gray = settings.homeEffects.copy(enableGrayscale = true, grayscalePercentage = 100)
         val grayscale = settings.copy(visualEffectsEnabled = true, homeEffects = gray, lockEffects = gray)
-        assertNull("effects turned on since: the change draws it again", ready.takeNext("album", ScreenType.HOME, grayscale))
+        assertNull("effects turned on since: the change draws it again", ready.takeNext(listOf("album"), ScreenType.HOME, grayscale))
 
         ready.prepare(listOf(ScreenType.BOTH), grayscale)
         assertEquals("the old drawing is dropped, not kept beside the new one", 1, File(cache, "ready").listFiles()!!.size)
-        val taken = ready.takeNext("album", ScreenType.HOME, grayscale)
+        val taken = ready.takeNext(listOf("album"), ScreenType.HOME, grayscale)
         assertEquals("next", taken?.wallpaperId)
         assertTrue(taken?.image is WallpaperImage.Encoded)
-        assertNull("it is handed out once", ready.takeNext("album", ScreenType.HOME, grayscale))
+        assertNull("it is handed out once", ready.takeNext(listOf("album"), ScreenType.HOME, grayscale))
     }
 }

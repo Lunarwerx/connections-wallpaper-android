@@ -107,7 +107,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
         private lateinit var renderer: PaperizeWallpaperRenderer
         private lateinit var renderController: PaperizeRenderController
         private val engineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        private var currentAlbumId: String? = null
+        private var currentAlbumIds: List<String> = emptyList()
         @Volatile private var currentWallpaper: Wallpaper? = null
         private var observedScalingType: ScalingType? = null
         private var observedLook: Triple<ScalingType, WallpaperEffects, Boolean>? = null
@@ -213,13 +213,13 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
             // In STATIC mode the static wallpaper worker owns HOME/LOCK; the engine stays empty.
             if (settingsRepository.getWallpaperMode() != WallpaperMode.LIVE) return empty
             val settings = settingsRepository.getScheduleSettings()
-            val albumId = settings.liveAlbumId ?: return empty
+            val albumIds = settings.liveAlbumIds.ifEmpty { return empty }
 
             repeat(Constants.MAX_WALLPAPER_LOAD_RETRIES) {
                 val candidate = try {
-                    changeWallpaperUseCase.dequeueNext(albumId, ScreenType.LIVE, settings.shuffleEnabled)
+                    changeWallpaperUseCase.dequeueNext(albumIds, ScreenType.LIVE, settings.shuffleEnabled)
                 } catch (_: EmptyAlbumException) {
-                    Log.w(TAG, "No wallpapers in album $albumId")
+                    Log.w(TAG, "No wallpapers in albums $albumIds")
                     return empty
                 }
                 // Skip unreadable items without deleting them: a permission or storage issue, or no internet for a
@@ -232,9 +232,9 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                         // what the live wallpaper shows: it showed a stale one (owner report, 2026-10-22). A picture set
                         // from outside the library stops being the one shown.
                         withContext(Dispatchers.IO) {
-                            changeWallpaperUseCase.completeSpecific(albumId, ScreenType.LIVE, candidate.id, settings.shuffleEnabled)
+                            changeWallpaperUseCase.completeSpecific(albumIds, candidate.albumId, ScreenType.LIVE, candidate.id, settings.shuffleEnabled)
                         }
-                        analytics.liveWallpaperShown(albumId, candidate)
+                        analytics.liveWallpaperShown(albumIds, candidate)
                     }
                 }
             }
@@ -244,7 +244,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
 
         /** A picture from outside the library (a Connections wallpaper), shown until the album's next one; the interval starts again from it. */
         private fun showPicture(uri: String) {
-            val picture = Wallpaper(id = uri, albumId = currentAlbumId.orEmpty(), uri = uri, fileName = uri.substringAfterLast('/'), dateModified = 0)
+            val picture = Wallpaper(id = uri, albumId = "", uri = uri, fileName = uri.substringAfterLast('/'), dateModified = 0)
             currentWallpaper = picture
             renderController.show(ContentUriImageLoader(contentResolver, uri.toUri(), latestSettings.liveScalingType))
             restartLiveIntervalTimer()
@@ -263,7 +263,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                     val timerConfigurationChanged =
                         latestWallpaperMode != mode ||
                             latestSettings.enableChanger != settings.enableChanger ||
-                            latestSettings.liveAlbumId != settings.liveAlbumId ||
+                            latestSettings.liveAlbumIds != settings.liveAlbumIds ||
                             latestSettings.liveIntervalMinutes != settings.liveIntervalMinutes ||
                             latestSettings.intervalEnabled != settings.intervalEnabled
                     latestSettings = settings
@@ -274,11 +274,11 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                         return@collect
                     }
                     
-                    val albumId = settings.liveAlbumId
+                    val albumIds = settings.liveAlbumIds
                     val effects = settings.appliedEffects(ScreenType.LIVE)
                     val scalingType = settings.liveScalingType
 
-                    val albumChanged = albumId != currentAlbumId
+                    val albumChanged = albumIds != currentAlbumIds
                     if (albumChanged) {
                         currentWallpaper = null
                     }
@@ -321,8 +321,8 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                     }
                     
                     if (albumChanged) {
-                        Log.d(TAG, "Album changed from $currentAlbumId to $albumId, reloading")
-                        currentAlbumId = albumId
+                        Log.d(TAG, "Albums changed from $currentAlbumIds to $albumIds, reloading")
+                        currentAlbumIds = albumIds
                         renderController.reloadCurrentArtwork()
                     }
                 }
@@ -425,7 +425,7 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                     latestWallpaperMode == WallpaperMode.LIVE &&
                     latestSettings.enableChanger &&
                     latestSettings.intervalEnabled &&
-                    latestSettings.liveAlbumId != null &&
+                    latestSettings.liveAlbumIds.isNotEmpty() &&
                     usesVisibleLiveTimer(intervalMinutes)
             if (!shouldRun) return
 

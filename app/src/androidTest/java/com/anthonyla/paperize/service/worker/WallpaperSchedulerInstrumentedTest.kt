@@ -98,8 +98,8 @@ class WallpaperSchedulerInstrumentedTest {
                 separateSchedules = true,
                 homeEnabled = true,
                 lockEnabled = true,
-                homeAlbumId = "home",
-                lockAlbumId = "lock",
+                homeAlbumIds = listOf("home"),
+                lockAlbumIds = listOf("lock"),
                 homeIntervalMinutes = 60,
                 lockIntervalMinutes = 90
             ),
@@ -123,7 +123,7 @@ class WallpaperSchedulerInstrumentedTest {
 
         val settings = ScheduleSettings(
             enableChanger = true, intervalEnabled = true, homeEnabled = true, lockEnabled = true,
-            homeAlbumId = "home", lockAlbumId = "lock", separateSchedules = true,
+            homeAlbumIds = listOf("home"), lockAlbumIds = listOf("lock"), separateSchedules = true,
             homeIntervalMinutes = 15, lockIntervalMinutes = 15
         )
         scheduler.updateSchedules(settings, WallpaperMode.STATIC, onlyIfNotScheduled = true)
@@ -135,7 +135,7 @@ class WallpaperSchedulerInstrumentedTest {
             assertEquals(previous.nextScheduleTimeMillis, kept.nextScheduleTimeMillis)
         }
 
-        scheduler.updateSchedules(settings.copy(homeIntervalMinutes = 60, lockAlbumId = "home", separateSchedules = false), WallpaperMode.STATIC, onlyIfNotScheduled = true)
+        scheduler.updateSchedules(settings.copy(homeIntervalMinutes = 60, lockAlbumIds = listOf("home"), separateSchedules = false), WallpaperMode.STATIC, onlyIfNotScheduled = true)
         awaitEnqueued(Constants.WORK_NAME_BOTH)
         awaitCancelled(Constants.WORK_NAME_HOME)
         awaitCancelled(Constants.WORK_NAME_LOCK)

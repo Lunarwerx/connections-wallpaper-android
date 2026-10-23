@@ -121,12 +121,17 @@ object PreferenceKeys {
     const val INTERVAL_ENABLED = "interval_enabled"
     const val HOME_ENABLED = "home_enabled"
     const val LOCK_ENABLED = "lock_enabled"
+    // Album lists are stored newline-joined in order; the *_ALBUM_ID keys are the single-album keys
+    // older builds wrote, read once and removed by the migration in SettingsRepositoryImpl.
+    const val HOME_ALBUM_IDS = "home_album_ids"
+    const val LOCK_ALBUM_IDS = "lock_album_ids"
     const val HOME_ALBUM_ID = "home_album_id"
     const val LOCK_ALBUM_ID = "lock_album_id"
     const val HOME_INTERVAL_MINUTES = "home_interval_minutes"
     const val LOCK_INTERVAL_MINUTES = "lock_interval_minutes"
 
     // Live Wallpaper Mode Settings (effect keys are built in SettingsRepositoryImpl)
+    const val LIVE_ALBUM_IDS = "live_album_ids"
     const val LIVE_ALBUM_ID = "live_album_id"
     const val LIVE_INTERVAL_MINUTES = "live_interval_minutes"
 

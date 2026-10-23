@@ -33,21 +33,23 @@ class ChangeWallpaperUseCase @Inject constructor(
     private val renderer: WallpaperRenderer,
     private val upcoming: UpcomingPictures
 ) {
-    suspend operator fun invoke(albumId: String, screenType: ScreenType): PreparedWallpaper {
+    suspend operator fun invoke(albumIds: List<String>, screenType: ScreenType): PreparedWallpaper {
         val settings = settingsRepository.getScheduleSettings()
         repeat(Constants.MAX_WALLPAPER_LOAD_RETRIES) {
             currentCoroutineContext().ensureActive()
-            val candidate = dequeueNext(albumId, screenType, settings.shuffleEnabled)
+            val candidate = dequeueNext(albumIds, screenType, settings.shuffleEnabled)
             try {
                 val bitmap = renderer.render(candidate, screenType, settings)
                 if (bitmap != null) {
-                    return PreparedWallpaper(WallpaperImage.Drawn(bitmap), albumId, screenType, candidate.id, settings.shuffleEnabled)
+                    return PreparedWallpaper(
+                        WallpaperImage.Drawn(bitmap), albumIds, candidate.albumId, screenType, candidate.id, settings.shuffleEnabled
+                    )
                 }
             } catch (e: CancellationException) {
                 // Cancelling preparation must not consume the selected queue item.
                 withContext(NonCancellable) {
                     try {
-                        wallpaperRepository.restoreWallpaperToQueueFront(albumId, screenType, candidate.id)
+                        wallpaperRepository.restoreWallpaperToQueueFront(albumIds, screenType, candidate.id)
                     } catch (restoreError: Exception) {
                         Log.e(TAG, "Failed to restore cancelled wallpaper", restoreError)
                     }
@@ -61,10 +63,10 @@ class ChangeWallpaperUseCase @Inject constructor(
     }
 
     /** Dequeue the next item, rebuilding an empty queue once. Throws [EmptyAlbumException] if none remain. */
-    suspend fun dequeueNext(albumId: String, screenType: ScreenType, shuffle: Boolean): Wallpaper =
-        wallpaperRepository.getAndDequeueWallpaper(albumId, screenType) ?: run {
-            wallpaperRepository.ensureWallpaperQueue(albumId, screenType, shuffle)
-            wallpaperRepository.getAndDequeueWallpaper(albumId, screenType)
+    suspend fun dequeueNext(albumIds: List<String>, screenType: ScreenType, shuffle: Boolean): Wallpaper =
+        wallpaperRepository.getAndDequeueWallpaper(albumIds, screenType) ?: run {
+            wallpaperRepository.ensureWallpaperQueue(albumIds, screenType, shuffle)
+            wallpaperRepository.getAndDequeueWallpaper(albumIds, screenType)
                 ?: throw EmptyAlbumException()
         }
 
@@ -78,7 +80,8 @@ class ChangeWallpaperUseCase @Inject constructor(
         prepared: PreparedWallpaper,
         screenType: ScreenType = prepared.screenType
     ) = completeSpecific(
-        albumId = prepared.albumId,
+        albumIds = prepared.albumIds,
+        pictureAlbumId = prepared.pictureAlbumId,
         screenType = screenType,
         wallpaperId = prepared.wallpaperId,
         shuffle = prepared.shuffle
@@ -86,12 +89,13 @@ class ChangeWallpaperUseCase @Inject constructor(
 
     /** Record a user-selected wallpaper and remove that exact item from the next-change queue. */
     suspend fun completeSpecific(
-        albumId: String,
+        albumIds: List<String>,
+        pictureAlbumId: String,
         screenType: ScreenType,
         wallpaperId: String,
         shuffle: Boolean
     ) {
-        runCatchingCancellable { wallpaperRepository.setCurrentWallpaper(albumId, screenType, wallpaperId) }
+        runCatchingCancellable { wallpaperRepository.setCurrentWallpaper(pictureAlbumId, screenType, wallpaperId) }
             .onFailure {
                 Log.e(TAG, "Applied wallpaper could not be recorded as current", it)
                 return
@@ -101,20 +105,20 @@ class ChangeWallpaperUseCase @Inject constructor(
             .onFailure { Log.w(TAG, "The picture shown before could not be cleared", it) }
 
         runCatchingCancellable {
-            wallpaperRepository.ensureWallpaperQueue(albumId, screenType, shuffle)
+            wallpaperRepository.ensureWallpaperQueue(albumIds, screenType, shuffle)
             // Build first when this is the first synchronized use of a screen queue, then remove
             // the exact applied item. This prevents the just-applied wallpaper from being
             // reintroduced at the head of a freshly built queue.
-            wallpaperRepository.removeWallpaperFromQueue(albumId, screenType, wallpaperId)
+            wallpaperRepository.removeWallpaperFromQueue(albumIds, screenType, wallpaperId)
         }.onFailure { Log.w(TAG, "Queue sync failed; it will rebuild on the next change", it) }
         // A picture from the network comes to the phone now, so the next change does not wait on it.
-        runCatchingCancellable { wallpaperRepository.peekNextWallpaper(albumId, screenType) }.getOrNull()?.let(upcoming::warm)
+        runCatchingCancellable { wallpaperRepository.peekNextWallpaper(albumIds, screenType) }.getOrNull()?.let(upcoming::warm)
     }
 
     /** Restore a prepared item after WallpaperManager rejected it. */
     suspend fun restore(prepared: PreparedWallpaper) {
         runCatchingCancellable {
-            wallpaperRepository.restoreWallpaperToQueueFront(prepared.albumId, prepared.screenType, prepared.wallpaperId)
+            wallpaperRepository.restoreWallpaperToQueueFront(prepared.albumIds, prepared.screenType, prepared.wallpaperId)
         }.onFailure { Log.e(TAG, "Failed to restore rejected wallpaper to its queue", it) }
     }
 

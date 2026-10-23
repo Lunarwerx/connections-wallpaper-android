@@ -63,7 +63,7 @@ class ScheduleSettingsTest {
     fun `individual scheduling splits one album only while the timer it splits is running`() {
         val split = ScheduleSettings(
             enableChanger = true, intervalEnabled = true, separateSchedules = true,
-            homeEnabled = true, lockEnabled = true, homeAlbumId = "album", lockAlbumId = "album"
+            homeEnabled = true, lockEnabled = true, homeAlbumIds = listOf("album"), lockAlbumIds = listOf("album")
         )
         assertEquals(setOf(ScreenType.HOME, ScreenType.LOCK), split.activeScreens(WallpaperMode.STATIC))
         // Its switch is hidden with the timer or the changer off, so the kept choice must not split the picture then.
@@ -84,9 +84,9 @@ class ScheduleSettingsTest {
         val current = ScheduleSettings()
         listOf(
             current.copy(enableChanger = true),
-            current.copy(homeAlbumId = "home"),
-            current.copy(lockAlbumId = "lock"),
-            current.copy(liveAlbumId = "live"),
+            current.copy(homeAlbumIds = listOf("home")),
+            current.copy(lockAlbumIds = listOf("lock")),
+            current.copy(liveAlbumIds = listOf("live")),
             current.copy(homeEnabled = true),
             current.copy(lockEnabled = true),
             current.copy(homeIntervalMinutes = 120),

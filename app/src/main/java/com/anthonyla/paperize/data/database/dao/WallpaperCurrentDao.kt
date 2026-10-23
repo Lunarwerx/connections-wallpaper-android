@@ -13,24 +13,26 @@ import kotlinx.coroutines.flow.Flow
 interface WallpaperCurrentDao {
 
     /**
-     * Return the wallpaper entity that was last applied for this album/screen,
+     * Return the wallpaper entity most recently applied for these albums on this screen,
      * or null if none has been recorded yet (or if it was deleted via CASCADE).
      */
     @Query("""
         SELECT w.* FROM wallpapers w
         INNER JOIN wallpaper_current wc ON w.id = wc.wallpaperId
-        WHERE wc.albumId = :albumId AND wc.screenType = :screenType
+        WHERE wc.albumId IN (:albumIds) AND wc.screenType = :screenType
+        ORDER BY wc.appliedAt DESC
         LIMIT 1
     """)
-    suspend fun getCurrentWallpaper(albumId: String, screenType: ScreenType): WallpaperEntity?
+    suspend fun getCurrentWallpaper(albumIds: List<String>, screenType: ScreenType): WallpaperEntity?
 
     @Query("""
         SELECT w.* FROM wallpapers w
         INNER JOIN wallpaper_current wc ON w.id = wc.wallpaperId
-        WHERE wc.albumId = :albumId AND wc.screenType = :screenType
+        WHERE wc.albumId IN (:albumIds) AND wc.screenType = :screenType
+        ORDER BY wc.appliedAt DESC
         LIMIT 1
     """)
-    fun getCurrentWallpaperFlow(albumId: String, screenType: ScreenType): Flow<WallpaperEntity?>
+    fun getCurrentWallpaperFlow(albumIds: List<String>, screenType: ScreenType): Flow<WallpaperEntity?>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertCurrentWallpaper(entity: WallpaperCurrentEntity)

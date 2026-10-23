@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+internal val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
     name = Constants.PREFERENCES_NAME
 )
 
@@ -42,9 +42,19 @@ private val CHANGE_ON_UNLOCK = booleanPreferencesKey(PreferenceKeys.CHANGE_ON_UN
 private val INTERVAL_ENABLED = booleanPreferencesKey(PreferenceKeys.INTERVAL_ENABLED)
 private val HOME_ENABLED = booleanPreferencesKey(PreferenceKeys.HOME_ENABLED)
 private val LOCK_ENABLED = booleanPreferencesKey(PreferenceKeys.LOCK_ENABLED)
-private val HOME_ALBUM_ID = stringPreferencesKey(PreferenceKeys.HOME_ALBUM_ID)
-private val LOCK_ALBUM_ID = stringPreferencesKey(PreferenceKeys.LOCK_ALBUM_ID)
-private val LIVE_ALBUM_ID = stringPreferencesKey(PreferenceKeys.LIVE_ALBUM_ID)
+private val HOME_ALBUM_IDS = stringPreferencesKey(PreferenceKeys.HOME_ALBUM_IDS)
+private val LOCK_ALBUM_IDS = stringPreferencesKey(PreferenceKeys.LOCK_ALBUM_IDS)
+private val LIVE_ALBUM_IDS = stringPreferencesKey(PreferenceKeys.LIVE_ALBUM_IDS)
+private val HOME_ALBUM_ID_LEGACY = stringPreferencesKey(PreferenceKeys.HOME_ALBUM_ID)
+private val LOCK_ALBUM_ID_LEGACY = stringPreferencesKey(PreferenceKeys.LOCK_ALBUM_ID)
+private val LIVE_ALBUM_ID_LEGACY = stringPreferencesKey(PreferenceKeys.LIVE_ALBUM_ID)
+/** Single-album key from an older build to the list key it becomes. */
+private val LEGACY_ALBUM_KEYS = listOf(
+    HOME_ALBUM_ID_LEGACY to HOME_ALBUM_IDS,
+    LOCK_ALBUM_ID_LEGACY to LOCK_ALBUM_IDS,
+    LIVE_ALBUM_ID_LEGACY to LIVE_ALBUM_IDS
+)
+private const val ALBUM_ID_SEPARATOR = "\n"
 private val HOME_INTERVAL_MINUTES = intPreferencesKey(PreferenceKeys.HOME_INTERVAL_MINUTES)
 private val LOCK_INTERVAL_MINUTES = intPreferencesKey(PreferenceKeys.LOCK_INTERVAL_MINUTES)
 private val LIVE_INTERVAL_MINUTES = intPreferencesKey(PreferenceKeys.LIVE_INTERVAL_MINUTES)
@@ -111,6 +121,7 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun updateScheduleSettings(transform: (ScheduleSettings) -> ScheduleSettings): ScheduleSettings {
         val updated = dataStore.edit { prefs ->
+            prefs.migrateLegacyAlbumIds()
             val settings = transform(scheduleSettings(prefs))
             prefs[ENABLE_CHANGER] = settings.enableChanger
             prefs[SEPARATE_SCHEDULES] = settings.separateSchedules
@@ -119,9 +130,9 @@ class SettingsRepositoryImpl @Inject constructor(
             prefs[INTERVAL_ENABLED] = settings.intervalEnabled
             prefs[HOME_ENABLED] = settings.homeEnabled
             prefs[LOCK_ENABLED] = settings.lockEnabled
-            prefs.setOrRemove(HOME_ALBUM_ID, settings.homeAlbumId)
-            prefs.setOrRemove(LOCK_ALBUM_ID, settings.lockAlbumId)
-            prefs.setOrRemove(LIVE_ALBUM_ID, settings.liveAlbumId)
+            prefs.setAlbumIds(HOME_ALBUM_IDS, settings.homeAlbumIds)
+            prefs.setAlbumIds(LOCK_ALBUM_IDS, settings.lockAlbumIds)
+            prefs.setAlbumIds(LIVE_ALBUM_IDS, settings.liveAlbumIds)
             prefs[HOME_INTERVAL_MINUTES] = settings.homeIntervalMinutes
             prefs[LOCK_INTERVAL_MINUTES] = settings.lockIntervalMinutes
             prefs[LIVE_INTERVAL_MINUTES] = settings.liveIntervalMinutes
@@ -142,33 +153,50 @@ class SettingsRepositoryImpl @Inject constructor(
         dataStore.edit { it.clear() }
     }
 
-    override suspend fun updateAlbumId(screen: ScreenType, albumId: String?) {
-        dataStore.edit { prefs -> albumIdKeys(screen).forEach { prefs.setOrRemove(it, albumId) } }
+    override suspend fun updateAlbumIds(screen: ScreenType, ids: List<String>) {
+        dataStore.edit { prefs ->
+            prefs.migrateLegacyAlbumIds()
+            val distinct = ids.distinct()
+            albumIdKeys(screen).forEach { prefs.setAlbumIds(it, distinct) }
+        }
     }
 
     override suspend fun clearAlbumSelectionsIfMatches(albumId: String): Boolean {
         var wasCleared = false
         dataStore.edit { prefs ->
-            val targets = listOf(HOME_ALBUM_ID, LOCK_ALBUM_ID, LIVE_ALBUM_ID).filter { prefs[it] == albumId }
-            targets.forEach { prefs.remove(it) }
-            wasCleared = targets.isNotEmpty()
+            prefs.migrateLegacyAlbumIds()
+            wasCleared = removeAlbumFromSelections(prefs, albumId, ALL_ALBUM_KEYS)
         }
         return wasCleared
     }
 
     override suspend fun clearEmptyAlbumSelection(albumId: String, screen: ScreenType) {
         dataStore.edit { prefs ->
-            val targets = albumIdKeys(screen).filter { prefs[it] == albumId }
-            if (targets.isEmpty()) return@edit
-            targets.forEach { prefs.remove(it) }
-            val active = if (WallpaperMode.fromString(prefs[WALLPAPER_MODE]) == WallpaperMode.LIVE) {
-                prefs[LIVE_ALBUM_ID] != null
-            } else {
-                (prefs[HOME_ENABLED] == true && prefs[HOME_ALBUM_ID] != null) ||
-                    (prefs[LOCK_ENABLED] == true && prefs[LOCK_ALBUM_ID] != null)
-            }
-            if (!active) prefs[ENABLE_CHANGER] = false
+            prefs.migrateLegacyAlbumIds()
+            removeAlbumFromSelections(prefs, albumId, albumIdKeys(screen))
         }
+    }
+
+    /**
+     * Takes [albumId] out of the [keys] lists. Rotation turns off when no screen has an album left.
+     * Returns whether any list held it.
+     */
+    private fun removeAlbumFromSelections(
+        prefs: MutablePreferences,
+        albumId: String,
+        keys: List<Preferences.Key<String>>
+    ): Boolean {
+        val holding = keys.filter { albumId in prefs.albumIds(it) }
+        if (holding.isEmpty()) return false
+        holding.forEach { key -> prefs.setAlbumIds(key, prefs.albumIds(key) - albumId) }
+        val active = if (WallpaperMode.fromString(prefs[WALLPAPER_MODE]) == WallpaperMode.LIVE) {
+            prefs.albumIds(LIVE_ALBUM_IDS).isNotEmpty()
+        } else {
+            (prefs[HOME_ENABLED] == true && prefs.albumIds(HOME_ALBUM_IDS).isNotEmpty()) ||
+                (prefs[LOCK_ENABLED] == true && prefs.albumIds(LOCK_ALBUM_IDS).isNotEmpty())
+        }
+        if (!active) prefs[ENABLE_CHANGER] = false
+        return true
     }
 
     override suspend fun updateDarkMode(dark: Boolean?) {
@@ -212,9 +240,9 @@ class SettingsRepositoryImpl @Inject constructor(
             intervalEnabled = prefs[INTERVAL_ENABLED] ?: defaults.intervalEnabled,
             homeEnabled = prefs[HOME_ENABLED] ?: defaults.homeEnabled,
             lockEnabled = prefs[LOCK_ENABLED] ?: defaults.lockEnabled,
-            homeAlbumId = prefs[HOME_ALBUM_ID],
-            lockAlbumId = prefs[LOCK_ALBUM_ID],
-            liveAlbumId = prefs[LIVE_ALBUM_ID],
+            homeAlbumIds = prefs.albumIdsOrLegacy(HOME_ALBUM_IDS, HOME_ALBUM_ID_LEGACY),
+            lockAlbumIds = prefs.albumIdsOrLegacy(LOCK_ALBUM_IDS, LOCK_ALBUM_ID_LEGACY),
+            liveAlbumIds = prefs.albumIdsOrLegacy(LIVE_ALBUM_IDS, LIVE_ALBUM_ID_LEGACY),
             homeIntervalMinutes = prefs[HOME_INTERVAL_MINUTES] ?: defaults.homeIntervalMinutes,
             lockIntervalMinutes = prefs[LOCK_INTERVAL_MINUTES] ?: defaults.lockIntervalMinutes,
             liveIntervalMinutes = prefs[LIVE_INTERVAL_MINUTES] ?: defaults.liveIntervalMinutes,
@@ -265,10 +293,35 @@ class SettingsRepositoryImpl @Inject constructor(
         if (value != null) this[key] = value else remove(key)
     }
 
-    private fun albumIdKeys(screen: ScreenType) = when (screen) {
-        ScreenType.HOME -> listOf(HOME_ALBUM_ID)
-        ScreenType.LOCK -> listOf(LOCK_ALBUM_ID)
-        ScreenType.BOTH -> listOf(HOME_ALBUM_ID, LOCK_ALBUM_ID)
-        ScreenType.LIVE -> listOf(LIVE_ALBUM_ID)
+    /** One-time move of the single-album keys to the list keys: a value with no list key becomes a one-item list. */
+    private fun MutablePreferences.migrateLegacyAlbumIds() {
+        LEGACY_ALBUM_KEYS.forEach { (legacy, list) ->
+            val legacyId = this[legacy]
+            if (legacyId != null && this[list] == null) this[list] = legacyId
+            remove(legacy)
+        }
     }
+
+    /** Ordered ids of [key], newline-joined; no key means no albums. */
+    private fun Preferences.albumIds(key: Preferences.Key<String>): List<String> =
+        this[key]?.split(ALBUM_ID_SEPARATOR)?.filter { it.isNotBlank() } ?: emptyList()
+
+    /** Reads an older build's single id when the list key was never written. */
+    private fun Preferences.albumIdsOrLegacy(
+        key: Preferences.Key<String>,
+        legacy: Preferences.Key<String>
+    ): List<String> = if (this[key] != null) albumIds(key) else listOfNotNull(this[legacy])
+
+    private fun MutablePreferences.setAlbumIds(key: Preferences.Key<String>, ids: List<String>) {
+        if (ids.isEmpty()) remove(key) else this[key] = ids.joinToString(ALBUM_ID_SEPARATOR)
+    }
+
+    private fun albumIdKeys(screen: ScreenType): List<Preferences.Key<String>> = when (screen) {
+        ScreenType.HOME -> listOf(HOME_ALBUM_IDS)
+        ScreenType.LOCK -> listOf(LOCK_ALBUM_IDS)
+        ScreenType.BOTH -> listOf(HOME_ALBUM_IDS, LOCK_ALBUM_IDS)
+        ScreenType.LIVE -> listOf(LIVE_ALBUM_IDS)
+    }
+
+    private val ALL_ALBUM_KEYS = listOf(HOME_ALBUM_IDS, LOCK_ALBUM_IDS, LIVE_ALBUM_IDS)
 }

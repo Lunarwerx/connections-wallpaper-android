@@ -35,20 +35,36 @@ class SettingsCoordinator @Inject constructor(
 ) {
     private val mutex = Mutex()
 
-    suspend fun selectAlbum(screen: ScreenType, albumId: String?) = mutex.withLock {
-        settingsRepository.updateAlbumId(screen, albumId)
+    /**
+     * Sets [screen]'s albums to [albumIds] in one write. When the set changed, the screen's queues are dropped so
+     * the next change draws from the new set, and a rotating screen changes its wallpaper now. Empty clears the albums.
+     */
+    suspend fun setAlbums(screen: ScreenType, albumIds: List<String>) = mutex.withLock {
+        val previous = settingsRepository.getScheduleSettings().albumIds(screen)
+        settingsRepository.updateAlbumIds(screen, albumIds)
+        val changed = previous.toSet() != albumIds.toSet()
         val mode = settingsRepository.getWallpaperMode()
         var settings = settingsRepository.getScheduleSettings()
-        if (albumId == null && settings.activeScreens(mode).isEmpty()) {
+        if (albumIds.isEmpty() && settings.activeScreens(mode).isEmpty()) {
             settingsRepository.updateEnableChanger(false)
             settings = settings.copy(enableChanger = false)
         }
+        if (changed) clearQueues(screen)
         scheduler.updateSchedules(settings, mode)
-        if (albumId != null && settings.enableChanger && settings.hasRequiredAlbums(mode) && mode == WallpaperMode.STATIC) {
-            val active = settings.activeScreens(mode)
+        val active = settings.activeScreens(mode)
+        val rotates = screen in active || ScreenType.BOTH in active
+        if (changed && rotates && settings.enableChanger && settings.hasRequiredAlbums(mode) && mode == WallpaperMode.STATIC) {
             WallpaperChangeService.changeWallpaper(context, if (ScreenType.BOTH in active) ScreenType.BOTH else screen)
         }
     }
+
+    /** Drops the queued pictures of the queues [screen] covers, so the next change draws from its current albums. */
+    private suspend fun clearQueues(screen: ScreenType) {
+        val queues = if (screen == ScreenType.BOTH) listOf(ScreenType.HOME, ScreenType.LOCK) else listOf(screen)
+        queues.forEach { wallpaperRepository.clearScreenQueue(it) }
+    }
+
+    private fun List<String>.withAlbum(albumId: String): List<String> = if (albumId in this) this else this + albumId
 
     /**
      * A new album goes where it was added from: the [screen] whose picker added it, or every enabled
@@ -63,10 +79,13 @@ class SettingsCoordinator @Inject constructor(
         val after = settingsRepository.updateScheduleSettings { current ->
             before = current
             val adopted = when {
-                mode == WallpaperMode.LIVE ->
-                    if (screen != null || current.liveAlbumId == null) current.copy(liveAlbumId = albumId) else current
-                screen == ScreenType.HOME -> current.copy(homeEnabled = true, homeAlbumId = albumId)
-                screen == ScreenType.LOCK -> current.copy(lockEnabled = true, lockAlbumId = albumId)
+                mode == WallpaperMode.LIVE -> when {
+                    screen != null -> current.copy(liveAlbumIds = current.liveAlbumIds.withAlbum(albumId))
+                    current.liveAlbumIds.isEmpty() -> current.copy(liveAlbumIds = listOf(albumId))
+                    else -> current
+                }
+                screen == ScreenType.HOME -> current.copy(homeEnabled = true, homeAlbumIds = current.homeAlbumIds.withAlbum(albumId))
+                screen == ScreenType.LOCK -> current.copy(lockEnabled = true, lockAlbumIds = current.lockAlbumIds.withAlbum(albumId))
                 else -> {
                     val noneOn = !current.homeEnabled && !current.lockEnabled
                     val home = current.homeEnabled || noneOn
@@ -74,22 +93,26 @@ class SettingsCoordinator @Inject constructor(
                     current.copy(
                         homeEnabled = home,
                         lockEnabled = lock,
-                        homeAlbumId = if (home && current.homeAlbumId == null) albumId else current.homeAlbumId,
-                        lockAlbumId = if (lock && current.lockAlbumId == null) albumId else current.lockAlbumId
+                        homeAlbumIds = if (home && current.homeAlbumIds.isEmpty()) listOf(albumId) else current.homeAlbumIds,
+                        lockAlbumIds = if (lock && current.lockAlbumIds.isEmpty()) listOf(albumId) else current.lockAlbumIds
                     )
                 }
             }
             if (current.activeScreens(mode).isEmpty() && adopted.hasRequiredAlbums(mode)) adopted.copy(enableChanger = true) else adopted
         }
         if (after == before) return@withLock false
+        // The new album joins the queues of the screens that gained it, so the next change can draw from it.
+        if (after.homeAlbumIds != before.homeAlbumIds) clearQueues(ScreenType.HOME)
+        if (after.lockAlbumIds != before.lockAlbumIds) clearQueues(ScreenType.LOCK)
+        if (after.liveAlbumIds != before.liveAlbumIds) clearQueues(ScreenType.LIVE)
         scheduler.updateSchedules(after, mode)
         if (mode == WallpaperMode.LIVE) {
             return@withLock after.enableChanger && !PaperizeLiveWallpaperService.isActive(context)
         }
         if (after.enableChanger && after.hasRequiredAlbums(mode)) {
             val both = ScreenType.BOTH in after.activeScreens(mode)
-            val home = after.homeAlbumId != before.homeAlbumId
-            val lock = after.lockAlbumId != before.lockAlbumId
+            val home = after.homeAlbumIds != before.homeAlbumIds
+            val lock = after.lockAlbumIds != before.lockAlbumIds
             when {
                 home && lock -> WallpaperChangeService.changeWallpaper(context)
                 home -> WallpaperChangeService.changeWallpaper(context, if (both) ScreenType.BOTH else ScreenType.HOME)
@@ -122,9 +145,9 @@ class SettingsCoordinator @Inject constructor(
             // A screen switched off keeps its album for when it is on again; activeScreens skips it.
             draft.copy(
                 enableChanger = current.enableChanger,
-                homeAlbumId = current.homeAlbumId,
-                lockAlbumId = current.lockAlbumId,
-                liveAlbumId = current.liveAlbumId
+                homeAlbumIds = current.homeAlbumIds,
+                lockAlbumIds = current.lockAlbumIds,
+                liveAlbumIds = current.liveAlbumIds
             ).validate()
         }
         if (previous.shuffleEnabled != updated.shuffleEnabled) {
@@ -195,7 +218,7 @@ class SettingsCoordinator @Inject constructor(
         val settings = settingsRepository.getScheduleSettings()
         when (val mode = settingsRepository.getWallpaperMode()) {
             WallpaperMode.LIVE ->
-                if (settings.liveAlbumId != null && settings.enableChanger && !PaperizeLiveWallpaperService.isActive(context)) {
+                if (settings.liveAlbumIds.isNotEmpty() && settings.enableChanger && !PaperizeLiveWallpaperService.isActive(context)) {
                     settingsRepository.updateEnableChanger(false)
                     scheduler.cancelAllWallpaperChanges()
                 }

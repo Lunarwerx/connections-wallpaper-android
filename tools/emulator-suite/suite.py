@@ -484,8 +484,9 @@ def t_home_fill_empty_slot():
     open_tab("Wallpaper")
     check(tab_top_has("Home album"), "the Home album row is on screen")
     cw.tap("Home album")
+    cw.tap(FOLDER)  # the picker is multi-select: unchecks the album Home uses, so the new one is all Home rotates
     cw.tap(second)
-    cw.d.press("back")
+    cw.tap("Done")
     check(wait_until(lambda: cw.labels().count(second) == 1, 6), f"Home uses {second}, Lock keeps {FOLDER}")
     open_tab("Library")
     cw.tap(second)
@@ -1044,8 +1045,8 @@ def t_library_picture_streams():
     if not cw.has("Lock album"):
         cw.tap("Lock")
     cw.tap("Lock album")
-    cw.tap("Streamed")
-    cw.d.press("back")
+    cw.tap("Streamed")  # multi-select: a tap checks the row, Done applies the picker's choices
+    cw.tap("Done")
     if not switch_state("Wallpaper changing"):
         cw.tap("Wallpaper changing")
     before = ids()

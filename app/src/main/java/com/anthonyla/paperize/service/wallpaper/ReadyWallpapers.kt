@@ -48,13 +48,13 @@ class ReadyWallpapers @Inject constructor(
     suspend fun prepare(screens: Collection<ScreenType>, settings: ScheduleSettings) {
         val wanted = LinkedHashMap<Key, Wallpaper>()
         for (screen in screens) {
-            val (albumId, queue) = when (screen) {
-                ScreenType.HOME, ScreenType.BOTH -> settings.homeAlbumId to ScreenType.HOME
-                ScreenType.LOCK -> settings.lockAlbumId to ScreenType.LOCK
+            val (albumIds, queue) = when (screen) {
+                ScreenType.HOME, ScreenType.BOTH -> settings.homeAlbumIds to ScreenType.HOME
+                ScreenType.LOCK -> settings.lockAlbumIds to ScreenType.LOCK
                 ScreenType.LIVE -> continue
             }
-            if (albumId == null) continue
-            val next = peek(albumId, queue, settings.shuffleEnabled) ?: continue
+            if (albumIds.isEmpty()) continue
+            val next = peek(albumIds, queue, settings.shuffleEnabled) ?: continue
             val drawnFor = when {
                 screen != ScreenType.BOTH -> listOf(screen)
                 settings.homeAndLockLookAlike -> listOf(ScreenType.HOME)
@@ -93,12 +93,12 @@ class ReadyWallpapers @Inject constructor(
         return synchronized(drawings) { drawing.file }
     }
 
-    /** The next wallpaper of [albumId]'s [queue] when it was drawn ahead: taken off the queue, with its file. */
-    suspend fun takeNext(albumId: String, queue: ScreenType, settings: ScheduleSettings): PreparedWallpaper? {
-        val next = wallpaperRepository.peekNextWallpaper(albumId, queue) ?: return null
+    /** The next wallpaper of [albumIds]' [queue] when it was drawn ahead: taken off the queue, with its file. */
+    suspend fun takeNext(albumIds: List<String>, queue: ScreenType, settings: ScheduleSettings): PreparedWallpaper? {
+        val next = wallpaperRepository.peekNextWallpaper(albumIds, queue) ?: return null
         val file = take(next.id, queue, settings) ?: return null
         val taken = try {
-            wallpaperRepository.getAndDequeueWallpaper(albumId, queue)
+            wallpaperRepository.getAndDequeueWallpaper(albumIds, queue)
         } catch (e: Exception) {
             file.delete()
             throw e
@@ -106,16 +106,16 @@ class ReadyWallpapers @Inject constructor(
         if (taken?.id != next.id) {
             // The queue moved while the drawing finished (an album refresh): its new head is drawn as usual.
             file.delete()
-            taken?.let { wallpaperRepository.restoreWallpaperToQueueFront(albumId, queue, it.id) }
+            taken?.let { wallpaperRepository.restoreWallpaperToQueueFront(albumIds, queue, it.id) }
             return null
         }
-        return PreparedWallpaper(WallpaperImage.Encoded(file), albumId, queue, next.id, settings.shuffleEnabled)
+        return PreparedWallpaper(WallpaperImage.Encoded(file), albumIds, next.albumId, queue, next.id, settings.shuffleEnabled)
     }
 
-    private suspend fun peek(albumId: String, queue: ScreenType, shuffle: Boolean): Wallpaper? =
-        wallpaperRepository.peekNextWallpaper(albumId, queue) ?: run {
-            wallpaperRepository.ensureWallpaperQueue(albumId, queue, shuffle)
-            wallpaperRepository.peekNextWallpaper(albumId, queue)
+    private suspend fun peek(albumIds: List<String>, queue: ScreenType, shuffle: Boolean): Wallpaper? =
+        wallpaperRepository.peekNextWallpaper(albumIds, queue) ?: run {
+            wallpaperRepository.ensureWallpaperQueue(albumIds, queue, shuffle)
+            wallpaperRepository.peekNextWallpaper(albumIds, queue)
         }
 
     private suspend fun draw(wallpaper: Wallpaper, screen: ScreenType, settings: ScheduleSettings): File? {

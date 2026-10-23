@@ -294,7 +294,7 @@ fun HomeScreen(
                                 appSettings = appSettings,
                                 wallpaperMode = mode,
                                 onToggleChanger = viewModel::setChangerEnabled,
-                                onSelectAlbum = viewModel::selectAlbum,
+                                onSetAlbums = viewModel::setAlbums,
                                 onUpdateScheduleSettings = viewModel::updateScheduleSettings,
                                 onUpdateScheduleSettingsDebounced = viewModel::updateScheduleSettingsDebounced,
                                 onChangeWallpaperNow = viewModel::changeWallpaperNow,

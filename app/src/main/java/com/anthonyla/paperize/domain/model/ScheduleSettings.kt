@@ -11,8 +11,9 @@ data class ScheduleSettings(
     val shuffleEnabled: Boolean = false,
     val homeEnabled: Boolean = false,
     val lockEnabled: Boolean = false,
-    val homeAlbumId: String? = null,
-    val lockAlbumId: String? = null,
+    /** Ordered, distinct album ids the screen rotates through; empty means no album. */
+    val homeAlbumIds: List<String> = emptyList(),
+    val lockAlbumIds: List<String> = emptyList(),
     val homeIntervalMinutes: Int = Constants.DEFAULT_INTERVAL_MINUTES,
     val lockIntervalMinutes: Int = Constants.DEFAULT_INTERVAL_MINUTES,
     val liveIntervalMinutes: Int = Constants.DEFAULT_INTERVAL_MINUTES,
@@ -21,7 +22,7 @@ data class ScheduleSettings(
     val homeScrollingEnabled: Boolean = false,
     val homeEffects: WallpaperEffects = WallpaperEffects(),
     val lockEffects: WallpaperEffects = WallpaperEffects(),
-    val liveAlbumId: String? = null,
+    val liveAlbumIds: List<String> = emptyList(),
     val liveScalingType: ScalingType = ScalingType.FILL,
     val liveEffects: WallpaperEffects = WallpaperEffects(),
     val adaptiveBrightness: Boolean = false,
@@ -57,20 +58,29 @@ data class ScheduleSettings(
     }
 
     fun hasRequiredAlbums(mode: WallpaperMode): Boolean = when (mode) {
-        WallpaperMode.LIVE -> liveAlbumId != null
+        WallpaperMode.LIVE -> liveAlbumIds.isNotEmpty()
         WallpaperMode.STATIC -> (homeEnabled || lockEnabled) &&
-            (!homeEnabled || homeAlbumId != null) && (!lockEnabled || lockAlbumId != null)
+            (!homeEnabled || homeAlbumIds.isNotEmpty()) && (!lockEnabled || lockAlbumIds.isNotEmpty())
     }
 
     fun activeScreens(mode: WallpaperMode): Set<ScreenType> {
-        if (mode == WallpaperMode.LIVE) return if (liveAlbumId != null) setOf(ScreenType.LIVE) else emptySet()
-        val home = homeEnabled && homeAlbumId != null
-        val lock = lockEnabled && lockAlbumId != null
-        if (home && lock && homeAlbumId == lockAlbumId && !appliesSeparateSchedules) return setOf(ScreenType.BOTH)
+        if (mode == WallpaperMode.LIVE) return if (liveAlbumIds.isNotEmpty()) setOf(ScreenType.LIVE) else emptySet()
+        val home = homeEnabled && homeAlbumIds.isNotEmpty()
+        val lock = lockEnabled && lockAlbumIds.isNotEmpty()
+        if (home && lock && homeAlbumIds.toSet() == lockAlbumIds.toSet() && !appliesSeparateSchedules) {
+            return setOf(ScreenType.BOTH)
+        }
         return buildSet {
             if (home) add(ScreenType.HOME)
             if (lock) add(ScreenType.LOCK)
         }
+    }
+
+    /** The albums [screen] rotates. BOTH shares the home list, since both screens hold the same set when they are synced. */
+    fun albumIds(screen: ScreenType): List<String> = when (screen) {
+        ScreenType.HOME, ScreenType.BOTH -> homeAlbumIds
+        ScreenType.LOCK -> lockAlbumIds
+        ScreenType.LIVE -> liveAlbumIds
     }
 
     /**
@@ -78,22 +88,22 @@ data class ScheduleSettings(
      * rotates, so switching modes keeps the pictures that were showing. Albums it already has stay.
      */
     fun carriedInto(mode: WallpaperMode): ScheduleSettings = when (mode) {
-        WallpaperMode.LIVE -> if (liveAlbumId != null) this else copy(
-            liveAlbumId = when {
-                homeEnabled && homeAlbumId != null -> homeAlbumId
-                lockEnabled && lockAlbumId != null -> lockAlbumId
-                else -> homeAlbumId ?: lockAlbumId
+        WallpaperMode.LIVE -> if (liveAlbumIds.isNotEmpty()) this else copy(
+            liveAlbumIds = when {
+                homeEnabled && homeAlbumIds.isNotEmpty() -> homeAlbumIds
+                lockEnabled && lockAlbumIds.isNotEmpty() -> lockAlbumIds
+                else -> homeAlbumIds.ifEmpty { lockAlbumIds }
             }
         )
-        WallpaperMode.STATIC -> if (liveAlbumId == null || hasRequiredAlbums(WallpaperMode.STATIC)) this else {
+        WallpaperMode.STATIC -> if (liveAlbumIds.isEmpty() || hasRequiredAlbums(WallpaperMode.STATIC)) this else {
             val noneOn = !homeEnabled && !lockEnabled
             val home = homeEnabled || noneOn
             val lock = lockEnabled || noneOn
             copy(
                 homeEnabled = home,
                 lockEnabled = lock,
-                homeAlbumId = if (home) homeAlbumId ?: liveAlbumId else homeAlbumId,
-                lockAlbumId = if (lock) lockAlbumId ?: liveAlbumId else lockAlbumId
+                homeAlbumIds = if (home) homeAlbumIds.ifEmpty { liveAlbumIds } else homeAlbumIds,
+                lockAlbumIds = if (lock) lockAlbumIds.ifEmpty { liveAlbumIds } else lockAlbumIds
             )
         }
     }
@@ -132,9 +142,9 @@ data class ScheduleSettings(
         return enableChanger != other.enableChanger ||
                changeOnUnlock != other.changeOnUnlock ||
                intervalEnabled != other.intervalEnabled ||
-               homeAlbumId != other.homeAlbumId ||
-               lockAlbumId != other.lockAlbumId ||
-               liveAlbumId != other.liveAlbumId ||
+               homeAlbumIds != other.homeAlbumIds ||
+               lockAlbumIds != other.lockAlbumIds ||
+               liveAlbumIds != other.liveAlbumIds ||
                homeEnabled != other.homeEnabled ||
                lockEnabled != other.lockEnabled ||
                homeIntervalMinutes != other.homeIntervalMinutes ||

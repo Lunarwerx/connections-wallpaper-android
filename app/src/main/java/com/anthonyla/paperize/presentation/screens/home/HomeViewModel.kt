@@ -61,11 +61,11 @@ class HomeViewModel @Inject constructor(
      * Reading the source URI (rather than WallpaperManager.getDrawable) avoids the storage permission
      * the preview would otherwise need. Falls back to the BOTH-mode record when home/lock are synced.
      */
-    val currentHomeWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.HOME) { it.homeAlbumId }
+    val currentHomeWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.HOME) { it.homeAlbumIds }
 
-    val currentLockWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LOCK) { it.lockAlbumId }
+    val currentLockWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LOCK) { it.lockAlbumIds }
 
-    val currentLiveWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LIVE) { it.liveAlbumId }
+    val currentLiveWallpaperUri: StateFlow<String?> = currentWallpaperUri(ScreenType.LIVE) { it.liveAlbumIds }
 
     /** True from a look edit until its redrawn wallpaper is on the phone. */
     val applyingLook: StateFlow<Boolean> = coordinator.reapplying.stateWhileSubscribed(viewModelScope, false)
@@ -153,8 +153,8 @@ class HomeViewModel @Inject constructor(
         }.also { job -> job.invokeOnCompletion { _importProgress.value = ImportProgress.Idle } }
     }
 
-    fun selectAlbum(screen: ScreenType, album: AlbumSummary?) {
-        viewModelScope.launch { coordinator.selectAlbum(screen, album?.id) }
+    fun setAlbums(screen: ScreenType, albumIds: List<String>) {
+        viewModelScope.launch { coordinator.setAlbums(screen, albumIds) }
     }
 
     fun setChangerEnabled(enabled: Boolean) {
@@ -190,21 +190,21 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch { if (coordinator.changeWallpaperNow()) _showLiveWallpaperPrompt.value = true }
     }
 
-    /** A picture set from outside the library while it shows, else the album's current one. */
+    /** A picture set from outside the library while it shows, else the most recent one of the screen's albums. */
     @OptIn(ExperimentalCoroutinesApi::class)
-    private fun currentWallpaperUri(screen: ScreenType, albumId: (ScheduleSettings) -> String?): StateFlow<String?> =
+    private fun currentWallpaperUri(screen: ScreenType, albumIds: (ScheduleSettings) -> List<String>): StateFlow<String?> =
         combine(
             settingsRepository.getShownPictureFlow(screen),
             scheduleSettings
-                .map(albumId)
+                .map(albumIds)
                 .distinctUntilChanged()
-                .flatMapLatest { id -> if (id == null) flowOf(null) else currentWallpaperUriFlow(id, screen) }
+                .flatMapLatest { ids -> if (ids.isEmpty()) flowOf(null) else currentWallpaperUriFlow(ids, screen) }
         ) { shown, current -> shown ?: current }
             .stateWhileSubscribed(viewModelScope, null)
 
-    private fun currentWallpaperUriFlow(albumId: String, screen: ScreenType): Flow<String?> = combine(
-        wallpaperRepository.getCurrentWallpaperFlow(albumId, screen),
-        wallpaperRepository.getCurrentWallpaperFlow(albumId, ScreenType.BOTH)
+    private fun currentWallpaperUriFlow(albumIds: List<String>, screen: ScreenType): Flow<String?> = combine(
+        wallpaperRepository.getCurrentWallpaperFlow(albumIds, screen),
+        wallpaperRepository.getCurrentWallpaperFlow(albumIds, ScreenType.BOTH)
     ) { specific, both -> (specific ?: both)?.uri }
 
     private companion object {

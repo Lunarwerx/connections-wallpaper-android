@@ -177,37 +177,39 @@ class ConnectionsAnalytics @Inject constructor(
                 if (pairs.isEmpty()) {
                     flowOf(emptyList<Shown>())
                 } else {
-                    combine(pairs.map { (screen, albumId) ->
-                        wallpaperRepository.getCurrentWallpaperFlow(albumId, screen).map { Shown(screen, albumId, it) }
+                    combine(pairs.map { (screen, albumIds) ->
+                        wallpaperRepository.getCurrentWallpaperFlow(albumIds, screen).map { Shown(screen, albumIds.size, it) }
                     }) { it.toList() }
                 }
             }
             .collect { shown ->
                 shown.forEach { entry ->
                     val wallpaper = entry.wallpaper ?: return@forEach
-                    val key = "${entry.screen}|${entry.albumId}"
+                    val key = entry.screen.name
                     val earlier = lastSeen.put(key, wallpaper.id)
                     // The first value seen is the baseline, not a change.
                     if (earlier != null && earlier != wallpaper.id) {
-                        wallpaperChanged(entry.screen, entry.albumId, wallpaper, currentTrigger())
+                        wallpaperChanged(entry.screen, entry.albumCount, wallpaper, currentTrigger())
                     }
                 }
             }
     }
 
     /** The live engine changed its picture, on its timer or a double tap. It keeps no current-wallpaper row, so it says so here. */
-    fun liveWallpaperShown(albumId: String, wallpaper: Wallpaper) {
-        wallpaperChanged(ScreenType.LIVE, albumId, wallpaper, "live")
+    fun liveWallpaperShown(albumIds: List<String>, wallpaper: Wallpaper) {
+        wallpaperChanged(ScreenType.LIVE, albumIds.size, wallpaper, "live")
     }
 
-    private fun wallpaperChanged(screen: ScreenType, albumId: String, wallpaper: Wallpaper, trigger: String) {
+    /** [albumCount] is how many albums the screen rotates; the album the picture came from is [wallpaper]'s. */
+    private fun wallpaperChanged(screen: ScreenType, albumCount: Int, wallpaper: Wallpaper, trigger: String) {
         enqueue(
             Kind.TRACK,
             name = "Wallpaper Changed",
             properties = mapOf(
                 "screen" to screen.name.lowercase(),
-                "album_id" to albumId,
-                "album_name" to albumNames[albumId],
+                "album_count" to albumCount,
+                "album_id" to wallpaper.albumId,
+                "album_name" to albumNames[wallpaper.albumId],
                 "file_name" to wallpaper.displayFileName,
                 "trigger" to trigger
             )
@@ -225,14 +227,10 @@ class ConnectionsAnalytics @Inject constructor(
     }
 
     private fun identifyTraits(s: Snapshot): Map<String, Any?> {
-        val names = s.albums.associate { it.id to it.name }
         return settingsTraits(s.app, s.mode, s.schedule) + mapOf(
             "album_count" to s.albums.size,
             "wallpaper_count" to s.albums.sumOf { it.wallpaperCount },
             "albums" to s.albums.take(AnalyticsConfig.MAX_ALBUMS_IN_TRAITS).map { albumProperties(it) },
-            "home_album_name" to s.schedule.homeAlbumId?.let { names[it] },
-            "lock_album_name" to s.schedule.lockAlbumId?.let { names[it] },
-            "live_album_name" to s.schedule.liveAlbumId?.let { names[it] },
             "account_state" to accountLabel(s.account),
             "trial_days_left" to (s.account as? AccountState.Trial)?.daysLeft,
             "install_time" to AnalyticsPayload.isoTime(AnalyticsDevice.snapshot(context).installedAt)
@@ -317,11 +315,11 @@ class ConnectionsAnalytics @Inject constructor(
         return if (System.currentTimeMillis() - at <= AnalyticsConfig.TRIGGER_HINT_TTL_MS) name else UNKNOWN_TRIGGER
     }
 
-    private fun shownAlbums(s: ScheduleSettings): List<Pair<ScreenType, String>> = listOfNotNull(
-        s.homeAlbumId?.let { ScreenType.HOME to it },
-        s.lockAlbumId?.let { ScreenType.LOCK to it },
-        s.homeAlbumId?.let { ScreenType.BOTH to it }
-    )
+    private fun shownAlbums(s: ScheduleSettings): List<Pair<ScreenType, List<String>>> = listOf(
+        ScreenType.HOME to s.homeAlbumIds,
+        ScreenType.LOCK to s.lockAlbumIds,
+        ScreenType.BOTH to s.homeAlbumIds
+    ).filter { it.second.isNotEmpty() }
 
     private data class Snapshot(
         val app: AppSettings,
@@ -331,7 +329,7 @@ class ConnectionsAnalytics @Inject constructor(
         val account: AccountState
     )
 
-    private data class Shown(val screen: ScreenType, val albumId: String, val wallpaper: Wallpaper?)
+    private data class Shown(val screen: ScreenType, val albumCount: Int, val wallpaper: Wallpaper?)
 }
 
 private fun albumProperties(album: AlbumSummary): Map<String, Any?> = mapOf(
