@@ -19,16 +19,32 @@ import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import io.mockk.verify
+import com.anthonyla.paperize.domain.model.Wallpaper
+import com.anthonyla.paperize.domain.source.UpcomingPictures
 
 class ChangeWallpaperUseCaseTest {
 
     private val repository = mockk<WallpaperRepository>(relaxed = true)
     private val renderer = mockk<WallpaperRenderer>()
+    private val upcoming = mockk<UpcomingPictures>(relaxed = true)
     private val useCase = ChangeWallpaperUseCase(
         wallpaperRepository = repository,
         settingsRepository = mockk<SettingsRepository>(relaxed = true),
-        renderer = renderer
+        renderer = renderer,
+        upcoming = upcoming
     )
+
+    @Test
+    fun `complete fetches the next picture of that screen ahead of its change`() = runTest {
+        val prepared = preparedWallpaper()
+        val next = Wallpaper(id = "next", albumId = prepared.albumId, uri = "content://next", fileName = "next", dateModified = 0)
+        coEvery { repository.peekNextWallpaper(prepared.albumId, ScreenType.HOME) } returns next
+
+        useCase.complete(prepared, ScreenType.HOME)
+
+        verify(exactly = 1) { upcoming.warm(next) }
+    }
 
     @Test
     fun `complete records current then synchronizes exact queue item`() = runTest {

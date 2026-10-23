@@ -26,7 +26,7 @@ fun OfflineResultsEffect(
     LaunchedEffect(results) {
         results.collect { result ->
             when (result) {
-                is OfflineResult.Saved -> {
+                is OfflineResult.Added -> {
                     haptics.performHapticFeedback(HapticFeedbackType.Confirm)
                     val answer = snackbarHostState.showSnackbar(
                         message = resources.getString(R.string.connections_collection_in_library, result.name),
@@ -34,8 +34,10 @@ fun OfflineResultsEffect(
                     )
                     if (answer == SnackbarResult.ActionPerformed) onOpenAlbum(result.albumId)
                 }
+                is OfflineResult.Downloaded ->
+                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_collection_downloaded, result.name))
                 is OfflineResult.Partly ->
-                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_collection_library_partly, result.saved, result.total))
+                    snackbarHostState.showSnackbar(resources.getString(R.string.connections_collection_download_partly, result.saved, result.total))
                 is OfflineResult.SignInNeeded -> onSignInNeeded(result.id)
                 is OfflineResult.Failed -> {
                     haptics.performHapticFeedback(HapticFeedbackType.Reject)

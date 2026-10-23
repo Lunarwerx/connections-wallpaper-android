@@ -12,6 +12,11 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.work.Configuration
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
+import com.anthonyla.paperize.connections.ConnectionsPictures
+import com.anthonyla.paperize.connections.PictureImages
 import com.anthonyla.paperize.core.constants.Constants
 import com.anthonyla.paperize.connections.analytics.ConnectionsAnalytics
 import com.anthonyla.paperize.core.WallpaperMode
@@ -29,7 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 
 @HiltAndroidApp
-class PaperizeApplication : Application(), Configuration.Provider, DefaultLifecycleObserver {
+class PaperizeApplication : Application(), Configuration.Provider, DefaultLifecycleObserver, SingletonImageLoader.Factory {
 
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
@@ -50,6 +55,18 @@ class PaperizeApplication : Application(), Configuration.Provider, DefaultLifecy
     lateinit var wallpaperChangeLock: WallpaperChangeLock
 
     private var night = false
+
+    @Inject
+    lateinit var pictures: ConnectionsPictures
+
+    /** Library pictures draw from what the phone holds, or their gallery preview, never a fetch for a thumbnail (PictureImages). */
+    override fun newImageLoader(context: PlatformContext): ImageLoader {
+        val images = PictureImages(pictures)
+        return ImageLoader.Builder(context).components {
+            add(images.forUri)
+            add(images.forString)
+        }.build()
+    }
 
     override fun onCreate() {
         super<Application>.onCreate()

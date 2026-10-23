@@ -16,7 +16,9 @@ import com.anthonyla.paperize.domain.repository.AlbumRepository
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
 import com.anthonyla.paperize.domain.source.DocumentSource
+import com.anthonyla.paperize.domain.source.UpcomingPictures
 import com.anthonyla.paperize.domain.source.WallpaperRenderer
+import com.anthonyla.paperize.connections.ConnectionsPictures
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -44,6 +46,9 @@ object AppModule {
 
     @Provides
     fun provideWallpaperRenderer(renderer: AndroidWallpaperRenderer): WallpaperRenderer = renderer
+
+    @Provides
+    fun provideUpcomingPictures(pictures: ConnectionsPictures): UpcomingPictures = pictures
 
     @Provides
     fun provideAlbumRepository(repository: AlbumRepositoryImpl): AlbumRepository = repository

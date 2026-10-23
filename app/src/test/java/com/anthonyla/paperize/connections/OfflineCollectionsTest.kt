@@ -33,12 +33,12 @@ class OfflineCollectionsTest {
 
     @After fun tearDown() = runTest { collections.close() }
 
-    private fun offline() = OfflineCollections(api, ConnectionsLibrary(account, originals), albums, collections.store)
+    private fun offline() = OfflineCollections(api, ConnectionsLibrary(account, originals), originals, albums, collections.store)
 
-    @Test fun `signed out, Save offline asks for the account and fetches nothing`() = runTest {
+    @Test fun `signed out, Add to library asks for the account and fetches nothing`() = runTest {
         coEvery { account.accessToken(any()) } returns null
 
-        val result = offline().save(art)
+        val result = offline().add(art)
 
         assertEquals(OfflineResult.SignInNeeded(art.id), result)
         coVerify(exactly = 0) { api.wallpapers(any(), any(), any(), any()) }
@@ -46,7 +46,7 @@ class OfflineCollectionsTest {
         assertEquals(emptyList<WallpaperCollection>(), collections.store.all.first())
     }
 
-    @Test fun `signed in, a gallery collection is saved page by page into one album and opens offline from what it saved`() = runTest {
+    @Test fun `signed in, a gallery collection is read page by page into one album at once, with no picture downloaded`() = runTest {
         coEvery { account.accessToken(any()) } returns "token"
         coEvery { api.wallpapers("", "art", null, null) } returns
             ConnectionsWallpaperPage(listOf(galleryWallpaper("a"), galleryWallpaper("b")), nextCursor = "page-2")
@@ -56,17 +56,28 @@ class OfflineCollectionsTest {
         coEvery { albums.getAlbumByName("Art") } returns null
         coEvery { albums.createAlbum("Art", null) } returns Album(id = "album-1", name = "Art", coverUri = null)
 
-        val result = offline().save(art)
+        val result = offline().add(art)
 
-        assertEquals(OfflineResult.Saved(art.id, "Art", 3, "album-1"), result)
-        coVerify(exactly = 1) { originals.keepOffline(galleryWallpaper("a")) }
-        coVerify(exactly = 1) { originals.keepOffline(galleryWallpaper("b")) }
-        coVerify(exactly = 1) { originals.keepOffline(galleryWallpaper("c")) }
+        assertEquals(OfflineResult.Added(art.id, "Art", 3, "album-1"), result)
+        coVerify(exactly = 0) { originals.keepOffline(any()) }
         coVerify(exactly = 1) { originals.addAllToAlbum(listOf(galleryWallpaper("a"), galleryWallpaper("b"), galleryWallpaper("c")), "album-1") }
         val saved = collections.store.all.first().single()
         assertEquals(listOf("a", "b", "c"), saved.wallpapers.map { it.id })
         assertEquals(listOf("a", "b", "c"), saved.savedIds)
         assertEquals("album-1", saved.albumId)
         assertNotNull(saved.savedAt)
+    }
+
+    @Test fun `Download goes on from the originals already on the phone and keeps going past one that fails`() = runTest {
+        val pictures = listOf(galleryWallpaper("a"), galleryWallpaper("b"), galleryWallpaper("c"))
+        collections.store.recordSave(art, pictures, "album-1", pictures.map { it.id }, complete = true, now = 1)
+        coEvery { originals.downloaded(pictures) } returns setOf("a")
+        coEvery { originals.keepOffline(galleryWallpaper("b")) } throws java.io.IOException("offline")
+
+        val result = offline().download(art)
+
+        assertEquals(OfflineResult.Partly(art.id, "Art", 2, 3), result)
+        coVerify(exactly = 0) { originals.keepOffline(galleryWallpaper("a")) }
+        coVerify(exactly = 1) { originals.keepOffline(galleryWallpaper("c")) }
     }
 }

@@ -20,12 +20,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Where a collection stands offline. */
+/** Where a collection stands in the Library. */
 sealed interface OfflineState {
-    data object NotSaved : OfflineState
-    data class Saving(val done: Int, val total: Int) : OfflineState
-    data object Saved : OfflineState
-    /** Saved before, and it now holds pictures that save did not. */
+    data object NotAdded : OfflineState
+    /** Being added: its list is being read. */
+    data object Adding : OfflineState
+    /** In the Library; [downloaded] of its [total] originals are on the phone. */
+    data class Added(val downloaded: Int, val total: Int) : OfflineState
+    data class Downloading(val done: Int, val total: Int) : OfflineState
+    /** Added before, and it now holds pictures that add did not. */
     data object Stale : OfflineState
 }
 
@@ -38,10 +41,13 @@ data class CollectionUiState(
     val failed: Boolean = false,
     /** An own collection that is no longer on the phone (deleted). */
     val missing: Boolean = false,
-    val offline: OfflineState = OfflineState.NotSaved,
+    val offline: OfflineState = OfflineState.NotAdded,
     /** What the phone keeps of its pictures, by id, so a saved collection shows with no internet. */
     val images: Map<String, Any> = emptyMap()
 )
+
+/** What runs for a collection now: a download's progress, an add, and how many of its originals are on the phone. */
+private data class Activity(val download: OfflineProgress?, val adding: Boolean, val downloaded: Int)
 
 /** The gallery's pages of one tag, as far as they have been read. */
 private data class TagPages(
@@ -72,13 +78,11 @@ class CollectionViewModel @Inject constructor(
     private val record = collections.all.map { all -> all.firstOrNull { it.id == id } }.distinctUntilChanged()
     private val pages = MutableStateFlow(TagPages())
     private val images = MutableStateFlow<Map<String, Any>>(emptyMap())
+    private val downloaded = MutableStateFlow(0)
+    private val download = offline.progress.map { it[id] }.distinctUntilChanged()
+    private val activity = combine(download, offline.adding.map { id in it }.distinctUntilChanged(), downloaded, ::Activity)
 
-    val state: StateFlow<CollectionUiState> = combine(
-        record,
-        pages,
-        offline.progress.map { it[id] }.distinctUntilChanged(),
-        images
-    ) { record, pages, progress, images ->
+    val state: StateFlow<CollectionUiState> = combine(record, pages, activity, images) { record, pages, activity, images ->
         val list = listFor(record, pages)
         val own = tag == null
         CollectionUiState(
@@ -89,12 +93,12 @@ class CollectionViewModel @Inject constructor(
             loading = !own && pages.loading,
             failed = !own && pages.failed,
             missing = own && record == null,
-            offline = offlineState(record, pages, list, progress),
+            offline = offlineState(record, pages, list, activity),
             images = images
         )
     }.stateWhileSubscribed(viewModelScope, CollectionUiState(own = tag == null))
 
-    /** How a save offline of this collection went, wherever it was started. */
+    /** How an add or a download of this collection went, wherever it was started. */
     val results: Flow<OfflineResult> = offline.results.filter { it.id == id }
 
     init {
@@ -102,10 +106,11 @@ class CollectionViewModel @Inject constructor(
             load(cursor = null)
             loadCount(tag)
         }
-        // A saved collection's pictures show from the phone, offline too.
+        // A downloaded collection's pictures show from the phone, offline too; the count follows a download as it runs.
         viewModelScope.launch {
-            combine(record, pages) { record, pages -> record to listFor(record, pages) }.collectLatest { (record, list) ->
+            combine(record, pages, download) { record, pages, _ -> record to listFor(record, pages) }.collectLatest { (record, list) ->
                 images.value = if (record?.savedIds.isNullOrEmpty()) emptyMap() else originals.localImages(list)
+                downloaded.value = record?.let { originals.downloaded(it.wallpapers).size } ?: 0
             }
         }
     }
@@ -121,10 +126,13 @@ class CollectionViewModel @Inject constructor(
         if (pages.value.loaded) loadMore() else load(cursor = null)
     }
 
-    /** Adds it to the Library, kept on the phone as an album; the account is asked for first (OfflineCollections). */
-    fun saveOffline() = offline.start(id)
+    /** Adds it to the Library as an album, at once; the account is asked for first (OfflineCollections). */
+    fun addToLibrary() = offline.start(id)
 
-    fun stopSaving() = offline.stop(id)
+    /** Keeps its originals on the phone, so it rotates with no internet. */
+    fun download() = offline.download(id)
+
+    fun stopDownload() = offline.stop(id)
 
     fun rename(name: String) {
         viewModelScope.launch { runCatchingCancellable { collections.rename(id, name) } }
@@ -142,17 +150,13 @@ class CollectionViewModel @Inject constructor(
         else -> record?.wallpapers.orEmpty()
     }
 
-    private fun offlineState(
-        record: WallpaperCollection?,
-        pages: TagPages,
-        list: List<ConnectionsWallpaper>,
-        progress: OfflineProgress?
-    ): OfflineState {
-        if (progress != null) return OfflineState.Saving(progress.done, progress.total)
-        if (record?.savedAt == null) return OfflineState.NotSaved
+    private fun offlineState(record: WallpaperCollection?, pages: TagPages, list: List<ConnectionsWallpaper>, activity: Activity): OfflineState {
+        activity.download?.let { return OfflineState.Downloading(it.done, it.total) }
+        if (activity.adding) return OfflineState.Adding
+        if (record?.savedAt == null) return OfflineState.NotAdded
         val saved = record.savedIds.toSet()
         val grown = list.any { it.id !in saved } || (tag != null && (pages.total ?: 0) > saved.size)
-        return if (grown) OfflineState.Stale else OfflineState.Saved
+        return if (grown) OfflineState.Stale else OfflineState.Added(activity.downloaded, record.wallpapers.size)
     }
 
     private fun load(cursor: String?) {

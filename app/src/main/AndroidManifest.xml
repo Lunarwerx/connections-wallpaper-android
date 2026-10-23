@@ -64,6 +64,12 @@
                 android:resource="@xml/connections_files" />
         </provider>
 
+        <!-- Library pictures from the Connections gallery, held by reference and fetched once, when one is first opened -->
+        <provider
+            android:name="com.anthonyla.paperize.connections.ConnectionsPictureProvider"
+            android:authorities="${applicationId}.pictures"
+            android:exported="false" />
+
         <!-- Main Activity -->
         <activity
             android:name=".presentation.MainActivity"

@@ -29,23 +29,17 @@ class ConnectionsLibraryTest {
         coVerify(exactly = 0) { originals.addAllToAlbum(any(), any()) }
     }
 
-    @Test fun `signed in, N pictures are kept and added to one album named once`() = runTest {
+    @Test fun `signed in, N pictures join one album named once, and nothing is downloaded`() = runTest {
         coEvery { account.accessToken(any()) } returns "token"
         coEvery { originals.addAllToAlbum(any(), any()) } returns 3
         val wallpapers = listOf(galleryWallpaper("a"), galleryWallpaper("b"), galleryWallpaper("c"))
         var namings = 0
-        val progress = mutableListOf<Pair<Int, Int>>()
 
-        val result = library.addToAlbum(
-            pick = { wallpapers },
-            albumFor = { namings++; "album-1" },
-            onProgress = { done, total -> progress += done to total }
-        )
+        val result = library.addToAlbum(pick = { wallpapers }, albumFor = { namings++; "album-1" })
 
-        assertEquals(LibraryAdd.Added("album-1", wallpapers, wallpapers, 3), result)
-        wallpapers.forEach { coVerify(exactly = 1) { originals.keepOffline(it) } }
+        assertEquals(LibraryAdd.Added("album-1", wallpapers, 3), result)
         coVerify(exactly = 1) { originals.addAllToAlbum(wallpapers, "album-1") }
+        coVerify(exactly = 0) { originals.keepOffline(any()) }
         assertEquals(1, namings)
-        assertEquals(listOf(0 to 3, 1 to 3, 2 to 3, 3 to 3), progress)
     }
 }

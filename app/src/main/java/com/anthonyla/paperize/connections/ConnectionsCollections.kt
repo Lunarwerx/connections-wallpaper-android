@@ -41,7 +41,7 @@ data class WallpaperCollection(
     /** The gallery tag it follows; null for one of the member's own. */
     val tag: String? = null,
     val wallpapers: List<ConnectionsWallpaper> = emptyList(),
-    /** When it was last saved offline whole, the album that holds its originals, and which pictures that save held. */
+    /** When it was last added to the Library whole, the album that holds it, and which pictures that add held. */
     val savedAt: Long? = null,
     val albumId: String? = null,
     val savedIds: List<String> = emptyList(),
@@ -59,10 +59,10 @@ data class CollectionCard(
     val cover: Any?,
     val color: String?,
     val own: Boolean,
-    /** In the Library: added whole, so its originals are on the phone. */
+    /** In the Library: added whole, as an album. */
     val offline: Boolean,
-    /** How far an add to the Library has got while one runs; null when none does. */
-    val adding: OfflineProgress? = null
+    /** How far a download of its originals has got while one runs; null when none does. */
+    val downloading: OfflineProgress? = null
 )
 
 /**
@@ -179,9 +179,9 @@ class ConnectionsCollections internal constructor(private val store: DataStore<P
     }
 
     /**
-     * Records a save offline: the album that holds the originals and which pictures it held, and when every one
-     * of them was saved ([complete]). A gallery tag's collection is kept from here on with the pictures it saved;
-     * one of the member's own that was deleted while it saved stays deleted.
+     * Records an add to the Library: the album that holds it and which pictures it held, and when every one of them
+     * was added ([complete]). A gallery tag's collection is kept from here on with the pictures it added; one of the
+     * member's own that was deleted while it was added stays deleted.
      */
     suspend fun recordSave(
         collection: WallpaperCollection,

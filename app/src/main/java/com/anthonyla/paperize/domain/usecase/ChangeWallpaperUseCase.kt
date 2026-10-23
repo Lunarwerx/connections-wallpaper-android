@@ -11,6 +11,7 @@ import com.anthonyla.paperize.domain.model.Wallpaper
 import com.anthonyla.paperize.domain.model.WallpaperImage
 import com.anthonyla.paperize.domain.repository.SettingsRepository
 import com.anthonyla.paperize.domain.repository.WallpaperRepository
+import com.anthonyla.paperize.domain.source.UpcomingPictures
 import com.anthonyla.paperize.domain.source.WallpaperRenderer
 import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
@@ -29,7 +30,8 @@ import kotlinx.coroutines.withContext
 class ChangeWallpaperUseCase @Inject constructor(
     private val wallpaperRepository: WallpaperRepository,
     private val settingsRepository: SettingsRepository,
-    private val renderer: WallpaperRenderer
+    private val renderer: WallpaperRenderer,
+    private val upcoming: UpcomingPictures
 ) {
     suspend operator fun invoke(albumId: String, screenType: ScreenType): PreparedWallpaper {
         val settings = settingsRepository.getScheduleSettings()
@@ -105,6 +107,8 @@ class ChangeWallpaperUseCase @Inject constructor(
             // reintroduced at the head of a freshly built queue.
             wallpaperRepository.removeWallpaperFromQueue(albumId, screenType, wallpaperId)
         }.onFailure { Log.w(TAG, "Queue sync failed; it will rebuild on the next change", it) }
+        // A picture from the network comes to the phone now, so the next change does not wait on it.
+        runCatchingCancellable { wallpaperRepository.peekNextWallpaper(albumId, screenType) }.getOrNull()?.let(upcoming::warm)
     }
 
     /** Restore a prepared item after WallpaperManager rejected it. */

@@ -12,15 +12,19 @@
   <string name="connections_collection_empty">点按壁纸上的书签，即可添加到这里</string>
   <string name="connections_update_library">更新资料库</string>
   <string name="connections_in_library">已在资料库中</string>
-  <string name="connections_adding_to_library">正在添加 %1$d / %2$d</string>
-  <string name="connections_stop_adding">停止添加</string>
+  <string name="connections_adding">正在添加…</string>
+  <string name="connections_download">下载</string>
+  <string name="connections_downloaded">已下载</string>
+  <string name="connections_downloading">正在下载 %1$d / %2$d</string>
+  <string name="connections_stop_download">停止下载</string>
   <string name="connections_collection_in_library">%1$s 已在你的资料库中</string>
-  <string name="connections_collection_library_partly">已将 %1$d / %2$d 张添加到资料库，再添加一次即可完成</string>
+  <string name="connections_collection_downloaded">%1$s 已下载</string>
+  <string name="connections_collection_download_partly">已下载 %1$d / %2$d 张，再下载一次即可完成</string>
   <string name="connections_collection_library_sign_in">将 %1$s 添加到你的资料库</string>
   <plurals name="connections_collections_library_sign_in">
     <item quantity="other">将 %1$d 个合集添加到你的资料库</item>
   </plurals>
-  <string name="connections_offline_sign_in_body">没有网络也能打开，还能作为相册轮换。使用免费的 Connections 账号即可。</string>
+  <string name="connections_offline_sign_in_body">它会作为相册轮换。使用免费的 Connections 账号即可。</string>
   <string name="connections_rename">重命名</string>
   <string name="connections_delete">删除</string>
   <string name="connections_more_options">更多选项</string>

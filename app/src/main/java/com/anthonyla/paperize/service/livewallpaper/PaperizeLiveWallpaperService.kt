@@ -21,7 +21,7 @@ import com.anthonyla.paperize.core.ScalingType
 import com.anthonyla.paperize.core.ScreenType
 import com.anthonyla.paperize.core.WallpaperMode
 import com.anthonyla.paperize.core.constants.Constants
-import com.anthonyla.paperize.core.util.isValid
+import com.anthonyla.paperize.core.util.canOpen
 import com.anthonyla.paperize.domain.model.ScheduleSettings
 import com.anthonyla.paperize.domain.model.Wallpaper
 import com.anthonyla.paperize.domain.model.WallpaperEffects
@@ -222,9 +222,10 @@ class PaperizeLiveWallpaperService : GLWallpaperService() {
                     Log.w(TAG, "No wallpapers in album $albumId")
                     return empty
                 }
-                // Skip unreadable items without deleting them: a permission or storage issue may be
-                // transient. AlbumRefreshWorker prunes documents that are actually gone.
-                if (candidate.uri.toUri().isValid(contentResolver)) {
+                // Skip unreadable items without deleting them: a permission or storage issue, or no internet for a
+                // Library picture the phone does not hold yet, may be transient. AlbumRefreshWorker prunes documents
+                // that are actually gone. Opening it here is also what brings a Library picture to the phone.
+                if (candidate.uri.toUri().canOpen(contentResolver)) {
                     return OpenedArtwork(ContentUriImageLoader(contentResolver, candidate.uri.toUri(), settings.liveScalingType)) {
                         currentWallpaper = candidate
                         // Recorded as the album's current picture, as a static change records its own, so the app shows

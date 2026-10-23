@@ -23,6 +23,8 @@ import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.DownloadDone
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LibraryAdd
 import androidx.compose.material.icons.outlined.LibraryAddCheck
@@ -112,7 +114,7 @@ fun CollectionScreen(
         if (pendingSave && accountState is AccountState.SignedIn) {
             pendingSave = false
             showAccount = false
-            viewModel.saveOffline()
+            viewModel.addToLibrary()
         }
     }
 
@@ -126,9 +128,9 @@ fun CollectionScreen(
         onOpenAlbum = onOpenAlbum
     )
 
-    val saveOffline = {
+    val addToLibrary = {
         if (signedIn) {
-            viewModel.saveOffline()
+            viewModel.addToLibrary()
         } else {
             pendingSave = true
             showAccount = true
@@ -196,8 +198,9 @@ fun CollectionScreen(
                 OfflineControl(
                     offline = state.offline,
                     enabled = state.count > 0,
-                    onSave = saveOffline,
-                    onStop = viewModel::stopSaving
+                    onAdd = addToLibrary,
+                    onDownload = viewModel::download,
+                    onStop = viewModel::stopDownload
                 )
             }
             Box(modifier = Modifier.fillMaxSize()) {
@@ -308,50 +311,68 @@ fun CollectionScreen(
     }
 }
 
-/** Add to library, how far an add has got (and Stop), In your library, or Update library when it has grown since. */
+/**
+ * Add to library (instant), In your library with Download beside it until every original is on the phone, how far a
+ * download has got (and Stop), or Update library when the collection has grown since it was added.
+ */
 @Composable
-private fun OfflineControl(offline: OfflineState, enabled: Boolean, onSave: () -> Unit, onStop: () -> Unit) {
+private fun OfflineControl(offline: OfflineState, enabled: Boolean, onAdd: () -> Unit, onDownload: () -> Unit, onStop: () -> Unit) {
     when (offline) {
-        OfflineState.NotSaved -> FilledTonalButton(onClick = onSave, enabled = enabled) {
+        OfflineState.NotAdded -> FilledTonalButton(onClick = onAdd, enabled = enabled) {
             Icon(Icons.Outlined.LibraryAdd, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.connections_add_to_library))
         }
-        OfflineState.Stale -> FilledTonalButton(onClick = onSave, enabled = enabled) {
+        OfflineState.Adding -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            Text(stringResource(R.string.connections_adding), style = MaterialTheme.typography.labelLarge)
+        }
+        OfflineState.Stale -> FilledTonalButton(onClick = onAdd, enabled = enabled) {
             Icon(Icons.Outlined.Sync, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(stringResource(R.string.connections_update_library))
         }
-        is OfflineState.Saving -> Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        is OfflineState.Downloading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CircularProgressIndicator(
                 progress = { if (offline.total > 0) offline.done.toFloat() / offline.total else 0f },
                 modifier = Modifier.size(18.dp),
                 strokeWidth = 2.dp
             )
             Text(
-                text = stringResource(R.string.connections_adding_to_library, offline.done, offline.total),
+                text = stringResource(R.string.connections_downloading, offline.done, offline.total),
                 style = MaterialTheme.typography.labelLarge
             )
             IconButton(onClick = onStop) {
-                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.connections_stop_adding))
+                Icon(Icons.Outlined.Close, contentDescription = stringResource(R.string.connections_stop_download))
             }
         }
-        OfflineState.Saved -> Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
+        is OfflineState.Added -> Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.LibraryAddCheck,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(stringResource(R.string.connections_in_library), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            if (offline.downloaded < offline.total) {
+                IconButton(onClick = onDownload) {
+                    Icon(Icons.Outlined.Download, contentDescription = stringResource(R.string.connections_download))
+                }
+            } else {
                 Icon(
-                    Icons.Outlined.LibraryAddCheck,
-                    contentDescription = null,
+                    Icons.Outlined.DownloadDone,
+                    contentDescription = stringResource(R.string.connections_downloaded),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.padding(horizontal = 12.dp).size(20.dp)
                 )
-                Text(stringResource(R.string.connections_in_library), style = MaterialTheme.typography.labelLarge)
             }
         }
     }

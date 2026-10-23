@@ -10,19 +10,23 @@
   <string name="connections_collection_name_taken">You already have a collection with this name</string>
   <string name="connections_save_to_collection">Save to collection</string>
   <string name="connections_collection_empty">Tap the bookmark on a wallpaper to add it here</string>
-  <!-- A whole collection added to the Library: every original is kept on the phone, in one album, so it works offline. -->
+  <!-- A whole collection added to the Library: an album at once, each picture fetched when it first shows. Download keeps every original on the phone. -->
   <string name="connections_update_library">Update library</string>
   <string name="connections_in_library">In your library</string>
-  <string name="connections_adding_to_library">Adding %1$d of %2$d</string>
-  <string name="connections_stop_adding">Stop adding</string>
+  <string name="connections_adding">Adding…</string>
+  <string name="connections_download">Download</string>
+  <string name="connections_downloaded">Downloaded</string>
+  <string name="connections_downloading">Downloading %1$d of %2$d</string>
+  <string name="connections_stop_download">Stop download</string>
   <string name="connections_collection_in_library">%1$s is in your library</string>
-  <string name="connections_collection_library_partly">Added %1$d of %2$d to your library. Add again to finish</string>
+  <string name="connections_collection_downloaded">%1$s is downloaded</string>
+  <string name="connections_collection_download_partly">Downloaded %1$d of %2$d. Download again to finish</string>
   <string name="connections_collection_library_sign_in">Add %1$s to your library</string>
   <plurals name="connections_collections_library_sign_in">
     <item quantity="one">Add %1$d collection to your library</item>
     <item quantity="other">Add %1$d collections to your library</item>
   </plurals>
-  <string name="connections_offline_sign_in_body">It opens with no internet, and rotates as an album. Free with a Connections account.</string>
+  <string name="connections_offline_sign_in_body">It rotates as an album. Free with a Connections account.</string>
   <string name="connections_rename">Rename</string>
   <string name="connections_delete">Delete</string>
   <string name="connections_more_options">More options</string>

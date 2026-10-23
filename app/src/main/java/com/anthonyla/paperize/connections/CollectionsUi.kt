@@ -244,15 +244,15 @@ internal fun CollectionCardTile(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 4.dp)
         ) {
-            val adding = card.adding
-            if (adding != null) {
+            val downloading = card.downloading
+            if (downloading != null) {
                 CircularProgressIndicator(
-                    progress = { if (adding.total > 0) adding.done.toFloat() / adding.total else 0f },
+                    progress = { if (downloading.total > 0) downloading.done.toFloat() / downloading.total else 0f },
                     modifier = Modifier.size(12.dp),
                     strokeWidth = 1.5.dp
                 )
                 Text(
-                    text = stringResource(R.string.connections_adding_to_library, adding.done, adding.total),
+                    text = stringResource(R.string.connections_downloading, downloading.done, downloading.total),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

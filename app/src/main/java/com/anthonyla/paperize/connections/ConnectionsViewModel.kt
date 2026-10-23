@@ -102,7 +102,7 @@ class ConnectionsViewModel @Inject constructor(
             }.flowOn(Dispatchers.IO),
             offline.progress
         ) { cards, progress ->
-            if (progress.isEmpty()) cards else cards.map { card -> progress[card.id]?.let { card.copy(adding = it) } ?: card }
+            if (progress.isEmpty()) cards else cards.map { card -> progress[card.id]?.let { card.copy(downloading = it) } ?: card }
         }.stateWhileSubscribed(viewModelScope, emptyList())
 
     /** How each collection's Library add went, wherever it was started. */
@@ -239,15 +239,11 @@ class ConnectionsViewModel @Inject constructor(
             }
             when (result) {
                 LibraryAdd.SignInNeeded -> _libraryWaiting.value = request
-                is LibraryAdd.Failed -> {
-                    _libraryWaiting.value = null
-                    _messages.send(ConnectionsMessage.Failed(result.reason))
-                }
                 is LibraryAdd.Added -> {
                     _libraryWaiting.value = null
                     _messages.send(
-                        if (result.kept.isNotEmpty() && result.added == 0) ConnectionsMessage.AlreadyInAlbum
-                        else ConnectionsMessage.AddedToLibrary(result.albumId, albumName, result.kept.size)
+                        if (result.added == 0) ConnectionsMessage.AlreadyInAlbum
+                        else ConnectionsMessage.AddedToLibrary(result.albumId, albumName, result.added)
                     )
                 }
             }

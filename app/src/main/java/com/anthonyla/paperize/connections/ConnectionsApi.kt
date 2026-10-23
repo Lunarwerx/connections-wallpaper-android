@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.io.File
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
@@ -63,7 +64,16 @@ data class ConnectionsDownload(
     val url: String,
     val fileName: String,
     val contentType: String
-)
+) {
+    /** The file extension of what [url] serves. */
+    val extension: String get() = when (contentType) {
+        "image/jpeg" -> "jpg"
+        "image/png" -> "png"
+        "image/webp" -> "webp"
+        "image/avif" -> "avif"
+        else -> fileName.substringAfterLast('.', "jpg")
+    }
+}
 
 @Serializable
 private data class ConnectionsRefusal(val error: String? = null, val message: String? = null)
@@ -97,6 +107,10 @@ class ConnectionsApi @Inject constructor() {
     suspend fun full(id: String): ConnectionsDownload =
         json.decodeFromString(request("GET", "/v1/wallpapers/full?id=${URLEncoder.encode(id, "UTF-8")}"))
 
+    /** A short-lived URL to the compact screen copy (WebP, sized for any screen): what a Library picture shows until it is downloaded. */
+    suspend fun screen(id: String): ConnectionsDownload =
+        json.decodeFromString(request("GET", "/v1/wallpapers/screen?id=${URLEncoder.encode(id, "UTF-8")}"))
+
     /** The original to save to the phone, counted as a download; [token] is the member's AEGIS access token (ConnectionsAccount.accessToken). */
     suspend fun download(id: String, token: String): ConnectionsDownload =
         json.decodeFromString(
@@ -112,6 +126,18 @@ class ConnectionsApi @Inject constructor() {
             connection.inputStream.use(write)
         } finally {
             connection.disconnect()
+        }
+    }
+
+    /** Streams [url] into [file], written beside it and renamed, so a copy cut short is never taken for a whole one. */
+    suspend fun readInto(url: String, file: File) = withContext(Dispatchers.IO) {
+        val dir = checkNotNull(file.parentFile).apply { mkdirs() }
+        val part = File(dir, "${file.name}.part")
+        try {
+            readOriginal(url) { input -> part.outputStream().use { input.copyTo(it) } }
+            if (!part.renameTo(file)) throw IOException("${file.name} could not be kept")
+        } finally {
+            part.delete()
         }
     }
 
