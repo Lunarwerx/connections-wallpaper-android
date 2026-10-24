@@ -343,10 +343,12 @@
   <string name="shortcut_next">Next picture</string>
   <string name="shortcut_back">Back, or close what is open</string>
   <string name="connections_remix">Remix</string>
-  <string name="connections_remix_style">Style</string>
+  <string name="connections_remix_style">Remix style</string>
   <string name="connections_remix_style_placeholder">Watercolor, neon, woodcut…</string>
-  <string name="connections_remixing">Remixing</string>
+  <string name="connections_remixing">Remixing · %1$d s</string>
+  <string name="connections_generate">Generate</string>
   <string name="connections_remix_again">Remix again</string>
+  <string name="connections_remix_random">Random style</string>
   <string name="connections_remix_paid">Remix comes with a paid plan.</string>
   <string name="connections_see_plans">See plans</string>
   <string name="connections_remix_out_of_credits">This account has run out of credits.</string>

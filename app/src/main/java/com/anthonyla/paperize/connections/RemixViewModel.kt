@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.core.graphics.scale
@@ -18,6 +19,7 @@ import com.anthonyla.paperize.service.worker.ApplyPictureWorker
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,20 +41,19 @@ enum class RemixFailure { OUT_OF_CREDITS, DECLINED, PAUSED, UNAVAILABLE, FAILED 
 
 /** Where the Remix sheet is. */
 sealed interface RemixStep {
-    /** Asking the gallery whether the member's plan opens Remix. */
-    data object Checking : RemixStep
-    /** It does not: the sheet offers the plans instead. */
-    data object Locked : RemixStep
-    /** Typing a style; [failure] says why the last try came back empty. */
+    /** Typing a style, where the sheet opens; [failure] says why the last try came back empty. */
     data class Ready(val failure: RemixFailure? = null) : RemixStep
-    data object Working : RemixStep
+    /** The member's plan does not open Remix: the sheet offers the plans instead. */
+    data object Locked : RemixStep
+    /** The model is drawing it, since [since] (SystemClock.elapsedRealtime). */
+    data class Working(val since: Long) : RemixStep
     /** The remixed picture, on the phone at [file]. */
     data class Done(val file: File, val width: Int, val height: Int) : RemixStep
 }
 
 data class RemixUiState(
     val wallpaper: ConnectionsWallpaper? = null,
-    val step: RemixStep = RemixStep.Checking,
+    val step: RemixStep = RemixStep.Ready(),
     /** The style the last remix was drawn in. */
     val prompt: String = "",
     val setting: Boolean = false,
@@ -94,10 +95,18 @@ class RemixViewModel @Inject constructor(
     suspend fun suggestedCredit(): String =
         account.session.first()?.name?.trim()?.takeUnless { looksLikeEmail(it) }.orEmpty()
 
-    /** Opens the sheet on [wallpaper]; reopening it on the same one keeps what was there. */
+    private var planCheck: Job? = null
+
+    /**
+     * Opens the sheet on [wallpaper], ready for a style at once; the plan is asked beside it and only swaps the style
+     * for the plans when it does not open Remix. Reopening on the same wallpaper keeps a remix being drawn or drawn.
+     * (2026-10-23: the sheet used to wait on the plan, and one reopened after a sign-in kept that wait with nothing asking.)
+     */
     fun open(wallpaper: ConnectionsWallpaper) {
-        if (_state.value.wallpaper?.id == wallpaper.id && _state.value.step != RemixStep.Locked) return
-        _state.value = RemixUiState(wallpaper = wallpaper)
+        val current = _state.value
+        val same = current.wallpaper?.id == wallpaper.id
+        if (same && (current.step is RemixStep.Working || current.step is RemixStep.Done)) return
+        _state.value = RemixUiState(wallpaper = wallpaper, prompt = if (same) current.prompt else "")
         askPlan()
     }
 
@@ -107,23 +116,27 @@ class RemixViewModel @Inject constructor(
     }
 
     private fun askPlan() {
-        viewModelScope.launch {
+        planCheck?.cancel()
+        planCheck = viewModelScope.launch {
             val me = runCatchingCancellable { withToken { api.me(it) } }
-            val step = when {
-                me.isSuccess -> if (me.getOrThrow().canRemix) RemixStep.Ready() else RemixStep.Locked
-                me.exceptionOrNull() is RemixSignInNeeded -> return@launch _signInNeeded.send(Unit)
-                // The remix itself answers 403 when the plan does not open it, so a failed check still lets them try.
-                else -> RemixStep.Ready()
+            if (me.exceptionOrNull() is RemixSignInNeeded) return@launch _signInNeeded.send(Unit)
+            // A check that failed changes nothing: the remix itself answers 403 when the plan does not open it.
+            val canRemix = me.getOrNull()?.canRemix ?: return@launch
+            _state.update {
+                when {
+                    !canRemix && it.step is RemixStep.Ready -> it.copy(step = RemixStep.Locked)
+                    canRemix && it.step == RemixStep.Locked -> it.copy(step = RemixStep.Ready())
+                    else -> it
+                }
             }
-            _state.update { if (it.step == RemixStep.Checking || it.step == RemixStep.Locked) it.copy(step = step) else it }
         }
     }
 
     fun remix(prompt: String) {
         val wallpaper = _state.value.wallpaper ?: return
         val style = prompt.trim()
-        if (style.isEmpty() || style.length > PROMPT_MAX || _state.value.step == RemixStep.Working) return
-        _state.update { it.copy(step = RemixStep.Working, prompt = style, error = null) }
+        if (style.isEmpty() || style.length > PROMPT_MAX || _state.value.step is RemixStep.Working) return
+        _state.update { it.copy(step = RemixStep.Working(SystemClock.elapsedRealtime()), prompt = style, error = null) }
         viewModelScope.launch {
             val made = runCatchingCancellable {
                 val remix = withToken { api.remix(wallpaper.id, style, it) }

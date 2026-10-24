@@ -339,10 +339,12 @@
   <string name="shortcut_next">下一张图片</string>
   <string name="shortcut_back">返回，或关闭打开的内容</string>
   <string name="connections_remix">重绘</string>
-  <string name="connections_remix_style">风格</string>
+  <string name="connections_remix_style">重绘风格</string>
   <string name="connections_remix_style_placeholder">水彩、霓虹、木刻…</string>
-  <string name="connections_remixing">正在重绘</string>
+  <string name="connections_remixing">正在重绘 · %1$d 秒</string>
+  <string name="connections_generate">生成</string>
   <string name="connections_remix_again">再次重绘</string>
+  <string name="connections_remix_random">随机风格</string>
   <string name="connections_remix_paid">重绘包含在付费方案中。</string>
   <string name="connections_see_plans">查看方案</string>
   <string name="connections_remix_out_of_credits">此账户的积分已用完。</string>

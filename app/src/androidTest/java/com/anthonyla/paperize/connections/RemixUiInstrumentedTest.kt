@@ -2,6 +2,7 @@ package com.anthonyla.paperize.connections
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.SystemClock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -14,20 +15,21 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.test.core.app.ApplicationProvider
 import com.anthonyla.paperize.R
 import com.anthonyla.paperize.presentation.common.theme.ViewerTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
 
-/** The Remix sheet's steps as a member meets them: the upsell, the style, the result, and submitting it to the gallery. */
+/** The Remix sheet's steps as a member meets them: the upsell, the style, the drawing, the result, and submitting it to the gallery. */
 class RemixUiInstrumentedTest {
     @get:Rule val compose = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -73,13 +75,28 @@ class RemixUiInstrumentedTest {
         assertEquals(1, plans)
     }
 
-    @Test fun aPaidPlanRemixesInTheStyleTyped() {
+    /** It opens on the style alone, the picture left to the viewer behind, and nothing is drawn until Generate. */
+    @Test fun aPaidPlanRemixesInTheStyleTypedOrOneTheDiceSuggests() {
         var asked: String? = null
         show(RemixUiState(wallpaper, RemixStep.Ready()), onRemix = { asked = it })
-        compose.onNodeWithText(text(R.string.connections_remix_style)).performTextInput("Watercolor")
+        compose.onNodeWithContentDescription(wallpaper.title).assertDoesNotExist()
+        val remix = compose.onNode(hasText(text(R.string.connections_generate)) and hasClickAction())
+        remix.assertIsNotEnabled()
+        compose.onNodeWithContentDescription(text(R.string.connections_remix_random)).performClick()
+        remix.performClick()
+        assertTrue("the dice fills a listed style, got $asked", asked in REMIX_STYLES)
+        compose.onNodeWithText(text(R.string.connections_remix_style)).performTextReplacement("Watercolor")
         shot(compose.onRoot(), "remix-ready")
-        compose.onNode(hasText(text(R.string.connections_remix)) and hasClickAction()).performClick()
+        remix.performClick()
         assertEquals("Watercolor", asked)
+    }
+
+    @Test fun whileTheModelDrawsTheCardShowsThePictureAndHowLongItHasRun() {
+        show(RemixUiState(wallpaper, RemixStep.Working(SystemClock.elapsedRealtime() - 12_000), prompt = "Watercolor"))
+        compose.onNodeWithContentDescription(wallpaper.title).assertIsDisplayed()
+        val drawing = { seconds: Long -> hasText(context.getString(R.string.connections_remixing, seconds)) }
+        compose.onNode(drawing(12L) or drawing(13L)).assertIsDisplayed()
+        shot(compose.onRoot(), "remix-working")
     }
 
     @Test fun aRemixCanBeSubmittedToTheGallery() {
