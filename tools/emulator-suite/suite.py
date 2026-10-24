@@ -625,7 +625,7 @@ def gallery_sizes() -> dict:
 
 
 def t_explore_set_signed_out():
-    """Signed out, a gallery wallpaper sets at its full size (never the 640px preview); only Save to phone asks for a sign-in."""
+    """Signed out, a gallery wallpaper sets at its full size (never the 640px preview); only Save to phone and Remix ask for a sign-in."""
     sizes = gallery_sizes()
     open_tab("Explore")
     check(cw.has("Search wallpapers", timeout=6), "Explore loads")
@@ -642,6 +642,10 @@ def t_explore_set_signed_out():
     check(max(got) >= min(1920, max(width, height)) and max(got) > 640, f"set at {got[0]}x{got[1]}, the original is {width}x{height}")
     cw.tap("Save to phone")
     check(cw.has("Sign in with Connections", timeout=6), "Save to phone asks a signed-out visitor to sign in")
+    cw.d.press("back")
+    check(wait_until(lambda: not cw.d(text="Sign in with Connections").exists, 4), "back closes the account sheet")
+    cw.tap("Remix")
+    check(cw.has("Sign in with Connections", timeout=6), "Remix asks a signed-out visitor to sign in")
     cw.d.press("back")
 
 

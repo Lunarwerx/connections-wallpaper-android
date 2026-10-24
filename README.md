@@ -28,6 +28,9 @@ gallery, a home-screen button, and a new name.
 - **Explore.** Browse and search the Connections gallery, filter by tag, and swipe through it in a
   full-screen viewer. Set a picture on the home screen, the lock screen or both, or add it to any
   album so it joins the rotation.
+- **Remix.** On a paid Connections plan, Remix draws a gallery picture again in a style you type,
+  charged to your Connections credits. Set the result, add it to an album, save it, or submit it to
+  the gallery under your name, where it waits for review.
 
 ## Sign in with Connections
 

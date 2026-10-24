@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.BookmarkAdd
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.CollectionsBookmark
@@ -45,6 +46,8 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PhotoAlbum
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Wallpaper
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -161,7 +164,9 @@ fun ConnectionsViewer(
     val pagerState = rememberPagerState(initialPage = startIndex.coerceIn(0, wallpapers.lastIndex)) { wallpapers.size }
     var chrome by rememberSaveable { mutableStateOf(true) }
     var sheet by rememberSaveable { mutableStateOf<ViewerSheet?>(null) }
+    var remixing by rememberSaveable { mutableStateOf(false) }
     val current = wallpapers.getOrNull(pagerState.currentPage)
+    val wallpaperSet = stringResource(R.string.connections_set_done)
 
     LaunchedEffect(pagerState, wallpapers.size) {
         snapshotFlow { pagerState.currentPage }.collect { page ->
@@ -236,7 +241,8 @@ fun ConnectionsViewer(
                             onSet = { sheet = ViewerSheet.Target },
                             onCollect = { sheet = ViewerSheet.Collection },
                             onAdd = { sheet = ViewerSheet.Album },
-                            onSave = { if (signedIn) viewModel.saveToPhone(wallpaper) else onSignInNeeded() }
+                            onSave = { if (signedIn) viewModel.saveToPhone(wallpaper) else onSignInNeeded() },
+                            onRemix = { if (signedIn) remixing = true else onSignInNeeded() }
                         )
                     }
                 }
@@ -275,6 +281,18 @@ fun ConnectionsViewer(
             )
             null -> Unit
         }
+        if (current != null && remixing) {
+            RemixSheet(
+                wallpaper = current,
+                albums = albums,
+                onSignInNeeded = onSignInNeeded,
+                onWallpaperSet = {
+                    remixing = false
+                    scope.launch { snackbarHostState.showSnackbar(wallpaperSet) }
+                },
+                onDismiss = { remixing = false }
+            )
+        }
     }
 }
 
@@ -309,7 +327,8 @@ private fun InfoCard(
     onSet: () -> Unit,
     onCollect: () -> Unit,
     onAdd: () -> Unit,
-    onSave: () -> Unit
+    onSave: () -> Unit,
+    onRemix: () -> Unit
 ) {
     val uriHandler = LocalUriHandler.current
     Surface(
@@ -329,7 +348,15 @@ private fun InfoCard(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                // Where the picture comes from sits beside its name, so the actions below fit a narrow phone.
+                // Remix and where the picture comes from sit beside its name, so the actions below fit a narrow phone.
+                AssistChip(
+                    onClick = onRemix,
+                    label = { Text(stringResource(R.string.connections_remix)) },
+                    leadingIcon = {
+                        Icon(Icons.Outlined.AutoAwesome, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize))
+                    },
+                    modifier = Modifier.padding(start = 8.dp)
+                )
                 wallpaper.sourceUrl?.let { source ->
                     IconButton(onClick = { uriHandler.openUri(source) }, modifier = Modifier.size(40.dp)) {
                         Icon(
@@ -405,7 +432,7 @@ private fun InfoCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TargetSheet(onPick: (WallpaperTarget) -> Unit, onDismiss: () -> Unit) {
+internal fun TargetSheet(onPick: (WallpaperTarget) -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberBottomSheetState(SheetValue.Hidden, setOf(SheetValue.Hidden, SheetValue.Expanded))) {
         Column(modifier = Modifier.padding(bottom = 16.dp)) {
             SheetTitle(stringResource(R.string.connections_set_wallpaper))

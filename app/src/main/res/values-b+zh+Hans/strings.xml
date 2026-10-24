@@ -338,5 +338,25 @@
   <string name="shortcut_previous">上一张图片</string>
   <string name="shortcut_next">下一张图片</string>
   <string name="shortcut_back">返回，或关闭打开的内容</string>
+  <string name="connections_remix">重绘</string>
+  <string name="connections_remix_style">风格</string>
+  <string name="connections_remix_style_placeholder">水彩、霓虹、木刻…</string>
+  <string name="connections_remixing">正在重绘</string>
+  <string name="connections_remix_again">再次重绘</string>
+  <string name="connections_remix_paid">重绘包含在付费方案中。</string>
+  <string name="connections_see_plans">查看方案</string>
+  <string name="connections_remix_out_of_credits">此账户的积分已用完。</string>
+  <string name="connections_remix_declined">模型拒绝了这种风格，未扣费。</string>
+  <string name="connections_remix_paused">此账户暂时无法使用积分，未扣费。</string>
+  <string name="connections_remix_unavailable">暂时无法重绘，未扣费。</string>
+  <string name="connections_remix_failed">无法重绘，请重试。</string>
+  <string name="connections_remix_error">操作失败：%1$s</string>
+  <string name="connections_submit_to_gallery">提交到图库</string>
+  <string name="connections_submit_for_review">提交审核</string>
+  <string name="connections_submitted">已提交审核</string>
+  <string name="connections_field_title">标题</string>
+  <string name="connections_your_name">你的名字</string>
+  <string name="connections_credit_not_email">请填写名字，不要填写邮箱地址。</string>
+  <string name="connections_rights_confirm">这张图片是我制作的，任何人都可以免费下载。</string>
 </resources>
 
